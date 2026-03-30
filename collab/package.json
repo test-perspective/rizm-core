@@ -1,0 +1,10 @@
+{
+  "name": "keel-collab",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@hocuspocus/server": "^2.15.2",
+    "yjs": "^13.6.27",
+    "y-protocols": "^1.0.6"
+  }
+}
