@@ -23,7 +23,7 @@ vi.mock('../auth/api', () => ({
 }));
 
 vi.mock('@blocknote/react', () => ({
-  useCreateBlockNote: (options: Record<string, unknown>) => {
+  useCreateBlockNote: (_options: Record<string, unknown>) => {
     editorRef = {
       setTextCursorPosition: setTextCursorPositionMock,
       getTextCursorPosition: vi.fn(),

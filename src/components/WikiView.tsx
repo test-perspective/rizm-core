@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { WikiMoveDialog } from './wiki/WikiMoveDialog';
 import { WikiPageListPane } from './wiki/WikiPageListPane';
 import { WikiEditorPane } from './wiki/WikiEditorPane';
 import type { WikiCollabPersistPayload } from './wiki/wikiCollaboration';
@@ -15,6 +16,7 @@ import {
 export function WikiView({
   projectId,
   viewId,
+  projects = [],
   pages,
   selectedPageId,
   onSelectPage,
@@ -94,6 +96,8 @@ export function WikiView({
     wikiCreateRef,
   });
 
+  const [movePageId, setMovePageId] = useState<string | null>(null);
+
   const defaultWidth = getDefaultWidth();
   const initialWidth = projectId && viewId
     ? getPageListWidth(projectId, viewId) ?? defaultWidth
@@ -172,6 +176,9 @@ export function WikiView({
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
         entityById={entityById}
+        onMovePage={
+          collabEnabled && projects.length > 0 ? (id) => setMovePageId(id) : undefined
+        }
       />
       <div
         role="separator"
@@ -223,6 +230,17 @@ export function WikiView({
         onServerEntity={onServerEntity}
         pagesCount={pages.length}
       />
+      {movePageId && onRefreshProject && projects.length > 0 ? (
+        <WikiMoveDialog
+          open
+          onClose={() => setMovePageId(null)}
+          sourceProjectId={projectId}
+          pageId={movePageId}
+          pages={pages}
+          projects={projects}
+          onRefreshProject={onRefreshProject}
+        />
+      ) : null}
     </div>
   );
 }

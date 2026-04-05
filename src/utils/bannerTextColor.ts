@@ -26,6 +26,7 @@ export function parseCssColorRgb(input: string): [number, number, number] | null
   const t = input.trim();
   if (t.startsWith('#')) {
     const v = parseRgbFromHex(t);
+    if (!v) return null;
     if (v.some((n) => Number.isNaN(n))) return null;
     return v;
   }

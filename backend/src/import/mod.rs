@@ -6,7 +6,9 @@
 //! - Import execution (bulk task fetch and write to Rizm entities)
 
 mod adf;
-mod jira;
+pub mod jira;
+
+pub use adf::code_block_note;
 
 use crate::db::Db;
 use serde::{Deserialize, Serialize};

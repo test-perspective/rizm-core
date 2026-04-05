@@ -8,13 +8,15 @@ use crate::api::attachments_api::AttachmentMeta;
 use crate::db::Db;
 use crate::import::adf::{
     adf_to_blocknote_doc_with_context, classify_jira_description_value, jira_wiki_text_to_blocknote_doc,
-    AdfImportContext, JiraDescriptionKind,
+    maybe_reparse_blocknote_from_flat_markdown, maybe_reparse_blocknote_wrapped_markdown, AdfImportContext,
+    JiraDescriptionKind,
 };
 
 use super::attachment_import;
 use super::board;
 use super::client;
 use super::comments;
+use super::JIRA_ISSUE_PAGE_SIZE;
 use super::super::{ImportEngineError, ImportMappingConfig, ImportResult};
 use super::transform;
 
@@ -25,6 +27,40 @@ fn merge_field_ids_with_attachment(field_ids: &[String]) -> Vec<String> {
         out.push("attachment".to_string());
     }
     out
+}
+
+/// How often to persist import job progress (SQLite). Higher = faster bulk import; `1` = every issue (debug).
+fn jira_import_progress_flush_interval() -> i64 {
+    const DEFAULT: i64 = 20;
+    match std::env::var("KEEL_JIRA_IMPORT_PROGRESS_INTERVAL") {
+        Ok(s) => s.parse::<i64>().unwrap_or(DEFAULT).max(1),
+        Err(_) => DEFAULT,
+    }
+}
+
+fn jira_import_progress_should_flush(
+    partial_done: i64,
+    last_flushed_partial: i64,
+    total_issues: i64,
+    interval: i64,
+    end_of_fetched_page: bool,
+) -> bool {
+    if total_issues <= 0 {
+        return false;
+    }
+    if interval <= 1 {
+        return true;
+    }
+    if partial_done >= total_issues {
+        return true;
+    }
+    if last_flushed_partial == 0 {
+        return true;
+    }
+    if partial_done - last_flushed_partial >= interval {
+        return true;
+    }
+    end_of_fetched_page
 }
 
 pub async fn run_import(
@@ -97,6 +133,8 @@ pub async fn run_import(
     let mut total_issues: i64 = 0;
     let mut processed_count: i64 = 0;
     let mut board_order: i64 = 0;
+    let progress_flush_every = jira_import_progress_flush_interval();
+    let mut last_progress_flushed_partial: i64 = 0;
 
     let count_res = client::request(
         connection_config,
@@ -129,7 +167,7 @@ pub async fn run_import(
         } else {
             let mut body = serde_json::json!({
                 "jql": jql,
-                "maxResults": 50,
+                "maxResults": JIRA_ISSUE_PAGE_SIZE,
                 "fields": fields_json,
             });
             if let Some(ref token) = next_page_token {
@@ -163,7 +201,30 @@ pub async fn run_import(
             break;
         }
 
-        for issue in &issues {
+        for (idx, issue) in issues.iter().enumerate() {
+            let partial_done = processed_count + (idx as i64) + 1;
+            let end_of_page = (idx + 1) == issues_len;
+            if let Some(jid) = job_id {
+                if total_issues > 0
+                    && jira_import_progress_should_flush(
+                        partial_done,
+                        last_progress_flushed_partial,
+                        total_issues,
+                        progress_flush_every,
+                        end_of_page,
+                    )
+                {
+                    let p = ((partial_done as f64 / total_issues as f64) * 100.0).min(99.0) as i64;
+                    let _ = db.set_import_job_progress_detailed(
+                        jid,
+                        p,
+                        partial_done,
+                        Some(total_issues),
+                    );
+                    last_progress_flushed_partial = partial_done;
+                }
+            }
+
             let external_id = issue
                 .get("id")
                 .map(|v| {
@@ -329,7 +390,12 @@ pub async fn run_import(
                             jira_wiki_text_to_blocknote_doc(s, &adf_ctx)
                         }
                         None => None,
-                    };
+                    }
+                    .map(|doc| {
+                        maybe_reparse_blocknote_wrapped_markdown(&doc, Some(&adf_ctx))
+                            .or_else(|| maybe_reparse_blocknote_from_flat_markdown(&doc, Some(&adf_ctx)))
+                            .unwrap_or(doc)
+                    });
 
                     let comments = if let Some(ref issue_key) = key {
                         comments::fetch_comments(db, connection_config, issue_key, Some(&adf_ctx)).await
@@ -372,20 +438,6 @@ pub async fn run_import(
         }
 
         processed_count += issues_len as i64;
-        let total = total_issues;
-        let percent = if total > 0 {
-            ((processed_count as f64 / total as f64) * 100.0).min(99.0) as i64
-        } else {
-            0
-        };
-        if let Some(jid) = job_id {
-            let _ = db.set_import_job_progress_detailed(
-                jid,
-                percent,
-                processed_count,
-                if total > 0 { Some(total) } else { None },
-            );
-        }
         if issues_len == 0 || !has_more {
             break;
         }
@@ -396,4 +448,38 @@ pub async fn run_import(
         skipped_count: skipped,
         error_count: errors,
     })
+}
+
+#[cfg(test)]
+mod progress_flush_tests {
+    use super::jira_import_progress_should_flush;
+
+    #[test]
+    fn flush_interval_one_always_when_total_positive() {
+        assert!(jira_import_progress_should_flush(1, 0, 10, 1, false));
+        assert!(jira_import_progress_should_flush(5, 4, 10, 1, false));
+    }
+
+    #[test]
+    fn flush_first_and_every_interval() {
+        assert!(jira_import_progress_should_flush(1, 0, 100, 25, false));
+        assert!(!jira_import_progress_should_flush(10, 1, 100, 25, false));
+        assert!(jira_import_progress_should_flush(26, 1, 100, 25, false));
+    }
+
+    #[test]
+    fn flush_end_of_page_even_if_below_interval() {
+        assert!(!jira_import_progress_should_flush(99, 76, 1000, 25, false));
+        assert!(jira_import_progress_should_flush(100, 76, 1000, 25, true));
+    }
+
+    #[test]
+    fn flush_when_reached_total() {
+        assert!(jira_import_progress_should_flush(1000, 990, 1000, 25, false));
+    }
+
+    #[test]
+    fn no_flush_when_total_unknown() {
+        assert!(!jira_import_progress_should_flush(1, 0, 0, 25, true));
+    }
 }

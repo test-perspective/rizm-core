@@ -25,4 +25,8 @@ export interface EntityDetailPanelProps {
   onEntityClick?: (entity: Entity) => void;
   usersById?: Record<string, UserSummary>;
   onResolveUsers?: (userIds: string[]) => void;
+  /** Optional: navigate to previous issue in the current table page / board lane (ArrowLeft). */
+  onNavigateDetailPrev?: () => void;
+  /** Optional: navigate to next issue in the current table page / board lane (ArrowRight). */
+  onNavigateDetailNext?: () => void;
 }

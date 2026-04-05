@@ -150,6 +150,26 @@ describe('buildColumns', () => {
       expect(el.type).toBe('span');
       expect(el.props.className).toContain('text-zinc-500');
     });
+
+    it('defines sortComparator that orders by project key then numeric sequence', () => {
+      const cols = buildColumns({
+        orderedProps,
+        savedWidths: {},
+        savedColumnOrder: null,
+        view: baseView,
+        allEntities: [],
+        usersById: {},
+        onUpsertPropertyOption: vi.fn(),
+      });
+      const taskKeyCol = cols.find((c) => c.field === 'taskKey');
+      expect(taskKeyCol).toBeDefined();
+      expect(taskKeyCol!.sortComparator).toBeDefined();
+
+      const cmp = taskKeyCol!.sortComparator as (a: unknown, b: unknown) => number;
+      expect(cmp('REQ-2', 'REQ-10')).toBeLessThan(0);
+      expect(cmp('AAA-9', 'BBB-1')).toBeLessThan(0);
+      expect(cmp('', 'REQ-1')).toBeGreaterThan(0);
+    });
   });
 
   describe('labels column clipboard parsing/formatting', () => {

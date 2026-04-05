@@ -108,7 +108,9 @@ export function CreateBranchDialog({
       const res = await createBitbucketBranch(projectId, bitbucketName, baseBranch.trim());
       const persisted = await onCreated(res);
       if (persisted === false) {
-        setError('Branch was created, but failed to update the card. Please reload and try again.');
+        setError(
+          'The branch was created in Bitbucket, but updating the card failed. Please reload and try again.'
+        );
         return;
       }
       setCreated({ name: res.name, url: res.url, baseBranch: baseBranch.trim() });

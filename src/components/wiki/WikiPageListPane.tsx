@@ -40,6 +40,7 @@ type WikiPageListPaneProps = {
   onCreateChildFolder: (parentId: string) => void;
   onDeletePage: (id: string) => void;
   onRename: (pageId: string, currentTitle: string) => void | Promise<void>;
+  onMovePage?: (id: string) => void;
   pageListContainerRef: React.RefObject<HTMLDivElement>;
   activeId: string | null;
   onDragStart: (event: DragStartEvent) => void;
@@ -94,6 +95,7 @@ export function WikiPageListPane({
   onCreateChildFolder,
   onDeletePage,
   onRename,
+  onMovePage,
   pageListContainerRef,
   activeId,
   onDragStart,
@@ -104,6 +106,7 @@ export function WikiPageListPane({
 }: WikiPageListPaneProps) {
   const [headerMenuAnchor, setHeaderMenuAnchor] = useState<HTMLElement | null>(null);
   const canDnD = canEdit && query.trim() === '';
+  const canEditMenu = canEdit;
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
@@ -220,7 +223,9 @@ export function WikiPageListPane({
                     onCreateChildFolder={onCreateChildFolder}
                     onDelete={onDeletePage}
                     onRename={onRename}
-                    canEdit={canDnD}
+                    canDrag={canDnD}
+                    canEditMenu={canEditMenu}
+                    onMove={onMovePage}
                       displayTitle={displayTitle}
                     />
                     {index < treeRows.length - 1 && (

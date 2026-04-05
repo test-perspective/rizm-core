@@ -29,9 +29,10 @@ pub async fn fetch_backlog_issue_keys(
     let mut start_at: i64 = 0;
     loop {
         let path = format!(
-            "{}/board/{}/backlog?maxResults=50&startAt={}",
+            "{}/board/{}/backlog?maxResults={}&startAt={}",
             client::jira_agile_path(),
             urlencoding::encode(board_id),
+            super::JIRA_ISSUE_PAGE_SIZE,
             start_at
         );
         let res = match client::request(config, "GET", &path, None).await {
@@ -72,10 +73,11 @@ pub async fn fetch_board_issues_page(
         .collect::<Vec<_>>()
         .join(",");
     let path = format!(
-        "{}/board/{}/issue?jql={}&maxResults=50&startAt={}&fields={}",
+        "{}/board/{}/issue?jql={}&maxResults={}&startAt={}&fields={}",
         client::jira_agile_path(),
         urlencoding::encode(board_id),
         urlencoding::encode(jql),
+        super::JIRA_ISSUE_PAGE_SIZE,
         start_at,
         fields_param
     );

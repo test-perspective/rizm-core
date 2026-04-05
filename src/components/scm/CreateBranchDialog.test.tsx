@@ -68,7 +68,9 @@ describe('CreateBranchDialog', () => {
 
     expect(onCreated).toHaveBeenCalledTimes(1);
     expect(onClose).not.toHaveBeenCalled();
-    expect(document.body.textContent).toContain('Branch was created, but failed to update the card. Please reload and try again.');
+    expect(document.body.textContent).toContain(
+      'The branch was created in Bitbucket, but updating the card failed. Please reload and try again.'
+    );
 
     act(() => {
       root.unmount();

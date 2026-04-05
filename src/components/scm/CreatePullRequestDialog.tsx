@@ -73,7 +73,9 @@ export function CreatePullRequestDialog({
         destinationBranch: destinationBranch.trim(),
       });
       if (persisted === false) {
-        setError('Pull request was created, but failed to update the card. Please reload and try again.');
+        setError(
+          'The pull request was created in Bitbucket, but updating the card failed. Please reload and try again.'
+        );
         return;
       }
       onClose();

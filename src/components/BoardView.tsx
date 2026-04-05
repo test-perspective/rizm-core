@@ -4,16 +4,17 @@ import { Entity, ViewConfig, PropertyDefinition, UserSummary, ScmProjectConfig }
 import {
   DndContext,
   DragOverlay,
-  closestCorners,
 } from '@dnd-kit/core';
 import {
   SortableContext,
   horizontalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CardContent } from './board/BoardCard';
+import { BoardColumnDragPreview } from './board/BoardColumnDragPreview';
 import { SortableBoardColumn } from './board/SortableBoardColumn';
 import { getVisibleBoardColumns } from '../utils/boardColumns';
 import { extractTaskIds } from './board/boardDividers';
+import { createBoardCollisionDetection } from './board/boardCollisionDetection';
 import { fetchBitbucketOAuthStatus, fetchProjectScmConfig } from '../api/scm';
 import { useBoardViewDnd } from './board/useBoardViewDnd';
 
@@ -31,6 +32,9 @@ interface BoardViewProps {
   onRenameBoardColumn?: (from: string, to: string) => void | Promise<void>;
   /** Full-board loading overlay while a column rename is in progress */
   columnRenameInProgress?: boolean;
+  /** When set, report task order in that entity's lane for detail panel keyboard navigation. */
+  openDetailEntityId?: string | null;
+  onBoardLaneEntityOrderForDetailChange?: (taskIdsInLane: string[]) => void;
 }
 
 export const BoardView = ({
@@ -46,6 +50,8 @@ export const BoardView = ({
   usersById = {},
   onRenameBoardColumn,
   columnRenameInProgress = false,
+  openDetailEntityId = null,
+  onBoardLaneEntityOrderForDetailChange,
 }: BoardViewProps) => {
   const groupByProp = useMemo(
     () => (view.groupBy ? properties.find((p) => p.name === view.groupBy) : undefined),
@@ -109,6 +115,7 @@ export const BoardView = ({
     activeEntity,
     activeDivider,
     activeColumnId,
+    displayColumns,
     sensors,
     handleDragStart,
     handleDragOver,
@@ -122,12 +129,40 @@ export const BoardView = ({
     onViewConfigUpdate,
   });
 
+  useEffect(() => {
+    if (!onBoardLaneEntityOrderForDetailChange) return;
+    if (!openDetailEntityId || !view.groupBy) {
+      onBoardLaneEntityOrderForDetailChange([]);
+      return;
+    }
+    const openEntity = entities.find((e) => e.id === openDetailEntityId);
+    if (!openEntity) {
+      onBoardLaneEntityOrderForDetailChange([]);
+      return;
+    }
+    const columnId = openEntity.properties[view.groupBy];
+    const colKey = columnId == null || columnId === '' ? '' : String(columnId);
+    const items = itemsByColumn[colKey] ?? [];
+    onBoardLaneEntityOrderForDetailChange(extractTaskIds(items));
+  }, [
+    entities,
+    itemsByColumn,
+    openDetailEntityId,
+    onBoardLaneEntityOrderForDetailChange,
+    view.groupBy,
+  ]);
+
+  const collisionDetectionStrategy = useCallback(
+    createBoardCollisionDetection(displayColumns),
+    [displayColumns]
+  );
+
   if (!hasValidGroupBy) return null;
 
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCorners}
+      collisionDetection={collisionDetectionStrategy}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
@@ -140,9 +175,9 @@ export const BoardView = ({
           ].join(' ')}
           aria-busy={columnRenameInProgress}
         >
-          <SortableContext items={columns} strategy={horizontalListSortingStrategy}>
+          <SortableContext items={displayColumns} strategy={horizontalListSortingStrategy}>
             <div className={isSingleColumn ? 'flex gap-4' : 'flex gap-4 min-w-max'}>
-              {columns.map((column) => (
+              {displayColumns.map((column) => (
                 <SortableBoardColumn
                   key={column}
                   columnId={column}
@@ -205,9 +240,17 @@ export const BoardView = ({
             </div>
           </div>
         ) : activeColumnId ? (
-          <div className="w-80 bg-zinc-950 border border-zinc-800 rounded-lg p-4 shadow-lg">
-            <div className="font-semibold text-white">{activeColumnId}</div>
-          </div>
+          <BoardColumnDragPreview
+            columnTitle={activeColumnId}
+            taskCount={extractTaskIds(itemsByColumn[activeColumnId] ?? []).length}
+            items={itemsByColumn[activeColumnId] ?? []}
+            entityById={entityById}
+            visibleProps={visibleProps}
+            allEntities={allEntities}
+            usersById={usersById}
+            isSingleColumn={isSingleColumn}
+            boardDividers={view.boardDividers ?? []}
+          />
         ) : null}
       </DragOverlay>
     </DndContext>

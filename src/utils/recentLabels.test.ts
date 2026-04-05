@@ -3,6 +3,7 @@ import {
   buildLabelOptionsWithRecent,
   DEFAULT_RECENT_LABELS_PINNED_COUNT,
   getRecentLabels,
+  labelAutocompletePassthroughFilterOptions,
   recordRecentLabels,
 } from './recentLabels';
 
@@ -47,6 +48,46 @@ describe('recentLabels', () => {
     });
 
     expect(result).toEqual(['build', 'backend', 'beta6']);
+  });
+
+  it('filters Japanese label options by substring (REQ-243)', () => {
+    const result = buildLabelOptionsWithRecent({
+      entityTypeId: 'task',
+      propName: 'labels',
+      options: ['障害対応', '設計', '要確認'],
+      inputValue: '障',
+      maxOptionsDisplay: 5,
+    });
+    expect(result).toEqual(['障害対応']);
+  });
+
+  it('trims input when filtering so trailing spaces still match (REQ-243)', () => {
+    const result = buildLabelOptionsWithRecent({
+      entityTypeId: 'task',
+      propName: 'labels',
+      options: ['backend', 'frontend'],
+      inputValue: 'back ',
+      maxOptionsDisplay: 5,
+    });
+    expect(result).toEqual(['backend']);
+  });
+
+  it('matches labels when query and option differ only by Unicode normalization (NFC)', () => {
+    const nfc = '\u304c\u304d'; // がき
+    const queryNfd = '\u304b\u3099\u304d'; // が + き (が as ka + combining dakuten)
+    const result = buildLabelOptionsWithRecent({
+      entityTypeId: 'task',
+      propName: 'labels',
+      options: [nfc, 'other'],
+      inputValue: queryNfd,
+      maxOptionsDisplay: 5,
+    });
+    expect(result).toEqual([nfc]);
+  });
+
+  it('labelAutocompletePassthroughFilterOptions returns options unchanged for MUI Autocomplete', () => {
+    const opts = ['a', 'b'];
+    expect(labelAutocompletePassthroughFilterOptions(opts)).toBe(opts);
   });
 
   it('keeps only up to 20 recent labels', () => {

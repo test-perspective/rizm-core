@@ -2,6 +2,7 @@ import type { PartialBlock } from '@blocknote/core';
 import { BlockNoteSchema, defaultInlineContentSpecs } from '@blocknote/core';
 import { createReactInlineContentSpec } from '@blocknote/react';
 import type { Entity } from '../../types';
+import { sanitizeBlockNoteBlocksForEditor } from '../../utils/sanitizeBlockNoteForEditor';
 import { getBackendUrl, isBackendEnabled } from '../../utils/storage';
 import { createStatusInlineSpec } from './StatusInline';
 
@@ -52,13 +53,18 @@ export async function replaceTransientImageUrlsInHtml(
 
 export const parseDoc = (raw: unknown): PartialBlock[] | undefined => {
   if (raw === null || raw === undefined) return undefined;
-  if (Array.isArray(raw)) return raw as PartialBlock[];
+  if (Array.isArray(raw)) {
+    const fixed = sanitizeBlockNoteBlocksForEditor(raw);
+    return (fixed ?? raw) as PartialBlock[];
+  }
   if (typeof raw !== 'string') return undefined;
   const trimmed = raw.trim();
   if (!trimmed) return undefined;
   try {
     const parsed = JSON.parse(trimmed);
-    return Array.isArray(parsed) ? (parsed as PartialBlock[]) : undefined;
+    if (!Array.isArray(parsed)) return undefined;
+    const fixed = sanitizeBlockNoteBlocksForEditor(parsed);
+    return (fixed ?? parsed) as PartialBlock[];
   } catch {
     return undefined;
   }

@@ -17,6 +17,7 @@ import {
   parseDoc,
   resolveRelativeApiUrlsInBlockNoteBlocks,
 } from './richText/richTextEditorHelpers';
+import { applyHexRgbTextColorFromDataValue } from './richText/applyCustomTextColorMarks';
 import { StableFormattingToolbarController } from './richText/StableFormattingToolbarController';
 import { StatusDialog } from './richText/StatusDialog';
 import { StatusEditContext } from './richText/StatusEditContext';
@@ -43,8 +44,8 @@ export function RichTextEditor({
   // BlockNote rejects empty arrays; use a default paragraph block when doc is [].
   const initialContent = useMemo(() => {
     if (collaboration) return undefined;
-    const parsed = parseDoc(value);
-    const withUrls = resolveRelativeApiUrlsInBlockNoteBlocks(parsed);
+    const blocks = parseDoc(value);
+    const withUrls = resolveRelativeApiUrlsInBlockNoteBlocks(blocks);
     if (withUrls && Array.isArray(withUrls) && withUrls.length === 0) {
       return [{ type: 'paragraph', content: [] }] as PartialBlock[];
     }
@@ -164,6 +165,23 @@ export function RichTextEditor({
   );
 
   const editor: any = useCreateBlockNote(createBlockNoteOptions);
+
+  useEffect(() => {
+    const root = containerRef.current;
+    if (!root || !editor) return;
+    const run = () => applyHexRgbTextColorFromDataValue(root);
+    run();
+    const obs = new MutationObserver(() => {
+      queueMicrotask(run);
+    });
+    obs.observe(root, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ['data-value', 'data-style-type'],
+    });
+    return () => obs.disconnect();
+  }, [editor, value]);
 
   useEffect(() => {
     if (getDocRef && editor) {

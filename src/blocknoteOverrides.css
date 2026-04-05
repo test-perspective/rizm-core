@@ -1,3 +1,13 @@
+/* Hex / rgb() textColor: BlockNote only defines preset names in its CSS; typed attr() helps where supported. */
+@supports (color: attr(data-value type(<color>))) {
+  .bn-container [data-style-type='textColor'][data-value^='#'] {
+    color: attr(data-value type(<color>));
+  }
+  .bn-container [data-style-type='textColor'][data-value^='rgb('] {
+    color: attr(data-value type(<color>));
+  }
+}
+
 .bn-container[data-color-scheme='dark'] {
   --bn-colors-menu-background: rgb(24 24 27);
   --bn-colors-menu-text: rgb(228 228 231);

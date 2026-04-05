@@ -1,5 +1,12 @@
 import { ApiError, apiJson, apiFetch } from '../auth/api';
-import type { Project, ProjectsIndexResponse, ProjectStateResponse, WikiPageMeta, WikiPageResponse } from '../types';
+import type {
+  MoveWikiPageResponse,
+  Project,
+  ProjectsIndexResponse,
+  ProjectStateResponse,
+  WikiPageMeta,
+  WikiPageResponse,
+} from '../types';
 
 export async function fetchProjectsIndex(): Promise<ProjectsIndexResponse> {
   return await apiJson<ProjectsIndexResponse>('/api/projects');
@@ -62,6 +69,30 @@ export async function saveWikiCollabState(
 export async function fetchWikiPages(projectId: string): Promise<WikiPageMeta[]> {
   return await apiJson<WikiPageMeta[]>(
     `/api/projects/${encodeURIComponent(projectId)}/wiki/pages`
+  );
+}
+
+export async function moveWikiPage(
+  projectId: string,
+  pageId: string,
+  body: {
+    destinationProjectId: string;
+    destinationParentId?: string | null;
+    beforePageId?: string | null;
+  }
+): Promise<MoveWikiPageResponse> {
+  const payload: Record<string, unknown> = {
+    destinationProjectId: body.destinationProjectId,
+    destinationParentId: body.destinationParentId ?? null,
+    beforePageId: body.beforePageId ?? null,
+  };
+  return await apiJson<MoveWikiPageResponse>(
+    `/api/projects/${encodeURIComponent(projectId)}/wiki/pages/${encodeURIComponent(pageId)}/move`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
   );
 }
 

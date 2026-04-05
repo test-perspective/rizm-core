@@ -1,11 +1,25 @@
 //! HTTP client for Jira Cloud REST API.
 
+use std::time::Duration;
+
 use serde_json::Value;
 
 use super::super::ImportEngineError;
 
 const JIRA_API_PATH: &str = "/rest/api/3";
 const JIRA_AGILE_PATH: &str = "/rest/agile/1.0";
+
+/// Per-request ceiling so a stalled Jira call cannot block an import job indefinitely.
+const JIRA_HTTP_TIMEOUT: Duration = Duration::from_secs(120);
+const JIRA_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+
+fn build_http_client() -> Result<reqwest::Client, ImportEngineError> {
+    reqwest::Client::builder()
+        .connect_timeout(JIRA_CONNECT_TIMEOUT)
+        .timeout(JIRA_HTTP_TIMEOUT)
+        .build()
+        .map_err(|e| ImportEngineError::Internal(e.to_string()))
+}
 
 pub fn base_url(config: &Value) -> Result<String, ImportEngineError> {
     let url = config
@@ -62,9 +76,7 @@ pub async fn request(
         path
     );
 
-    let client = reqwest::Client::builder()
-        .build()
-        .map_err(|e| ImportEngineError::Internal(e.to_string()))?;
+    let client = build_http_client()?;
 
     let mut req = match method {
         "GET" => client.get(&url),
@@ -114,9 +126,7 @@ pub async fn request_bytes(config: &Value, path: &str) -> Result<Vec<u8>, Import
         path
     );
 
-    let client = reqwest::Client::builder()
-        .build()
-        .map_err(|e| ImportEngineError::Internal(e.to_string()))?;
+    let client = build_http_client()?;
 
     let res = client
         .get(&url)

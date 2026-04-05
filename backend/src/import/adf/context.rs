@@ -16,6 +16,16 @@ pub struct AdfImportContext {
 }
 
 impl AdfImportContext {
+    /// Empty context for plain-text / backfill paths where Jira attachment resolution is unavailable.
+    pub fn empty() -> Self {
+        Self {
+            project_id: String::new(),
+            entity_pk: String::new(),
+            jira_to_rizm: HashMap::new(),
+            rizm_meta_by_id: HashMap::new(),
+        }
+    }
+
     pub fn attachment_url(&self, rizm_id: &str) -> String {
         format!(
             "/api/projects/{}/entities/{}/attachments/{}",

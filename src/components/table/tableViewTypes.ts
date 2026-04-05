@@ -14,6 +14,8 @@ export interface TableViewProps {
   usersById?: Record<string, UserSummary>;
   onResolveUsers?: (userIds: string[]) => void;
   onReload?: () => void | Promise<unknown>;
+  /** Sorted entity ids on the current table page (for detail panel keyboard navigation). */
+  onTablePageEntityOrderChange?: (entityIdsOnPage: string[]) => void;
 }
 
 export const builtinFieldMap: Record<'createdAt' | 'updatedAt' | 'id', keyof TableRow> = {

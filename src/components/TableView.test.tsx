@@ -59,6 +59,43 @@ describe('TableView', () => {
     localStorage.clear();
   });
 
+  it('passes onStateChange when onTablePageEntityOrderChange is provided', async () => {
+    const onTablePageEntityOrderChange = vi.fn();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <TableView
+          entities={entities}
+          view={baseView}
+          properties={properties}
+          onEntityUpdate={() => {}}
+          onUpsertPropertyOption={() => {}}
+          projectId="p1"
+          projectKey="REQ"
+          onTablePageEntityOrderChange={onTablePageEntityOrderChange}
+        />
+      );
+    });
+
+    expect(typeof capturedDataGridProps.onStateChange).toBe('function');
+
+    act(() => {
+      (capturedDataGridProps.onStateChange as () => void)?.();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(onTablePageEntityOrderChange).toHaveBeenCalled();
+
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
   it('passes cell-copy props to DataGridPremium: rowSelection=false, cellSelection, disableRowSelectionOnClick', async () => {
     const container = document.createElement('div');
     document.body.appendChild(container);

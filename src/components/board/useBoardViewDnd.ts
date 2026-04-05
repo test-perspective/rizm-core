@@ -26,6 +26,31 @@ type UseBoardViewDndParams = {
   onViewConfigUpdate?: (view: ViewConfig) => void;
 };
 
+function areSameOrder(left: string[], right: string[]) {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function mergeVisibleColumnsIntoOrdered(
+  orderedColumns: string[],
+  visibleColumns: string[],
+  displayColumns: string[]
+) {
+  const visibleSet = new Set(visibleColumns);
+  const displaySet = new Set(displayColumns);
+  if (
+    visibleColumns.length !== displayColumns.length ||
+    visibleColumns.some((column) => !displaySet.has(column))
+  ) {
+    return orderedColumns;
+  }
+
+  const nextVisibleQueue = [...displayColumns];
+  return orderedColumns.map((column) => {
+    if (!visibleSet.has(column)) return column;
+    return nextVisibleQueue.shift() ?? column;
+  });
+}
+
 export function useBoardViewDnd(params: UseBoardViewDndParams) {
   const { columns, orderedColumns, entities, view, onEntityUpdate, onViewConfigUpdate } = params;
 
@@ -64,11 +89,15 @@ export function useBoardViewDnd(params: UseBoardViewDndParams) {
   }, [columns, entities, view.groupBy, view.boardDividers, entityById]);
 
   const [itemsByColumn, setItemsByColumn] = useState<Record<string, string[]>>(initialItemsByColumn);
+  const [displayColumns, setDisplayColumns] = useState<string[]>(columns);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeColumnId, setActiveColumnId] = useState<string | null>(null);
   const itemsByColumnRef = useRef<Record<string, string[]>>(initialItemsByColumn);
+  const displayColumnsRef = useRef<string[]>(columns);
+  const activeColumnIdRef = useRef<string | null>(null);
   const dragOriginColumnRef = useRef<string | null>(null);
   const isDividerDragInProgressRef = useRef(false);
+  const hasPendingColumnPreviewRef = useRef(false);
   const dividerPrevTaskRef = useRef<Map<string, string | undefined>>(new Map());
 
   useEffect(() => {
@@ -86,6 +115,18 @@ export function useBoardViewDnd(params: UseBoardViewDndParams) {
     }
   }, [view.boardDividers, initialItemsByColumn]);
 
+  useEffect(() => {
+    if (activeColumnId) return;
+    if (hasPendingColumnPreviewRef.current) {
+      if (areSameOrder(columns, displayColumnsRef.current)) {
+        hasPendingColumnPreviewRef.current = false;
+      }
+      return;
+    }
+    setDisplayColumns(columns);
+    displayColumnsRef.current = columns;
+  }, [columns, activeColumnId]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -94,11 +135,16 @@ export function useBoardViewDnd(params: UseBoardViewDndParams) {
   const handleDragStart = (event: DragStartEvent) => {
     const id = String(event.active.id);
     if (orderedColumns.includes(id)) {
+      setDisplayColumns(columns);
+      displayColumnsRef.current = columns;
+      hasPendingColumnPreviewRef.current = false;
+      activeColumnIdRef.current = id;
       setActiveColumnId(id);
       setActiveId(null);
       return;
     }
     setActiveId(id);
+    activeColumnIdRef.current = null;
     setActiveColumnId(null);
     dragOriginColumnRef.current = findContainerId(id, itemsByColumnRef.current);
     if (isDividerId(id)) return;
@@ -121,6 +167,23 @@ export function useBoardViewDnd(params: UseBoardViewDndParams) {
     if (!over) return;
     const activeItemId = String(active.id);
     const overId = String(over.id);
+
+    if (activeColumnIdRef.current && orderedColumns.includes(activeItemId)) {
+      const overColumnId = orderedColumns.includes(overId)
+        ? overId
+        : findContainerId(overId, itemsByColumnRef.current);
+      if (!overColumnId || !displayColumnsRef.current.includes(overColumnId)) return;
+      setDisplayColumns((prev) => {
+        const oldIndex = prev.indexOf(activeItemId);
+        const newIndex = prev.indexOf(overColumnId);
+        if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return prev;
+        const next = arrayMove(prev, oldIndex, newIndex);
+        displayColumnsRef.current = next;
+        hasPendingColumnPreviewRef.current = true;
+        return next;
+      });
+      return;
+    }
 
     setItemsByColumn((prev) => {
       const activeCol = findContainerId(activeItemId, prev);
@@ -164,21 +227,34 @@ export function useBoardViewDnd(params: UseBoardViewDndParams) {
     const activeId = String(active.id);
     const overId = over ? String(over.id) : null;
 
-    if (activeColumnId && orderedColumns.includes(activeId)) {
+    if (activeColumnIdRef.current && orderedColumns.includes(activeId)) {
+      const nextOrderedColumns = mergeVisibleColumnsIntoOrdered(
+        orderedColumns,
+        columns,
+        displayColumnsRef.current
+      );
       const overColumnId = (() => {
         if (!overId) return null;
         if (orderedColumns.includes(overId)) return overId;
         return findContainerId(overId, itemsByColumnRef.current);
       })();
-      if (!overColumnId || !orderedColumns.includes(overColumnId)) {
+      if (!overColumnId && areSameOrder(nextOrderedColumns, orderedColumns)) {
+        setDisplayColumns(columns);
+        displayColumnsRef.current = columns;
+        hasPendingColumnPreviewRef.current = false;
+        activeColumnIdRef.current = null;
         setActiveColumnId(null);
         return;
       }
-      const oldIndex = orderedColumns.indexOf(activeId);
-      const newIndex = orderedColumns.indexOf(overColumnId);
-      if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex && onViewConfigUpdate) {
-        onViewConfigUpdate({ ...view, columnOrder: arrayMove(orderedColumns, oldIndex, newIndex) });
+      if (!areSameOrder(nextOrderedColumns, orderedColumns) && onViewConfigUpdate) {
+        onViewConfigUpdate({ ...view, columnOrder: nextOrderedColumns });
+        hasPendingColumnPreviewRef.current = true;
+      } else {
+        setDisplayColumns(columns);
+        displayColumnsRef.current = columns;
+        hasPendingColumnPreviewRef.current = false;
       }
+      activeColumnIdRef.current = null;
       setActiveColumnId(null);
       return;
     }
@@ -262,6 +338,7 @@ export function useBoardViewDnd(params: UseBoardViewDndParams) {
     activeEntity,
     activeDivider,
     activeColumnId,
+    displayColumns,
     sensors,
     handleDragStart,
     handleDragOver,

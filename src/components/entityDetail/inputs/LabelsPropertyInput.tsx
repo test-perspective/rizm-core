@@ -2,7 +2,11 @@ import { useMemo, useState } from 'react';
 import { Autocomplete, TextField } from '@mui/material';
 import type { PropertyDefinition } from '../../../types';
 import { TagPill } from '../../common/TagPill';
-import { buildLabelOptionsWithRecent, recordRecentLabels } from '../../../utils/recentLabels';
+import {
+  buildLabelOptionsWithRecent,
+  labelAutocompletePassthroughFilterOptions,
+  recordRecentLabels,
+} from '../../../utils/recentLabels';
 
 type LabelsPropertyInputProps = {
   value: any;
@@ -63,6 +67,7 @@ export const LabelsPropertyInput = ({
       inputValue={inputValue}
       onInputChange={(_event, nextValue) => setInputValue(nextValue)}
       options={displayOptions}
+      filterOptions={labelAutocompletePassthroughFilterOptions}
       filterSelectedOptions
       renderTags={(value, getTagProps) =>
         value.map((option, index) => {

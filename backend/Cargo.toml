@@ -1,6 +1,6 @@
 [package]
 name = "keel-backend"
-version = "0.12.0"
+version = "0.13.0"
 edition = "2021"
 
 [lib]
@@ -18,6 +18,10 @@ path = "src/bin/keel_seed_demo.rs"
 [[bin]]
 name = "keel_delete_project"
 path = "src/bin/keel_delete_project.rs"
+
+[[bin]]
+name = "keel_backfill_jira_markdown"
+path = "src/bin/keel_backfill_jira_markdown.rs"
 
 [dependencies]
 anyhow = "1.0"

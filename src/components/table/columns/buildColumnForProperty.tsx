@@ -21,6 +21,7 @@ import {
   isEmptyLabelToken,
   EMPTY_LABEL_GROUP_VALUE,
 } from './buildColumnsLabelsUtils';
+import { compareTaskKeyForSort } from './taskKeySort';
 
 export type BuildColumnForPropertyArgs = {
   prop: PropertyDefinition;
@@ -83,6 +84,7 @@ export function buildColumnForProperty(args: BuildColumnForPropertyArgs): GridCo
       flex: 0,
       editable: false,
       type: 'string',
+      sortComparator: (v1, v2) => compareTaskKeyForSort(v1, v2),
       renderCell: (params: GridRenderCellParams<TableRow, unknown>) => {
         const v = params.value;
         if (v === null || v === undefined || v === '') return <span className="text-zinc-500">—</span>;

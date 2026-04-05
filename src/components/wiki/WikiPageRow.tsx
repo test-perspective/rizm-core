@@ -1,6 +1,17 @@
 import { useCallback, useState } from 'react';
 import type { Entity } from '../../types';
-import { ChevronDown, ChevronRight, FilePlus, FileText, Folder, FolderPlus, MoreVertical, Pencil, Trash2 } from 'lucide-react';
+import {
+  ArrowRightLeft,
+  ChevronDown,
+  ChevronRight,
+  FilePlus,
+  FileText,
+  Folder,
+  FolderPlus,
+  MoreVertical,
+  Pencil,
+  Trash2,
+} from 'lucide-react';
 import { Menu, MenuItem } from '@mui/material';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { buildInsideDropId } from './wikiDndTarget';
@@ -20,7 +31,11 @@ type WikiPageRowProps = {
   onCreateChildFolder: (parentId: string) => void;
   onDelete: (id: string) => void;
   onRename: (pageId: string, currentTitle: string) => void | Promise<void>;
-  canEdit: boolean;
+  /** When true, row is draggable and accepts drops (DnD). */
+  canDrag: boolean;
+  /** When true, row menu (rename, create, delete, move) is available. */
+  canEditMenu: boolean;
+  onMove?: (id: string) => void;
   displayTitle: string;
 };
 
@@ -37,17 +52,19 @@ export function WikiPageRow({
   onCreateChildFolder,
   onDelete,
   onRename,
-  canEdit,
+  canDrag,
+  canEditMenu,
+  onMove,
   displayTitle,
 }: WikiPageRowProps) {
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const { attributes, listeners, setNodeRef: setDraggableRef, isDragging } = useDraggable({
     id: page.id,
-    disabled: !canEdit,
+    disabled: !canDrag,
   });
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({
     id: buildInsideDropId(page.id),
-    disabled: !canEdit,
+    disabled: !canDrag,
   });
 
   const setRef = useCallback(
@@ -76,13 +93,13 @@ export function WikiPageRow({
       ref={setRef}
       data-page-id={page.id}
       style={style}
-      {...(canEdit ? { ...attributes, ...listeners } : {})}
+      {...(canDrag ? { ...attributes, ...listeners } : {})}
       className={`group w-full flex items-center gap-2 px-3 py-1 rounded-md transition-colors ${
         isActive ? 'bg-zinc-800 text-white' : 'text-zinc-300 hover:bg-zinc-900'
-      } ${isDragging ? 'z-50' : ''} ${canEdit ? 'cursor-grab active:cursor-grabbing' : ''} ${
+      } ${isDragging ? 'z-50' : ''} ${canDrag ? 'cursor-grab active:cursor-grabbing' : ''} ${
         isOver ? 'ring-2 ring-violet-500 ring-inset' : ''
       }`}
-      title={canEdit ? 'Drag to move' : undefined}
+      title={canDrag ? 'Drag to move' : undefined}
     >
       {hasChildren ? (
         <button
@@ -126,7 +143,7 @@ export function WikiPageRow({
           e.stopPropagation();
           setMenuAnchor(e.currentTarget);
         }}
-        disabled={!canEdit}
+        disabled={!canEditMenu}
         className="shrink-0 p-2 text-zinc-500 hover:text-zinc-400 hover:bg-zinc-950 disabled:text-zinc-700 rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
         title="Menu"
         aria-label="Row menu"
@@ -156,6 +173,16 @@ export function WikiPageRow({
           <Pencil className="w-4 h-4 mr-2 shrink-0" />
           Rename
         </MenuItem>
+        {onMove ? (
+          <MenuItem
+            onClick={() => {
+              onMove(page.id);
+            }}
+          >
+            <ArrowRightLeft className="w-4 h-4 mr-2 shrink-0" />
+            Move…
+          </MenuItem>
+        ) : null}
         <MenuItem
           onClick={() => onCreateChildPage(page.id)}
         >

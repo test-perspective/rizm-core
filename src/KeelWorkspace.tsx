@@ -64,6 +64,8 @@ export function KeelWorkspace() {
   const [policyDialogOpen, setPolicyDialogOpen] = useState(false);
   const [projectDetailDialogOpen, setProjectDetailDialogOpen] = useState(false);
   const [boardColumnRenameBusy, setBoardColumnRenameBusy] = useState(false);
+  /** Entity ids in table current page or board lane — for detail panel ArrowLeft/ArrowRight. */
+  const [detailNavEntityIds, setDetailNavEntityIds] = useState<string[]>([]);
   const wikiCreateRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -130,6 +132,25 @@ export function KeelWorkspace() {
     pendingUrlProjectId,
     clearPendingUrlProjectId,
   });
+
+  // Only clear when leaving table/board. Do not depend on effectiveViewId — switching board→table
+  // changes view id; clearing on every view id change can run after the table repopulates and wipe ids.
+  useEffect(() => {
+    const t = currentView?.type;
+    if (t === 'table' || t === 'board') return;
+    setDetailNavEntityIds([]);
+  }, [currentView?.type]);
+
+  useEffect(() => {
+    if (overlayEntity) setDetailNavEntityIds([]);
+  }, [overlayEntity]);
+
+  const handleDetailNavEntityOrderChange = useCallback((ids: string[]) => {
+    setDetailNavEntityIds((prev) => {
+      if (prev.length === ids.length && prev.every((id, i) => id === ids[i])) return prev;
+      return ids;
+    });
+  }, []);
 
   const searchQueryFromLocation =
     (location.state as { searchQuery?: string } | null)?.searchQuery ?? undefined;
@@ -372,11 +393,14 @@ export function KeelWorkspace() {
           currentEntity={currentEntity}
           currentEntities={currentEntities}
           entities={entities}
+          projects={projects}
           activeProjectId={activeProjectId}
           activeProjectKey={activeProjectKey}
           scmIntegrationEnabled={scmIntegrationEnabled}
           effectiveViewId={effectiveViewId ?? undefined}
           selectedWikiPageId={selectedWikiPageId}
+          detailUrlEntityId={urlEntityId ?? null}
+          onDetailNavEntityOrderChange={handleDetailNavEntityOrderChange}
           usersById={usersById}
           onResolveUsers={resolveUsers}
           onNavigateEntity={handleNavigateEntity}
@@ -499,6 +523,7 @@ export function KeelWorkspace() {
         onProgressCancel={handleProgressCancel}
         onProgressClose={handleProgressClose}
         buildPath={buildPath}
+        detailNavEntityIds={detailNavEntityIds}
       />
     </div>
   );

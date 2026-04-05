@@ -47,10 +47,10 @@ function Harness({
   const [lastSavedTitleById, setLastSavedTitleById] = useState<Record<string, string | undefined>>(
     initialLastSavedTitleById ?? {}
   );
-  const [mode, setMode] = useState<'edit' | 'read'>('read');
-  const [crdtBlobById, setCrdtBlobById] = useState<Record<string, number[] | undefined>>({});
+  const [, setMode] = useState<'edit' | 'read'>('read');
+  const [, setCrdtBlobById] = useState<Record<string, number[] | undefined>>({});
   const [loadingDocId, setLoadingDocId] = useState<string | null>(null);
-  const [editorResetTokenById, setEditorResetTokenById] = useState<Record<string, number>>({});
+  const [, setEditorResetTokenById] = useState<Record<string, number>>({});
   const [commentValues, setCommentValues] = useState<Record<string, any>>({});
 
   const docByIdRef = useRef(docById);

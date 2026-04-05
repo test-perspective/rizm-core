@@ -1,6 +1,10 @@
 //! Jira import engine: fetches projects, fields, statuses, comments and issues from Jira Cloud REST API v3.
 
+/// Max issues (or comments) per Jira REST page. Cloud allows up to 100 for search/board/comment pagination.
+pub(crate) const JIRA_ISSUE_PAGE_SIZE: i64 = 100;
+
 mod attachment_import;
+mod backfill;
 mod board;
 mod client;
 mod comments;
@@ -11,6 +15,8 @@ mod transform;
 use serde_json::Value;
 
 use crate::db::Db;
+
+pub use backfill::compute_jira_markdown_backfill_patch;
 
 use super::{
     ImportEngine, ImportEngineError, ImportMappingConfig, ImportMetadata, ImportProvider,

@@ -1,5 +1,5 @@
 import type { MutableRefObject } from 'react';
-import type { Entity, EntityDefinition, UserSummary, ViewConfig } from '../../types';
+import type { Entity, EntityDefinition, ProjectMeta, UserSummary, ViewConfig } from '../../types';
 import { BoardView } from '../BoardView';
 import { TableView } from '../TableView';
 import { WikiView } from '../WikiView';
@@ -9,11 +9,15 @@ type WorkspaceViewPanelProps = {
   currentEntity: EntityDefinition;
   currentEntities: Entity[];
   entities: Entity[];
+  projects: ProjectMeta[];
   activeProjectId: string;
   activeProjectKey: string;
   scmIntegrationEnabled: boolean;
   effectiveViewId?: string;
   selectedWikiPageId: string | null;
+  /** URL entity segment when present — used for board lane detail navigation order. */
+  detailUrlEntityId?: string | null;
+  onDetailNavEntityOrderChange?: (entityIds: string[]) => void;
   usersById: Record<string, UserSummary>;
   onResolveUsers: (userIds: string[]) => void;
   onNavigateEntity: (entityId: string) => void;
@@ -38,11 +42,14 @@ export function WorkspaceViewPanel({
   currentEntity,
   currentEntities,
   entities,
+  projects,
   activeProjectId,
   activeProjectKey,
   scmIntegrationEnabled,
   effectiveViewId,
   selectedWikiPageId,
+  detailUrlEntityId = null,
+  onDetailNavEntityOrderChange,
   usersById,
   onResolveUsers,
   onNavigateEntity,
@@ -91,6 +98,8 @@ export function WorkspaceViewPanel({
           usersById={usersById}
           onRenameBoardColumn={onRenameBoardColumn}
           columnRenameInProgress={boardColumnRenameBusy}
+          openDetailEntityId={detailUrlEntityId}
+          onBoardLaneEntityOrderForDetailChange={onDetailNavEntityOrderChange}
         />
       )}
       {currentView.type === 'table' && (
@@ -111,12 +120,14 @@ export function WorkspaceViewPanel({
           usersById={usersById}
           onResolveUsers={onResolveUsers}
           onReload={onRefreshProject}
+          onTablePageEntityOrderChange={onDetailNavEntityOrderChange}
         />
       )}
       {currentView.type === 'wiki' && (
         <WikiView
           projectId={activeProjectId}
           viewId={effectiveViewId ?? currentView.id}
+          projects={projects}
           pages={currentEntities}
           selectedPageId={selectedWikiPageId}
           onRefreshProject={onRefreshProject}

@@ -15,6 +15,7 @@ mod state;
 mod system_info;
 mod types;
 mod users;
+mod wiki_move;
 
 pub use core::Db;
 pub use types::{

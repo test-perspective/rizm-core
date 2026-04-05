@@ -68,7 +68,9 @@ describe('CreatePullRequestDialog', () => {
 
     expect(onCreated).toHaveBeenCalledTimes(1);
     expect(onClose).not.toHaveBeenCalled();
-    expect(document.body.textContent).toContain('Pull request was created, but failed to update the card. Please reload and try again.');
+    expect(document.body.textContent).toContain(
+      'The pull request was created in Bitbucket, but updating the card failed. Please reload and try again.'
+    );
 
     act(() => {
       root.unmount();

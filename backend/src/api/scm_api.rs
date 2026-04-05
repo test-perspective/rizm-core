@@ -128,6 +128,12 @@ struct BitbucketStoredToken {
     obtained_at: Option<i64>,
 }
 
+/// Bitbucket redirects the browser here without a SPA `fetch`; session cookies are host-bound.
+/// This route must not require session auth — user id comes from the one-time `oauth_states` row.
+pub fn public_bitbucket_oauth_router() -> Router<AppState> {
+    Router::new().route("/api/scm/bitbucket/oauth/callback", get(bitbucket_oauth_callback))
+}
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .route(
@@ -144,7 +150,6 @@ pub fn router() -> Router<AppState> {
         )
         .route("/api/scm/bitbucket/oauth/status", get(bitbucket_oauth_status))
         .route("/api/scm/bitbucket/oauth/start", get(bitbucket_oauth_start))
-        .route("/api/scm/bitbucket/oauth/callback", get(bitbucket_oauth_callback))
 }
 
 async fn get_project_scm_config(
@@ -241,7 +246,6 @@ async fn bitbucket_oauth_start(
 
 async fn bitbucket_oauth_callback(
     State(state): State<AppState>,
-    Extension(_user): Extension<AuthedUser>,
     Query(q): Query<OAuthCallbackQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
     if let Some(err) = q.error {

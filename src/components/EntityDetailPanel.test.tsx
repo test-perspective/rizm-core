@@ -125,6 +125,62 @@ describe('EntityDetailPanel', () => {
     container.remove();
   });
 
+  it('calls onNavigateDetailPrev on ArrowLeft when provided', async () => {
+    mockSchemaOpen = false;
+    const onPrev = vi.fn();
+    const onNext = vi.fn();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<EntityDetailPanel {...baseProps} onNavigateDetailPrev={onPrev} onNavigateDetailNext={onNext} />);
+    });
+
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    });
+
+    expect(onPrev).toHaveBeenCalledTimes(1);
+    expect(onNext).not.toHaveBeenCalled();
+
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it('does not navigate with ArrowLeft when focus is in an input', async () => {
+    mockSchemaOpen = false;
+    const onPrev = vi.fn();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <div>
+          <input data-testid="focus-trap" />
+          <EntityDetailPanel {...baseProps} onNavigateDetailPrev={onPrev} />
+        </div>
+      );
+    });
+
+    const input = container.querySelector('[data-testid="focus-trap"]') as HTMLInputElement;
+    input.focus();
+
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    });
+
+    expect(onPrev).not.toHaveBeenCalled();
+
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
   it('calls handleClose on Escape when schema editor is closed', async () => {
     mockSchemaOpen = false;
     const container = document.createElement('div');

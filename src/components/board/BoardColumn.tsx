@@ -5,6 +5,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { SortableCard } from './BoardCard';
 import { SortableDivider } from './BoardDivider';
 import { BoardColumnHeaderTitle } from './BoardColumnHeaderTitle';
+import { BoardColumnShell } from './BoardColumnShell';
 import { getColumnDropId } from './boardDnd';
 import { extractTaskIds, insertDividersIntoItems, deriveDividersFromItems, isDividerId } from './boardDividers';
 import { computeOrderForMove, ORDER_KEY } from './boardOrder';
@@ -122,93 +123,88 @@ export const BoardColumn = ({
   };
 
   return (
-    <div className={isSingleColumn ? "w-full bg-zinc-950 border border-zinc-800 rounded-lg" : "w-80 flex-shrink-0 bg-zinc-950 border border-zinc-800 rounded-lg"}>
-      <div className="px-4 py-3 border-b border-zinc-800">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <span
-              className="inline-flex shrink-0 cursor-grab touch-none select-none items-center text-zinc-500 active:cursor-grabbing"
-              {...dragHandleProps}
-              aria-label="Drag to reorder column"
+    <BoardColumnShell
+      isSingleColumn={isSingleColumn}
+      headerStart={
+        <>
+          <span
+            className="inline-flex shrink-0 cursor-grab touch-none select-none items-center text-zinc-500 active:cursor-grabbing"
+            {...dragHandleProps}
+            aria-label="Drag to reorder column"
+          >
+            <GripVertical className="h-4 w-4" aria-hidden />
+          </span>
+          {onRenameColumn ? (
+            <BoardColumnHeaderTitle title={title} onRename={onRenameColumn} />
+          ) : (
+            <h3 className="min-w-0 flex-1 truncate font-semibold text-white">{title}</h3>
+          )}
+        </>
+      }
+      headerEnd={
+        <>
+          {isSingleColumn && onViewConfigUpdate && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleAddDivider();
+              }}
+              className="px-2 py-1 text-xs text-zinc-400 hover:text-white hover:bg-zinc-800 rounded transition-colors"
+              type="button"
+              title="Add section"
             >
-              <GripVertical className="h-4 w-4" aria-hidden />
-            </span>
-            {onRenameColumn ? (
-              <BoardColumnHeaderTitle title={title} onRename={onRenameColumn} />
-            ) : (
-              <h3 className="min-w-0 flex-1 truncate font-semibold text-white">{title}</h3>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {isSingleColumn && onViewConfigUpdate && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleAddDivider();
-                }}
-                className="px-2 py-1 text-xs text-zinc-400 hover:text-white hover:bg-zinc-800 rounded transition-colors"
-                type="button"
-                title="Add section"
-              >
-                + Section
-              </button>
-            )}
-            <span className="text-xs text-zinc-500">{count}</span>
-          </div>
-        </div>
-      </div>
-
-      <div
-        ref={setNodeRef}
-        className={[
-          'p-3 space-y-2 min-h-[200px] rounded-b-lg',
-          isOver ? 'bg-violet-500/5' : '',
-        ].join(' ')}
-      >
-        <SortableContext items={items} strategy={verticalListSortingStrategy}>
-          {items.map((id) => {
-            if (isDividerId(id)) {
-              const divider = dividerById.get(id);
-              if (!divider) {
-                return null;
-              }
-              return (
-                <SortableDivider
-                  key={id}
-                  divider={divider}
-                  isSingleColumn={isSingleColumn}
-                  view={view}
-                  onViewConfigUpdate={onViewConfigUpdate}
-                />
-              );
+              + Section
+            </button>
+          )}
+          <span className="text-xs text-zinc-500">{count}</span>
+        </>
+      }
+      bodyRef={setNodeRef}
+      isDropOver={isOver}
+    >
+      <SortableContext items={items} strategy={verticalListSortingStrategy}>
+        {items.map((id) => {
+          if (isDividerId(id)) {
+            const divider = dividerById.get(id);
+            if (!divider) {
+              return null;
             }
-            const entity = entityById[id];
-            if (!entity) return null;
             return (
-              <SortableCard
+              <SortableDivider
                 key={id}
-                entity={entity}
-                visibleProps={visibleProps}
-                onClick={() => onEntityClick(entity)}
-                onEntityUpdate={onEntityUpdate}
-                allEntities={allEntities}
-                onEntityClick={onEntityClick}
-                variant={isSingleColumn ? 'row' : 'card'}
-                columnTaskIds={columnTaskIds}
-                onMoveCard={handleMoveCard}
-                usersById={usersById}
-                projectId={projectId}
-                scmIntegrationEnabled={scmIntegrationEnabled}
-                scmConfig={scmConfig ?? null}
-                scmConnected={Boolean(scmConnected)}
-                scmLoading={Boolean(scmLoading)}
-                onScmRefresh={onScmRefresh}
+                divider={divider}
+                isSingleColumn={isSingleColumn}
+                view={view}
+                onViewConfigUpdate={onViewConfigUpdate}
               />
             );
-          })}
-        </SortableContext>
-      </div>
-    </div>
+          }
+          const entity = entityById[id];
+          if (!entity) return null;
+          return (
+            <SortableCard
+              key={id}
+              entity={entity}
+              visibleProps={visibleProps}
+              onClick={() => onEntityClick(entity)}
+              onEntityUpdate={onEntityUpdate}
+              allEntities={allEntities}
+              onEntityClick={onEntityClick}
+              variant={isSingleColumn ? 'row' : 'card'}
+              columnTaskIds={columnTaskIds}
+              onMoveCard={handleMoveCard}
+              usersById={usersById}
+              projectId={projectId}
+              scmIntegrationEnabled={scmIntegrationEnabled}
+              scmConfig={scmConfig ?? null}
+              scmConnected={Boolean(scmConnected)}
+              scmLoading={Boolean(scmLoading)}
+              onScmRefresh={onScmRefresh}
+            />
+          );
+        })}
+      </SortableContext>
+    </BoardColumnShell>
   );
 };
 

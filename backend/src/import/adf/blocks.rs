@@ -42,3 +42,28 @@ pub fn paragraph_file_attachment(url: &str, filename: &str) -> Value {
         "children": []
     })
 }
+
+/// BlockNote `codeBlock` (fenced / preformatted), not inline `code` in a paragraph.
+pub fn code_block_note(inner: &str, language: &str) -> Value {
+    let normalized = inner.replace("\r\n", "\n");
+    let mut props = block_props().as_object().cloned().unwrap_or_default();
+    props.insert(
+        "language".to_string(),
+        Value::String(if language.trim().is_empty() {
+            "text".to_string()
+        } else {
+            language.trim().to_string()
+        }),
+    );
+    json!({
+        "id": uuid::Uuid::new_v4().to_string(),
+        "type": "codeBlock",
+        "props": props,
+        "content": [{
+            "type": "text",
+            "text": normalized,
+            "styles": {}
+        }],
+        "children": []
+    })
+}

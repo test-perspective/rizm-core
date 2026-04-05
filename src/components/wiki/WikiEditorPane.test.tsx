@@ -4,9 +4,13 @@ import { createRoot } from 'react-dom/client';
 import type { Entity } from '../../types';
 import { WikiEditorPane } from './WikiEditorPane';
 
-let lastWikiEditorProps: { page: Entity; docJson: string | undefined; onUpdateDoc: (doc: string) => void } | null = null;
+let lastWikiEditorProps: {
+  page: Entity;
+  docJson: string | undefined;
+  onUpdateDoc: (doc: string) => void;
+} | null = null;
 vi.mock('./WikiEditor', () => ({
-  WikiEditor: (props: { page: Entity; docJson?: string; onUpdateDoc: (doc: string) => void }) => {
+  WikiEditor: (props: { page: Entity; docJson: string | undefined; onUpdateDoc: (doc: string) => void }) => {
     lastWikiEditorProps = props;
     return (
       <div>

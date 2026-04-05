@@ -1,9 +1,10 @@
 //! ADF → BlockNote JSON. Optional [AdfImportContext] resolves Jira `media` attachments.
 
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 
 use super::blocks;
 use super::context::AdfImportContext;
+use crate::mcp::markdown::{jira_wiki_preprocessed_paragraph_to_inline_content, preprocess_jira_wiki_plain_text};
 
 fn adf_marks_to_styles(marks: Option<&Value>) -> Value {
     let mut styles = serde_json::Map::new();
@@ -14,7 +15,8 @@ fn adf_marks_to_styles(marks: Option<&Value>) -> Value {
                     "strong" => styles.insert("bold".to_string(), Value::Bool(true)),
                     "em" => styles.insert("italic".to_string(), Value::Bool(true)),
                     "code" => styles.insert("code".to_string(), Value::Bool(true)),
-                    "strike" => styles.insert("strikethrough".to_string(), Value::Bool(true)),
+                    // BlockNote defaultStyleSpecs use `strike`, not `strikethrough`.
+                    "strike" => styles.insert("strike".to_string(), Value::Bool(true)),
                     "underline" => styles.insert("underline".to_string(), Value::Bool(true)),
                     _ => None,
                 };
@@ -24,6 +26,62 @@ fn adf_marks_to_styles(marks: Option<&Value>) -> Value {
     Value::Object(styles)
 }
 
+fn adf_link_href_from_marks(marks: Option<&Value>) -> Option<String> {
+    let arr = marks?.as_array()?;
+    for m in arr {
+        if m.get("type").and_then(|t| t.as_str()) != Some("link") {
+            continue;
+        }
+        let href = m
+            .get("attrs")
+            .and_then(|a| a.get("href"))
+            .and_then(|h| h.as_str())
+            .filter(|s| !s.is_empty())?;
+        return Some(href.to_string());
+    }
+    None
+}
+
+fn merge_adf_base_styles_into_segment(seg: &mut Value, base: &Map<String, Value>) {
+    if base.is_empty() {
+        return;
+    }
+    let Some(obj) = seg.as_object_mut() else {
+        return;
+    };
+    match obj.get("type").and_then(|t| t.as_str()) {
+        Some("text") => {
+            let st = obj.entry("styles").or_insert_with(|| json!({}));
+            if let Some(m) = st.as_object_mut() {
+                for (k, v) in base {
+                    m.entry(k.clone()).or_insert_with(|| v.clone());
+                }
+            }
+        }
+        Some("link") => {
+            if let Some(Value::Array(items)) = obj.get_mut("content") {
+                for it in items.iter_mut() {
+                    merge_adf_base_styles_into_segment(it, base);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+fn merge_adf_base_styles_into_segments(mut segments: Vec<Value>, base_styles: &Value) -> Vec<Value> {
+    let Some(base_obj) = base_styles.as_object() else {
+        return segments;
+    };
+    if base_obj.is_empty() {
+        return segments;
+    }
+    for seg in &mut segments {
+        merge_adf_base_styles_into_segment(seg, base_obj);
+    }
+    segments
+}
+
 fn adf_inline_to_blocknote_content(nodes: &[Value]) -> Vec<Value> {
     let mut out = Vec::new();
     for node in nodes {
@@ -31,13 +89,42 @@ fn adf_inline_to_blocknote_content(nodes: &[Value]) -> Vec<Value> {
             let t = obj.get("type").and_then(|v| v.as_str()).unwrap_or("");
             if t == "text" {
                 let text = obj.get("text").and_then(|v| v.as_str()).unwrap_or("");
+                let text = preprocess_jira_wiki_plain_text(text);
                 let styles = adf_marks_to_styles(obj.get("marks"));
-                if !text.is_empty() {
-                    out.push(json!({
+                let link_href = adf_link_href_from_marks(obj.get("marks"));
+                if text.contains("{color:") {
+                    let segs = merge_adf_base_styles_into_segments(
+                        jira_wiki_preprocessed_paragraph_to_inline_content(&text),
+                        &styles,
+                    );
+                    if let Some(href) = link_href {
+                        if !segs.is_empty() {
+                            out.push(json!({
+                                "type": "link",
+                                "href": href,
+                                "content": segs
+                            }));
+                        }
+                    } else {
+                        for seg in segs {
+                            out.push(seg);
+                        }
+                    }
+                } else if !text.is_empty() {
+                    let inner = json!({
                         "type": "text",
                         "text": text,
                         "styles": styles
-                    }));
+                    });
+                    if let Some(href) = link_href {
+                        out.push(json!({
+                            "type": "link",
+                            "href": href,
+                            "content": vec![inner]
+                        }));
+                    } else {
+                        out.push(inner);
+                    }
                 }
             } else if t == "hardBreak" {
                 out.push(json!({
@@ -45,6 +132,20 @@ fn adf_inline_to_blocknote_content(nodes: &[Value]) -> Vec<Value> {
                     "text": "\n",
                     "styles": {}
                 }));
+            } else if t == "status" {
+                // Jira ADF inline status pill → plain text (BlockNote `status` is editor-only).
+                let label = obj
+                    .get("attrs")
+                    .and_then(|a| a.get("text"))
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("");
+                if !label.is_empty() {
+                    out.push(json!({
+                        "type": "text",
+                        "text": label,
+                        "styles": {}
+                    }));
+                }
             }
         }
     }
@@ -186,22 +287,12 @@ fn adf_block_to_blocknote(node: &Value, ctx: Option<&AdfImportContext>) -> Optio
                     }
                 }
             }
-            let segs = if text.is_empty() {
-                vec![]
-            } else {
-                vec![json!({
-                    "type": "text",
-                    "text": text,
-                    "styles": {"code": true}
-                })]
-            };
-            Some(json!({
-                "id": id,
-                "type": "paragraph",
-                "props": blocks::block_props(),
-                "content": segs,
-                "children": []
-            }))
+            let language = obj
+                .get("attrs")
+                .and_then(|a| a.get("language"))
+                .and_then(|l| l.as_str())
+                .unwrap_or("text");
+            Some(blocks::code_block_note(&text, language))
         }
         "blockquote" => {
             let mut children = Vec::new();
@@ -211,11 +302,16 @@ fn adf_block_to_blocknote(node: &Value, ctx: Option<&AdfImportContext>) -> Optio
             if children.is_empty() {
                 None
             } else {
+                // BlockNote quote uses inline `content`; empty array breaks the editor when `children` hold blocks.
                 Some(json!({
                     "id": id,
                     "type": "quote",
                     "props": blocks::block_props(),
-                    "content": [],
+                    "content": [{
+                        "type": "text",
+                        "text": "",
+                        "styles": {}
+                    }],
                     "children": children
                 }))
             }
@@ -417,6 +513,8 @@ mod tests {
         let blocks: Vec<Value> = serde_json::from_str(&s).unwrap();
         let quote = blocks.iter().find(|b| b.get("type").and_then(|t| t.as_str()) == Some("quote"));
         let quote = quote.expect("quote block");
+        let content = quote.get("content").and_then(|c| c.as_array()).expect("content");
+        assert!(!content.is_empty(), "quote must have inline content for BlockNote");
         let children = quote.get("children").and_then(|c| c.as_array()).expect("children");
         assert!(children.iter().any(|b| b.get("type").and_then(|t| t.as_str()) == Some("image")));
     }
@@ -477,5 +575,280 @@ mod tests {
         let s = adf_to_blocknote_doc_with_context(&adf, Some(&ctx)).expect("doc");
         let blocks: Vec<Value> = serde_json::from_str(&s).unwrap();
         assert!(blocks.iter().any(|b| b.get("type").and_then(|t| t.as_str()) == Some("image")));
+    }
+
+    #[test]
+    fn adf_text_node_with_jira_color_wiki_converts_to_textcolor() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "paragraph",
+                "content": [{
+                    "type": "text",
+                    "text": "{color:#FF5630}[ 確認 ]{color}"
+                }]
+            }]
+        });
+        let s = adf_to_blocknote_doc_with_context(&adf, None).expect("doc");
+        assert!(!s.contains("{color"), "{}", s);
+        assert!(s.contains("確認"), "{}", s);
+        assert!(s.contains("textColor"), "{}", s);
+        assert!(s.contains("#FF5630"), "{}", s);
+    }
+
+    #[test]
+    fn adf_jira_color_case_insensitive_delimiters_in_text_node() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "paragraph",
+                "content": [{
+                    "type": "text",
+                    "text": "{Color:#FF5630}OK{Color}"
+                }]
+            }]
+        });
+        let s = adf_to_blocknote_doc_with_context(&adf, None).expect("doc");
+        assert!(!s.to_ascii_lowercase().contains("{color"), "{}", s);
+        assert!(s.contains("OK"), "{}", s);
+        assert!(s.contains("#FF5630"), "{}", s);
+    }
+
+    /// Regression (TPD-4): Description is `paragraph` + `orderedList` only (no ADF headings). Import must
+    /// not rely on a preceding h2 for list preservation (see `sanitizeBlockNoteForEditor` for bad DB rows).
+    #[test]
+    fn tpd4_paragraph_then_ordered_list_stays_numbered_after_import_reparse_chain() {
+        use crate::import::adf::{
+            maybe_reparse_blocknote_from_flat_markdown, maybe_reparse_blocknote_wrapped_markdown,
+        };
+
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {"type": "paragraph", "content": [{"type": "text", "text": "再現方法"}]},
+                {"type": "orderedList", "attrs": {"order": 1}, "content": [
+                    {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "テーブルを空にする"}]}]},
+                    {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "ステップ2"}]}]}
+                ]},
+                {"type": "paragraph", "content": [{"type": "text", "text": "別セクション"}]},
+                {"type": "orderedList", "attrs": {"order": 1}, "content": [
+                    {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "A"}]}]},
+                    {"type": "listItem", "content": [{"type": "paragraph"}]}
+                ]}
+            ]
+        });
+        let ctx = super::super::context::AdfImportContext::empty();
+        let doc = super::adf_to_blocknote_doc_with_context(&adf, Some(&ctx)).expect("adf doc");
+        let after = maybe_reparse_blocknote_wrapped_markdown(&doc, Some(&ctx))
+            .or_else(|| maybe_reparse_blocknote_from_flat_markdown(&doc, Some(&ctx)))
+            .unwrap_or_else(|| doc.clone());
+
+        let blocks: Vec<Value> = serde_json::from_str(&after).unwrap();
+        let top_numbered = blocks
+            .iter()
+            .filter(|b| b.get("type").and_then(|t| t.as_str()) == Some("numberedListItem"))
+            .count();
+        assert!(top_numbered >= 2, "expected top-level numbered list items: {}", after);
+        assert!(
+            !blocks
+                .iter()
+                .any(|b| b.get("type").and_then(|t| t.as_str()) == Some("heading")),
+            "ADF without headings must not produce heading blocks: {}",
+            after
+        );
+    }
+
+    /// Regression (TPD-196): Jira `orderedList` must stay `numberedListItem` after the same re-parse
+    /// chain as `import_run` (flat Markdown re-parse used to collapse lists into `#` pseudo-headings).
+    #[test]
+    fn tpd196_ordered_list_keeps_numbered_items_after_import_reparse_chain() {
+        use crate::import::adf::{
+            maybe_reparse_blocknote_from_flat_markdown, maybe_reparse_blocknote_wrapped_markdown,
+        };
+
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {"type": "heading", "attrs": {"level": 2}, "content": [{"type": "text", "text": "再現手順"}]},
+                {"type": "orderedList", "attrs": {"order": 1}, "content": [
+                    {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "ステップ1"}]}]},
+                    {"type": "listItem", "content": [
+                        {"type": "paragraph", "content": [{"type": "text", "text": "ステップ2"}]},
+                        {"type": "bulletList", "content": [
+                            {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "ネストA"}]}]},
+                            {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "ネストB"}]}]}
+                        ]}
+                    ]},
+                    {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "ステップ3"}]}]}
+                ]}
+            ]
+        });
+        let ctx = super::super::context::AdfImportContext::empty();
+        let doc = super::adf_to_blocknote_doc_with_context(&adf, Some(&ctx)).expect("adf doc");
+        let after = maybe_reparse_blocknote_wrapped_markdown(&doc, Some(&ctx))
+            .or_else(|| maybe_reparse_blocknote_from_flat_markdown(&doc, Some(&ctx)))
+            .unwrap_or_else(|| doc.clone());
+
+        let blocks: Vec<Value> = serde_json::from_str(&after).unwrap();
+        let numbered_count = blocks
+            .iter()
+            .filter(|b| b.get("type").and_then(|t| t.as_str()) == Some("numberedListItem"))
+            .count();
+        assert!(numbered_count >= 1, "need top-level numbered items: {}", after);
+
+        fn count_numbered_deep(blocks: &[Value]) -> usize {
+            let mut n = 0usize;
+            for b in blocks {
+                if b.get("type").and_then(|t| t.as_str()) == Some("numberedListItem") {
+                    n += 1;
+                }
+                if let Some(ch) = b.get("children").and_then(|c| c.as_array()) {
+                    n += count_numbered_deep(ch.as_slice());
+                }
+            }
+            n
+        }
+        assert!(count_numbered_deep(&blocks) >= 3, "nested doc should keep ≥3 numbered items: {}", after);
+
+        for b in &blocks {
+            if b.get("type").and_then(|t| t.as_str()) != Some("heading") {
+                continue;
+            }
+            let level = b
+                .get("props")
+                .and_then(|p| p.get("level"))
+                .and_then(|l| l.as_i64())
+                .unwrap_or(0);
+            let flat = b
+                .get("content")
+                .and_then(|c| c.as_array())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|x| x.get("text").and_then(|t| t.as_str()))
+                        .collect::<String>()
+                })
+                .unwrap_or_default();
+            if flat.starts_with("ステップ") {
+                assert_ne!(
+                    level, 1,
+                    "ordered-list steps must not become ATX-style (level 1) headings: {}",
+                    after
+                );
+            }
+        }
+    }
+
+    /// Regression (TPD-155): Leading ADF `codeBlock` plus trailing URL must stay a real code block after import re-parse.
+    #[test]
+    fn tpd155_code_block_survives_import_reparse_chain() {
+        use crate::import::adf::{
+            maybe_reparse_blocknote_from_flat_markdown, maybe_reparse_blocknote_wrapped_markdown,
+        };
+
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {
+                    "type": "codeBlock",
+                    "content": [{ "type": "text", "text": "91:4    warning  lint\n\n97:16   warning  more" }]
+                },
+                {
+                    "type": "paragraph",
+                    "content": [{ "type": "text", "text": "forge lintで引っかかる。" }]
+                },
+                {
+                    "type": "paragraph",
+                    "content": [{ "type": "text", "text": "See https://developer.atlassian.com/x" }]
+                }
+            ]
+        });
+        let ctx = super::super::context::AdfImportContext::empty();
+        let doc = super::adf_to_blocknote_doc_with_context(&adf, Some(&ctx)).expect("adf doc");
+        let after = maybe_reparse_blocknote_wrapped_markdown(&doc, Some(&ctx))
+            .or_else(|| maybe_reparse_blocknote_from_flat_markdown(&doc, Some(&ctx)))
+            .unwrap_or_else(|| doc.clone());
+
+        let blocks: Vec<Value> = serde_json::from_str(&after).unwrap();
+        assert_eq!(
+            blocks.first().and_then(|b| b.get("type")).and_then(|t| t.as_str()),
+            Some("codeBlock"),
+            "first block must stay codeBlock: {}",
+            after
+        );
+        let code_text = blocks
+            .first()
+            .and_then(|b| b.get("content"))
+            .and_then(|c| c.as_array())
+            .and_then(|a| a.first())
+            .and_then(|x| x.get("text"))
+            .and_then(|t| t.as_str())
+            .unwrap_or("");
+        assert!(
+            code_text.contains("91:4") && code_text.contains("97:16"),
+            "code body must be preserved: {}",
+            after
+        );
+    }
+
+    #[test]
+    fn adf_status_inline_becomes_plain_text() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "paragraph",
+                "content": [
+                    {"type": "text", "text": "a "},
+                    {"type": "status", "attrs": {"text": "再現せず", "color": "blue"}},
+                    {"type": "text", "text": " b"}
+                ]
+            }]
+        });
+        let s = super::adf_to_blocknote_doc_with_context(&adf, None).expect("doc");
+        assert!(s.contains("再現せず"), "{}", s);
+    }
+
+    #[test]
+    fn adf_link_mark_becomes_blocknote_link_inline() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "paragraph",
+                "content": [{
+                    "type": "text",
+                    "text": "x",
+                    "marks": [{ "type": "link", "attrs": { "href": "http://example.test/y" } }]
+                }]
+            }]
+        });
+        let s = super::adf_to_blocknote_doc_with_context(&adf, None).expect("doc");
+        assert!(s.contains("\"link\""), "{}", s);
+        assert!(s.contains("http://example.test/y"), "{}", s);
+        assert!(s.contains("x"), "{}", s);
+    }
+
+    #[test]
+    fn adf_strike_mark_uses_blocknote_strike_style_key() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "paragraph",
+                "content": [{
+                    "type": "text",
+                    "text": "gone",
+                    "marks": [{ "type": "strike" }]
+                }]
+            }]
+        });
+        let s = super::adf_to_blocknote_doc_with_context(&adf, None).expect("doc");
+        assert!(s.contains("\"strike\":true"), "expected BlockNote strike style, got {}", s);
+        assert!(!s.contains("strikethrough"), "{}", s);
     }
 }

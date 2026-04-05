@@ -74,6 +74,8 @@ type WorkspaceOverlaysProps = {
   onProgressCancel: () => void;
   onProgressClose: () => void;
   buildPath: BuildPathFn;
+  /** Ordered entity ids for ArrowLeft/ArrowRight in detail (table: current page, board: same lane). */
+  detailNavEntityIds?: string[];
 };
 
 export function WorkspaceOverlays(props: WorkspaceOverlaysProps) {
@@ -131,6 +133,7 @@ export function WorkspaceOverlays(props: WorkspaceOverlaysProps) {
     onProgressCancel,
     onProgressClose,
     buildPath,
+    detailNavEntityIds = [],
   } = props;
 
   const detailSchemaEntity: EntityDefinition =
@@ -138,6 +141,47 @@ export function WorkspaceOverlays(props: WorkspaceOverlaysProps) {
       ? manifest.entities.find((d) => d.id === overlayEntity.entityId) ?? currentEntity
       : currentEntity;
   const detailTitleLikeProperty = manifest.entities.find((e) => e.id === detailSchemaEntity.id)?.titleLikeProperty;
+
+  const urlDetailEntity = overlayEntity == null ? selectedEntityFromUrl : null;
+  const enableDetailArrowNav =
+    overlayEntity == null &&
+    urlDetailEntity != null &&
+    effectiveViewId != null &&
+    (currentView.type === 'table' || currentView.type === 'board');
+
+  const onNavigateDetailPrev =
+    enableDetailArrowNav && detailNavEntityIds.length > 0
+      ? () => {
+          const id = urlDetailEntity!.id;
+          const i = detailNavEntityIds.indexOf(id);
+          if (i <= 0) return;
+          navigate(
+            buildPath({
+              projectId: activeProjectId,
+              viewId: effectiveViewId!,
+              entityId: detailNavEntityIds[i - 1],
+            }),
+            { replace: false }
+          );
+        }
+      : undefined;
+
+  const onNavigateDetailNext =
+    enableDetailArrowNav && detailNavEntityIds.length > 0
+      ? () => {
+          const id = urlDetailEntity!.id;
+          const i = detailNavEntityIds.indexOf(id);
+          if (i < 0 || i >= detailNavEntityIds.length - 1) return;
+          navigate(
+            buildPath({
+              projectId: activeProjectId,
+              viewId: effectiveViewId!,
+              entityId: detailNavEntityIds[i + 1],
+            }),
+            { replace: false }
+          );
+        }
+      : undefined;
 
   return (
     <>
@@ -219,6 +263,8 @@ export function WorkspaceOverlays(props: WorkspaceOverlaysProps) {
             }}
             usersById={usersById}
             onResolveUsers={onResolveUsers}
+            onNavigateDetailPrev={onNavigateDetailPrev}
+            onNavigateDetailNext={onNavigateDetailNext}
           />
           </EntityDetailPanelErrorBoundary>
         )}

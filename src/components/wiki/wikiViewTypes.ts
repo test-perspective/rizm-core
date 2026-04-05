@@ -1,10 +1,12 @@
 import type React from 'react';
-import type { Entity } from '../../types';
+import type { Entity, ProjectMeta } from '../../types';
 import type { CreateWikiNodeOptions } from './wikiPersistenceHelpers';
 
 export type WikiViewProps = {
   projectId: string;
   viewId?: string;
+  /** Used for cross-project wiki move. */
+  projects?: ProjectMeta[];
   pages: Entity[];
   selectedPageId: string | null;
   onSelectPage: (id: string) => void;
@@ -19,3 +21,4 @@ export type WikiViewProps = {
   /** REQ-242: Ref for header New Page to call same flow as create toplevel page */
   wikiCreateRef?: React.MutableRefObject<(() => void) | null>;
 };
+

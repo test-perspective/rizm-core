@@ -1,5 +1,5 @@
 import { ApiError } from '../../auth/api';
-import { createEntityApi, deleteEntityApi, patchEntityApi } from '../../api/entities';
+import { createEntityApi, deleteEntityApi, getEntityApi, patchEntityApi } from '../../api/entities';
 import { putManifestApi, type PutManifestOptions } from '../../api/manifest';
 import type { Entity, Project, ProjectManifest, ViewConfig } from '../../types';
 import { reconcileManifestWithData } from '../../utils/manifestReconcile';
@@ -54,6 +54,14 @@ async function runModifyEntityPatch(
     console.error(`[entity.patch] ${message} projectId=${activeProjectId} entityId=${entityId}`, error);
   };
 
+  const applySuccessfulPatch = (entity: Entity, nextEtag: string) => {
+    entityEtagByIdRef.current[entityId] = nextEtag;
+    setActiveProject((prev) => {
+      if (!prev) return prev;
+      return { ...prev, entities: (prev.entities ?? []).map((e) => (e.id === entityId ? entity : e)) };
+    });
+  };
+
   const sendPatchOnce = async () => {
     const etag = entityEtagByIdRef.current[entityId] ?? `"0"`;
     return await patchEntityApi(activeProjectId, entityId, properties, etag);
@@ -81,13 +89,36 @@ async function runModifyEntityPatch(
     throw lastError;
   };
 
+  /**
+   * Sync If-Match token from GET /entities/:id (authoritative) when project refresh
+   * did not yield a successful retry (e.g. stale etags in client ref).
+   * Only updates the etag ref to preserve optimistic UI until PATCH succeeds.
+   */
+  const tryRecoverPatchViaEntityGet = async (): Promise<boolean> => {
+    try {
+      const latest = await getEntityApi(activeProjectId, entityId);
+      if (!latest?.etag) {
+        logPatchFailure('Failed to GET entity for patch recovery', new Error('missing etag'));
+        return false;
+      }
+      entityEtagByIdRef.current[entityId] = latest.etag;
+    } catch (getError) {
+      logPatchFailure('Failed to GET entity for patch recovery', getError);
+      return false;
+    }
+    try {
+      const { entity, etag: nextEtag } = await sendPatchWithTransientRetries();
+      applySuccessfulPatch(entity, nextEtag);
+      return true;
+    } catch (patchAfterGetError) {
+      logPatchFailure('Failed to PATCH entity after GET recovery', patchAfterGetError);
+      return false;
+    }
+  };
+
   try {
     const { entity, etag: nextEtag } = await sendPatchWithTransientRetries();
-    entityEtagByIdRef.current[entityId] = nextEtag;
-    setActiveProject((prev) => {
-      if (!prev) return prev;
-      return { ...prev, entities: (prev.entities ?? []).map((e) => (e.id === entityId ? entity : e)) };
-    });
+    applySuccessfulPatch(entity, nextEtag);
     return true;
   } catch (e) {
     if (e instanceof ApiError && (e.status === 412 || e.status === 409)) {
@@ -95,18 +126,18 @@ async function runModifyEntityPatch(
         await refreshActiveProject({ bypassProjectRefreshBlock: true });
       } catch (refreshError) {
         logPatchFailure('Failed to refresh project before retry', refreshError);
+        const recovered = await tryRecoverPatchViaEntityGet();
+        if (recovered) return true;
         return false;
       }
       try {
         const { entity, etag: nextEtag } = await sendPatchWithTransientRetries();
-        entityEtagByIdRef.current[entityId] = nextEtag;
-        setActiveProject((prev) => {
-          if (!prev) return prev;
-          return { ...prev, entities: (prev.entities ?? []).map((e) => (e.id === entityId ? entity : e)) };
-        });
+        applySuccessfulPatch(entity, nextEtag);
         return true;
       } catch (retryError) {
         logPatchFailure('Failed to patch entity after refresh', retryError);
+        const recovered = await tryRecoverPatchViaEntityGet();
+        if (recovered) return true;
         try {
           await refreshActiveProject({ bypassProjectRefreshBlock: true });
         } catch (refreshError) {
@@ -125,6 +156,8 @@ async function runModifyEntityPatch(
     } catch (refreshError) {
       logPatchFailure('Failed to refresh project after patch failure', refreshError);
     }
+    const recovered = await tryRecoverPatchViaEntityGet();
+    if (recovered) return true;
     return false;
   }
 }

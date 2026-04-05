@@ -7,6 +7,10 @@ type RecentLabelsByEntityProp = Record<string, string[]>;
 
 const makeEntityPropKey = (entityTypeId: string, propName: string): string => `${entityTypeId}::${propName}`;
 
+/** Unicode NFC + trim for stable substring matching (e.g. compatibility forms). */
+const normalizeForLabelMatch = (value: string): string =>
+  value.trim().normalize('NFC').toLowerCase();
+
 const normalizeLabels = (labels: string[]): string[] => {
   const seen = new Set<string>();
   const result: string[] = [];
@@ -93,6 +97,12 @@ type BuildLabelOptionsWithRecentArgs = {
   maxOptionsDisplay: number;
 };
 
+/**
+ * Use as MUI Autocomplete `filterOptions`: we already filter in {@link buildLabelOptionsWithRecent}.
+ * Without this, MUI applies a second pass (trim/accents rules) and can hide all options for some inputs.
+ */
+export const labelAutocompletePassthroughFilterOptions = <T,>(options: T[]): T[] => options;
+
 export const buildLabelOptionsWithRecent = ({
   entityTypeId,
   propName,
@@ -102,9 +112,9 @@ export const buildLabelOptionsWithRecent = ({
   maxOptionsDisplay,
 }: BuildLabelOptionsWithRecentArgs): string[] => {
   const normalizedOptions = normalizeLabels(options);
-  const query = inputValue.trim().toLowerCase();
-  const filtered = query
-    ? normalizedOptions.filter((option) => option.toLowerCase().includes(query))
+  const queryNorm = normalizeForLabelMatch(inputValue);
+  const filtered = queryNorm
+    ? normalizedOptions.filter((option) => normalizeForLabelMatch(option).includes(queryNorm))
     : normalizedOptions;
 
   const recent = getRecentLabels(entityTypeId, propName);

@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useLayoutEffect, useMemo, useRef } from 'react';
 import {
   DataGridPremium,
   GridColumnResizeParams,
@@ -14,6 +14,7 @@ import { tableGridSx, tablePaginationSx } from './table/tableViewStyles';
 import type { TableViewProps } from './table/tableViewTypes';
 import { useTableViewState } from './table/useTableViewState';
 import { useTableViewExport } from './table/useTableViewExport';
+import { createTablePageNavIdsSync } from './table/useTablePageNavEntityIds';
 
 export const TableView = ({
   entities,
@@ -28,6 +29,7 @@ export const TableView = ({
   usersById = {},
   onResolveUsers,
   onReload,
+  onTablePageEntityOrderChange,
 }: TableViewProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const gridContainerRef = useRef<HTMLDivElement>(null);
@@ -60,6 +62,20 @@ export const TableView = ({
     onUpsertPropertyOption,
     apiRef,
   });
+
+  const syncPageNavIds = useMemo(
+    () =>
+      onTablePageEntityOrderChange
+        ? createTablePageNavIdsSync(apiRef, state.page, state.rowsPerPage, onTablePageEntityOrderChange)
+        : undefined,
+    [apiRef, state.page, state.rowsPerPage, onTablePageEntityOrderChange]
+  );
+
+  // Re-sync when the table remounts (e.g. board → table): DataGrid may not emit stateChange until user interaction.
+  // Do not depend on filterModel here — unstable refs caused update-depth loops before.
+  useLayoutEffect(() => {
+    syncPageNavIds?.();
+  }, [syncPageNavIds, state.rows.length]);
 
   const { handleExportCsv, isExportingCsv } = useTableViewExport({
     apiRef,
@@ -170,6 +186,7 @@ export const TableView = ({
                 state.handleColumnWidthChange(field, width);
               }
             }}
+            {...(syncPageNavIds ? { onStateChange: syncPageNavIds } : {})}
             sx={tableGridSx}
           />
         </div>

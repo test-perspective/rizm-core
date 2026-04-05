@@ -8,6 +8,13 @@ vi.mock('../../utils/storage', () => ({
 
 import { getBackendUrl, isBackendEnabled } from '../../utils/storage';
 
+type TestImageBlock = {
+  type: 'image';
+  props: { url: string; caption?: string };
+  children: unknown[];
+  id?: string;
+};
+
 describe('richTextEditorHelpers', () => {
   beforeEach(() => {
     vi.mocked(isBackendEnabled).mockReturnValue(true);
@@ -27,8 +34,8 @@ describe('richTextEditorHelpers', () => {
           children: [],
         },
       ] as any;
-      const out = resolveRelativeApiUrlsInBlockNoteBlocks(blocks);
-      expect(out?.[0].props.url).toBe(
+      const out = resolveRelativeApiUrlsInBlockNoteBlocks(blocks) as TestImageBlock[] | undefined;
+      expect(out?.[0]?.props.url).toBe(
         'http://localhost:48888/api/projects/p/entities/e/attachments/x'
       );
     });
@@ -36,14 +43,15 @@ describe('richTextEditorHelpers', () => {
     it('does not change already absolute URLs', () => {
       const u = 'http://localhost:48888/api/projects/p/entities/e/attachments/x';
       const blocks = [{ type: 'image', props: { url: u }, children: [] }] as any;
-      const out = resolveRelativeApiUrlsInBlockNoteBlocks(blocks);
-      expect(out?.[0].props.url).toBe(u);
+      const out = resolveRelativeApiUrlsInBlockNoteBlocks(blocks) as TestImageBlock[] | undefined;
+      expect(out?.[0]?.props.url).toBe(u);
     });
 
     it('no-ops when backend is disabled', () => {
       vi.mocked(isBackendEnabled).mockReturnValue(false);
       const blocks = [{ type: 'image', props: { url: '/api/x' }, children: [] }] as any;
-      expect(resolveRelativeApiUrlsInBlockNoteBlocks(blocks)?.[0].props.url).toBe('/api/x');
+      const out = resolveRelativeApiUrlsInBlockNoteBlocks(blocks) as TestImageBlock[] | undefined;
+      expect(out?.[0]?.props.url).toBe('/api/x');
     });
   });
 

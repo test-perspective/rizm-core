@@ -172,3 +172,9 @@ export interface WikiPageResponse {
   parentId?: string | null;
   order?: number;
 }
+
+export interface MoveWikiPageResponse {
+  destinationProjectId: string;
+  rootPageId: string;
+  movedPageIds: string[];
+}

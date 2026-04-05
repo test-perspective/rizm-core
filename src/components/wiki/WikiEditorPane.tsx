@@ -17,8 +17,7 @@ const LOADING_SPINNER_DELAY_MS = 500;
  */
 function useDisplayedPage(
   selected: Entity | null,
-  docById: Record<string, string | undefined>,
-  loadingDocId: string | null
+  docById: Record<string, string | undefined>
 ): { display: Entity | null; isLoadingOverlay: boolean } {
   const lastDisplayedRef = useRef<Entity | null>(null);
 
@@ -136,7 +135,7 @@ export function WikiEditorPane({
   const [showDelayedSpinner, setShowDelayedSpinner] = useState(false);
   const loadingDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { display, isLoadingOverlay } = useDisplayedPage(selected, docById, loadingDocId);
+  const { display, isLoadingOverlay } = useDisplayedPage(selected, docById);
   const isLoadingWithoutDoc =
     !!selected && loadingDocId === selected.id && docById[selected.id] === undefined;
   const selectedToken = display ? editorResetTokenById[display.id] ?? 0 : 0;
@@ -282,54 +281,54 @@ export function WikiEditorPane({
             onMouseDown={mode === 'read' && !isLoadingOverlay ? handleContentMouseDown : undefined}
           >
             <WikiEditor
-                key={`${display.id}:${selectedToken}`}
-                projectId={projectId}
-                page={display}
-                docJson={docForDisplay}
-                editable={canEdit && mode === 'edit' && !isLoadingOverlay}
-                mode={mode}
-                restoreScrollTop={restoreScrollTop}
-                searchQuery={searchQuery}
-                focusRequest={!isLoadingOverlay && focusRequest ? { blockId: focusRequest.blockId } : undefined}
-                focusRequestToken={focusRequestToken}
-                onScrollTopChange={onScrollTopChange}
-                onUpdateDoc={(doc) => onDocChange(display.id, doc)}
-                entities={entities}
-                onEntityClick={onEntityClick}
-                onServerEntity={onServerEntity}
-                collabEnabled={collabEnabled}
-                collabUserName={collabUserName}
-                crdtBlob={crdtBlobById[display.id]}
-                onCollabPersisted={onCollabPersisted}
-                onPageDeleted={onPageDeleted}
-                footer={
-                  mode === 'read' ? (
-                    <div
-                      onMouseDown={(event) => event.stopPropagation()}
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      <CommentsSection
-                        entity={display}
-                        comments={comments}
-                        canComment={canComment}
-                        entities={entities}
-                        onEntityClick={onEntityClick}
-                        onAddComment={onAddComment}
-                        user={user}
-                        editingCommentId={editingCommentId}
-                        commentDraftById={commentDraftById}
-                        commentDirtyById={commentDirtyById}
-                        onEditComment={onEditComment}
-                        onCommentDraftChange={onCommentDraftChange}
-                        onSaveComment={onSaveComment}
-                        onCancelEditComment={onCancelEditComment}
-                        onDeleteComment={onDeleteComment}
-                        onNewCommentDraftChange={onNewCommentDraftChange}
-                      />
-                    </div>
-                  ) : undefined
-                }
-              />
+              key={`${display.id}:${selectedToken}`}
+              projectId={projectId}
+              page={display}
+              docJson={docForDisplay}
+              editable={canEdit && mode === 'edit' && !isLoadingOverlay}
+              mode={mode}
+              restoreScrollTop={restoreScrollTop}
+              searchQuery={searchQuery}
+              focusRequest={!isLoadingOverlay && focusRequest ? { blockId: focusRequest.blockId } : undefined}
+              focusRequestToken={focusRequestToken}
+              onScrollTopChange={onScrollTopChange}
+              onUpdateDoc={(doc) => onDocChange(display.id, doc)}
+              entities={entities}
+              onEntityClick={onEntityClick}
+              onServerEntity={onServerEntity}
+              collabEnabled={collabEnabled}
+              collabUserName={collabUserName}
+              crdtBlob={crdtBlobById[display.id]}
+              onCollabPersisted={onCollabPersisted}
+              onPageDeleted={onPageDeleted}
+              footer={
+                mode === 'read' ? (
+                  <div
+                    onMouseDown={(event) => event.stopPropagation()}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <CommentsSection
+                      entity={display}
+                      comments={comments}
+                      canComment={canComment}
+                      entities={entities}
+                      onEntityClick={onEntityClick}
+                      onAddComment={onAddComment}
+                      user={user}
+                      editingCommentId={editingCommentId}
+                      commentDraftById={commentDraftById}
+                      commentDirtyById={commentDirtyById}
+                      onEditComment={onEditComment}
+                      onCommentDraftChange={onCommentDraftChange}
+                      onSaveComment={onSaveComment}
+                      onCancelEditComment={onCancelEditComment}
+                      onDeleteComment={onDeleteComment}
+                      onNewCommentDraftChange={onNewCommentDraftChange}
+                    />
+                  </div>
+                ) : undefined
+              }
+            />
             {isLoadingOverlay && (
               <div
                 className="absolute inset-0 bg-black rounded-lg z-10 transition-opacity duration-150"

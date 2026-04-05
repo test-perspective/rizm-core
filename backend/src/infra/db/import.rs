@@ -369,6 +369,28 @@ impl Db {
         .context("select entity_id by external")
     }
 
+    /// List internal entity row ids (`entities.id`) linked to an external provider (e.g. Jira) for a project.
+    pub fn list_entity_ids_with_external_provider(
+        &self,
+        project_id: &str,
+        provider: &str,
+    ) -> anyhow::Result<Vec<String>> {
+        let conn = self.pool.get().context("get sqlite conn")?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT entity_id FROM entity_external_ids WHERE project_id = ?1 AND provider = ?2",
+            )
+            .context("prepare list entity_external_ids")?;
+        let rows = stmt
+            .query_map(params![project_id, provider], |r| r.get::<_, String>(0))
+            .context("query list entity_external_ids")?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row.context("read entity_id")?);
+        }
+        Ok(out)
+    }
+
     pub fn get_user_import_config(&self, user_id: &str, provider: &str) -> anyhow::Result<Option<String>> {
         let key = format!("import_config:{}:{}", user_id, provider);
         let conn = self.pool.get().context("get sqlite conn")?;

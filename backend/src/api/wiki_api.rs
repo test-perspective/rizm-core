@@ -1,8 +1,7 @@
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    routing::put,
-    routing::get,
+    routing::{get, post, put},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
@@ -11,7 +10,7 @@ use serde_json::Value;
 use crate::app_state::AppState;
 use crate::auth::AuthedUser;
 use crate::permissions::{can_read, can_write};
-use crate::search::indexer::enqueue_entity_upsert;
+use crate::search::indexer::{enqueue_entity_delete, enqueue_entity_upsert};
 use crate::ApiError;
 use axum::Extension;
 
@@ -54,6 +53,24 @@ struct SaveWikiCollabRequest {
     crdt_blob: Vec<u8>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MoveWikiPageRequest {
+    destination_project_id: String,
+    #[serde(default)]
+    destination_parent_id: Option<String>,
+    #[serde(default)]
+    before_page_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MoveWikiPageResponse {
+    destination_project_id: String,
+    root_page_id: String,
+    moved_page_ids: Vec<String>,
+}
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .route(
@@ -63,6 +80,10 @@ pub fn router() -> Router<AppState> {
         .route(
             "/api/projects/:project_id/wiki/pages/:page_id",
             get(get_wiki_page),
+        )
+        .route(
+            "/api/projects/:project_id/wiki/pages/:page_id/move",
+            post(move_wiki_page),
         )
         .route(
             "/api/projects/:project_id/wiki/pages/:page_id/collab",
@@ -217,6 +238,73 @@ async fn get_wiki_page(
         node_type,
         parent_id,
         order,
+    }))
+}
+
+async fn move_wiki_page(
+    State(state): State<AppState>,
+    Path((source_project_id, page_id)): Path<(String, String)>,
+    Extension(user): Extension<AuthedUser>,
+    Json(req): Json<MoveWikiPageRequest>,
+) -> Result<Json<MoveWikiPageResponse>, ApiError> {
+    let dest = req.destination_project_id.trim();
+    if dest.is_empty() {
+        return Err(ApiError::bad_request("destinationProjectId is required"));
+    }
+    let dest = dest.to_string();
+
+    let db = state.db.read().await;
+    if !can_write(&db, &source_project_id, Some(&user)).map_err(|_| ApiError::internal())? {
+        return Err(ApiError::forbidden("insufficient permissions"));
+    }
+    if !can_write(&db, &dest, Some(&user)).map_err(|_| ApiError::internal())? {
+        return Err(ApiError::forbidden("insufficient permissions"));
+    }
+
+    let outcome = db
+        .move_wiki_page_subtree(
+            &state.db_path,
+            &source_project_id,
+            &page_id,
+            &dest,
+            req.destination_parent_id.as_deref(),
+            req.before_page_id.as_deref(),
+            &user.user_id,
+        )
+        .map_err(|e| {
+            let msg = e.to_string();
+            if msg.contains("not found") {
+                return ApiError::not_found("not found");
+            }
+            if msg.contains("cannot move")
+                || msg.contains("invalid")
+                || msg.contains("destination")
+                || msg.contains("beforePage")
+                || msg.contains("attachment destination")
+            {
+                return ApiError::bad_request(msg);
+            }
+            tracing::error!(error = %e, "wiki move failed");
+            ApiError::internal()
+        })?;
+
+    let root_page_id = page_id.clone();
+    let moved_page_ids = outcome.moved_page_ids.clone();
+    let destination_project_id = outcome.dest_project_id.clone();
+
+    drop(db);
+
+    for (pid, pk) in outcome.index_deletes {
+        enqueue_entity_delete(state.clone(), pid, pk);
+    }
+    for (pid, ent) in outcome.index_upserts {
+        enqueue_entity_upsert(state.clone(), pid, ent);
+    }
+
+    Ok(Json(MoveWikiPageResponse {
+        destination_project_id,
+        root_page_id,
+        moved_page_ids,
     }))
 }
 

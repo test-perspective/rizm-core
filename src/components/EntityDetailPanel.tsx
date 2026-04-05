@@ -7,6 +7,7 @@ import { CommentsSection } from './entityDetail/comments/CommentsSection';
 import { PropertyInput } from './entityDetail/inputs/PropertyInput';
 import type { EntityDetailPanelProps } from './entityDetail/entityDetailPanelTypes';
 import { useEntityDetailPanelModel } from './entityDetail/useEntityDetailPanelModel';
+import { shouldSuppressAdjacentEntityNavigation } from '../utils/entityDetailKeyboardGuards';
 
 const DEFAULT_WIDTH = 672;
 const MIN_WIDTH = 360;
@@ -35,6 +36,8 @@ export const EntityDetailPanel = ({
   usersById = {},
   onResolveUsers,
   allowSchemaEdit = true,
+  onNavigateDetailPrev,
+  onNavigateDetailNext,
 }: EntityDetailPanelProps) => {
   const {
     user,
@@ -106,16 +109,31 @@ export const EntityDetailPanel = ({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || e.defaultPrevented) return;
-      if (schemaOpen) {
-        setSchemaOpen(false);
-      } else {
-        void handleClose();
+      if (e.key === 'Escape' && !e.defaultPrevented) {
+        if (schemaOpen) {
+          setSchemaOpen(false);
+        } else {
+          void handleClose();
+        }
+        return;
       }
+
+      if (schemaOpen) return;
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      if (shouldSuppressAdjacentEntityNavigation(e)) return;
+
+      if (e.key === 'ArrowLeft') {
+        if (!onNavigateDetailPrev) return;
+        onNavigateDetailPrev();
+      } else {
+        if (!onNavigateDetailNext) return;
+        onNavigateDetailNext();
+      }
+      e.preventDefault();
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [schemaOpen, setSchemaOpen, handleClose]);
+  }, [schemaOpen, setSchemaOpen, handleClose, onNavigateDetailPrev, onNavigateDetailNext]);
 
   useEffect(() => {
     if (!allowSchemaEdit && schemaOpen) {
@@ -224,8 +242,14 @@ export const EntityDetailPanel = ({
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {properties.filter((p) => p.name !== 'taskKey').map((prop) => (
             <div key={prop.name}>
-              <label className="block text-sm font-medium text-zinc-400 mb-2 capitalize">{prop.name}</label>
-              {renderInput(prop)}
+              {prop.type === 'richtext' ? (
+                renderInput(prop)
+              ) : (
+                <>
+                  <label className="block text-sm font-medium text-zinc-400 mb-2 capitalize">{prop.name}</label>
+                  {renderInput(prop)}
+                </>
+              )}
             </div>
           ))}
 

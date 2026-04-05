@@ -16,6 +16,7 @@ vi.mock('react-router-dom', () => ({
     state: null,
     key: 'default',
   }),
+  useNavigate: () => vi.fn(),
 }));
 
 vi.mock('../auth/AuthContext', () => ({

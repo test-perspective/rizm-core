@@ -153,6 +153,7 @@ function buildProps(overrides: Partial<OverlaysProps> = {}): OverlaysProps {
       `/p/${encodeURIComponent(projectId)}/v/${encodeURIComponent(viewId)}${
         entityId ? `/e/${encodeURIComponent(entityId)}` : ''
       }`,
+    detailNavEntityIds: [],
     ...overrides,
   };
 }
@@ -182,6 +183,69 @@ describe('WorkspaceOverlays', () => {
     expect(detailPropsRef.current?.titleLikeProperty).toBe('title');
     expect(detailPropsRef.current?.allowSchemaEdit).toBe(false);
     expect(detailPropsRef.current?.entity).toEqual(taskInstance);
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('does not pass detail arrow navigation callbacks for wiki task overlay', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <WorkspaceOverlays
+          {...buildProps({
+            overlayEntity: taskInstance,
+            currentView: wikiManifest.views[0],
+            currentEntity: wikiEntityDef,
+            currentEntities: [wikiPageEntity],
+            effectiveViewId: 'wikiView',
+            detailNavEntityIds: ['task-1', 'task-2'],
+          })}
+        />
+      );
+    });
+
+    expect(detailPropsRef.current?.onNavigateDetailPrev).toBeUndefined();
+    expect(detailPropsRef.current?.onNavigateDetailNext).toBeUndefined();
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('passes detail navigation callbacks for table URL detail that call navigate', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <WorkspaceOverlays
+          {...buildProps({
+            overlayEntity: null,
+            selectedEntityFromUrl: taskInstance,
+            currentView: tableView,
+            currentEntity: taskEntityDef,
+            currentEntities: [taskInstance],
+            effectiveViewId: 'tableView',
+            detailNavEntityIds: ['before', 'task-1', 'after'],
+          })}
+        />
+      );
+    });
+
+    const prev = detailPropsRef.current?.onNavigateDetailPrev as (() => void) | undefined;
+    const next = detailPropsRef.current?.onNavigateDetailNext as (() => void) | undefined;
+    expect(prev).toBeTypeOf('function');
+    expect(next).toBeTypeOf('function');
+
+    act(() => prev?.());
+    expect(mockNavigate).toHaveBeenCalledWith('/p/p1/v/tableView/e/before', { replace: false });
+
+    act(() => next?.());
+    expect(mockNavigate).toHaveBeenCalledWith('/p/p1/v/tableView/e/after', { replace: false });
 
     act(() => root.unmount());
     container.remove();

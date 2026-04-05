@@ -80,6 +80,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/status", get(health))
         .merge(crate::mcp_http::router())
         .merge(crate::auth::router())
+        .merge(crate::api::scm_api::public_bitbucket_oauth_router())
         .with_state(state.clone());
 
     let protected = Router::new()
