@@ -76,6 +76,8 @@ type WorkspaceOverlaysProps = {
   buildPath: BuildPathFn;
   /** Ordered entity ids for ArrowLeft/ArrowRight in detail (table: current page, board: same lane). */
   detailNavEntityIds?: string[];
+  /** REQ-288: skip dim/blur over the embedded notes pane (pixels from left edge). */
+  entityDetailBackdropExcludeLeftPx?: number;
 };
 
 export function WorkspaceOverlays(props: WorkspaceOverlaysProps) {
@@ -134,6 +136,7 @@ export function WorkspaceOverlays(props: WorkspaceOverlaysProps) {
     onProgressClose,
     buildPath,
     detailNavEntityIds = [],
+    entityDetailBackdropExcludeLeftPx = 0,
   } = props;
 
   const detailSchemaEntity: EntityDefinition =
@@ -265,6 +268,7 @@ export function WorkspaceOverlays(props: WorkspaceOverlaysProps) {
             onResolveUsers={onResolveUsers}
             onNavigateDetailPrev={onNavigateDetailPrev}
             onNavigateDetailNext={onNavigateDetailNext}
+            backdropExcludeLeftPx={entityDetailBackdropExcludeLeftPx}
           />
           </EntityDetailPanelErrorBoundary>
         )}

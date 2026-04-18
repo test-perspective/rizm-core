@@ -11,4 +11,6 @@ export interface SidebarProps {
   onViewChange: (viewId: string) => void;
   onOpenProjectDetail?: () => void;
   onReorderViews?: (orderedViewIds: string[]) => void;
+  /** REQ-288: when true, only NewProjectModal is rendered (sidebar column hidden). */
+  notesPaneOccluding?: boolean;
 }

@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useKeel } from './hooks/useKeel';
-import { Sidebar } from './components/Sidebar';
+import { Sidebar, type SidebarHandle } from './components/Sidebar';
 import { Entity, ViewConfig, type ProjectManifest } from './types';
 import { reorderViews } from './utils/manifestMutations';
 import { useAppDialog } from './components/dialogs';
@@ -16,7 +16,12 @@ import { useCreateEntityHandler } from './workspace/useCreateEntityHandler';
 import { resolveViewIdForSearchKind } from './workspace/searchRouting';
 import { useWorkspaceManifestHandlers } from './workspace/useWorkspaceManifestHandlers';
 import { WorkspaceHeader } from './components/workspace/WorkspaceHeader';
-import { WorkspaceViewPanel } from './components/workspace/WorkspaceViewPanel';
+import {
+  WorkspaceViewPanel,
+  type WorkspaceNotesPaneConfig,
+} from './components/workspace/WorkspaceViewPanel';
+import { NotePanePagePickerDialog } from './components/workspace/NotePanePagePickerDialog';
+import type { ViewTitleNotesMenu } from './components/BoardViewMenu';
 import { WorkspaceStateScreens } from './components/workspace/WorkspaceStateScreens';
 import { WorkspaceOverlays } from './components/workspace/WorkspaceOverlays';
 import { useCreateProjectHandler } from './workspace/useCreateProjectHandler';
@@ -24,6 +29,13 @@ import { fetchProjectState } from './api/projects';
 import type { SearchResult } from './api/search';
 import { prepareSelectOptionRenameInManifest, finalizeSelectOptionRenameInManifest } from './utils/renameSelectOption';
 import { waitForManifestPutQueueDrain } from './hooks/useKeel/manifestPutQueue';
+import type { NotePanePrefs } from './workspace/notePaneStorage';
+import {
+  getNotePanePrefs,
+  setNotePanePrefs,
+  getDefaultNotePaneWidthPx,
+  notePaneWidthBounds,
+} from './workspace/notePaneStorage';
 
 export function KeelWorkspace() {
   const dialog = useAppDialog();
@@ -67,6 +79,14 @@ export function KeelWorkspace() {
   /** Entity ids in table current page or board lane — for detail panel ArrowLeft/ArrowRight. */
   const [detailNavEntityIds, setDetailNavEntityIds] = useState<string[]>([]);
   const wikiCreateRef = useRef<(() => void) | null>(null);
+  const sidebarRef = useRef<SidebarHandle>(null);
+  const [notePanePickerOpen, setNotePanePickerOpen] = useState(false);
+  const [notePanePickerTargetViewId, setNotePanePickerTargetViewId] = useState<string | null>(null);
+  const [notePaneLocal, setNotePaneLocal] = useState<NotePanePrefs>(() => ({
+    open: false,
+    pageId: null,
+    widthPx: getDefaultNotePaneWidthPx(),
+  }));
 
   useEffect(() => {
     if (consumeReturnToProjectDetailsAfterScmOAuth()) {
@@ -133,6 +153,17 @@ export function KeelWorkspace() {
     clearPendingUrlProjectId,
   });
 
+  const wikiViewConfig = useMemo(() => {
+    if (!manifest) return null;
+    const v = manifest.views.find((x) => x.type === 'wiki');
+    return v ? { viewId: v.id, entityId: v.entityId } : null;
+  }, [manifest]);
+
+  const wikiPagesForNotes = useMemo(() => {
+    if (!wikiViewConfig) return [];
+    return entities.filter((e) => e.entityId === wikiViewConfig.entityId);
+  }, [entities, wikiViewConfig]);
+
   // Only clear when leaving table/board. Do not depend on effectiveViewId — switching board→table
   // changes view id; clearing on every view id change can run after the table repopulates and wipe ids.
   useEffect(() => {
@@ -151,6 +182,94 @@ export function KeelWorkspace() {
       return ids;
     });
   }, []);
+
+  useEffect(() => {
+    if (!activeProjectId || !effectiveViewId || !currentView) return;
+    if (currentView.type !== 'board' && currentView.type !== 'table') return;
+    setNotePaneLocal(getNotePanePrefs(activeProjectId, effectiveViewId));
+  }, [activeProjectId, effectiveViewId, currentView?.type, currentView?.id]);
+
+  useEffect(() => {
+    if (!activeProjectId || !effectiveViewId || !currentView) return;
+    if (currentView.type !== 'board' && currentView.type !== 'table') return;
+    setNotePaneLocal((prev) => {
+      if (!prev.open || !prev.pageId) return prev;
+      if (wikiPagesForNotes.some((p) => p.id === prev.pageId)) return prev;
+      const next: NotePanePrefs = {
+        ...prev,
+        pageId: wikiPagesForNotes[0]?.id ?? null,
+      };
+      setNotePanePrefs(activeProjectId, effectiveViewId, next);
+      return next;
+    });
+  }, [activeProjectId, effectiveViewId, currentView?.type, currentView?.id, wikiPagesForNotes]);
+
+  const persistNotePaneForView = useCallback(
+    (viewId: string, next: NotePanePrefs) => {
+      setNotePanePrefs(activeProjectId, viewId, next);
+      if (viewId === effectiveViewId) {
+        setNotePaneLocal(next);
+      }
+    },
+    [activeProjectId, effectiveViewId]
+  );
+
+  const hideNotePaneForView = useCallback(
+    (viewId: string) => {
+      const prev = getNotePanePrefs(activeProjectId, viewId);
+      persistNotePaneForView(viewId, { ...prev, open: false });
+    },
+    [activeProjectId, persistNotePaneForView]
+  );
+
+  const openNotePanePickerForView = useCallback((viewId: string) => {
+    setNotePanePickerTargetViewId(viewId);
+    setNotePanePickerOpen(true);
+  }, []);
+
+  const handleNotePanePickerConfirm = useCallback(
+    (pageId: string, targetViewId: string) => {
+      const prev = getNotePanePrefs(activeProjectId, targetViewId);
+      const widthPx =
+        prev.widthPx >= notePaneWidthBounds.min ? prev.widthPx : getDefaultNotePaneWidthPx();
+      const next: NotePanePrefs = { open: true, pageId, widthPx };
+      setNotePanePrefs(activeProjectId, targetViewId, next);
+      setNotePanePickerOpen(false);
+      setNotePanePickerTargetViewId(null);
+      if (targetViewId !== effectiveViewId) {
+        setLastViewForProject(activeProjectId, targetViewId);
+        navigate(buildPath({ projectId: activeProjectId, viewId: targetViewId }), { replace: false });
+      } else {
+        setNotePaneLocal(next);
+      }
+    },
+    [activeProjectId, navigate, buildPath, effectiveViewId]
+  );
+
+  const handleNotesWikiDelete = useCallback(
+    (id: string) => {
+      if (!wikiViewConfig) return;
+      const pages = entities.filter((e) => e.entityId === wikiViewConfig.entityId);
+      const collectDescendants = (parentId: string): string[] =>
+        pages
+          .filter((e) => e.properties?.parentId === parentId)
+          .flatMap((e) => [e.id, ...collectDescendants(e.id)]);
+      const toDelete = [id, ...collectDescendants(id)];
+      toDelete.forEach((entityId) => removeEntity(entityId));
+      const remaining = pages.filter((e) => !toDelete.includes(e.id));
+      if (!effectiveViewId) return;
+      setNotePaneLocal((prev) => {
+        if (!prev.open || !prev.pageId || !toDelete.includes(prev.pageId)) return prev;
+        const next: NotePanePrefs = {
+          ...prev,
+          pageId: remaining[0]?.id ?? null,
+        };
+        setNotePanePrefs(activeProjectId, effectiveViewId, next);
+        return next;
+      });
+    },
+    [wikiViewConfig, entities, removeEntity, activeProjectId, effectiveViewId]
+  );
 
   const searchQueryFromLocation =
     (location.state as { searchQuery?: string } | null)?.searchQuery ?? undefined;
@@ -312,6 +431,90 @@ export function KeelWorkspace() {
 
   const scmIntegrationEnabled = manifest.entities.some((e) => e.id === 'scmIntegration');
 
+  const notesOccludeSidebar =
+    notePaneLocal.open && (currentView.type === 'board' || currentView.type === 'table');
+
+  const viewTitleNotesMenu: ViewTitleNotesMenu | undefined =
+    wikiViewConfig && (currentView.type === 'board' || currentView.type === 'table')
+      ? {
+          show: true,
+          wikiPagesCount: wikiPagesForNotes.length,
+          isNotePaneOpen: notePaneLocal.open,
+          onOpenPicker: () => {
+            if (effectiveViewId) openNotePanePickerForView(effectiveViewId);
+          },
+          onHide: () => {
+            if (effectiveViewId) hideNotePaneForView(effectiveViewId);
+          },
+        }
+      : undefined;
+
+  const notesPaneForPanel: WorkspaceNotesPaneConfig | null =
+    wikiViewConfig &&
+    effectiveViewId &&
+    (currentView.type === 'board' || currentView.type === 'table') &&
+    notePaneLocal.open
+      ? (() => {
+          const ev = effectiveViewId;
+          return {
+            wikiViewId: wikiViewConfig.viewId,
+            wikiPages: wikiPagesForNotes,
+            pageId: notePaneLocal.pageId,
+            widthPx: notePaneLocal.widthPx,
+            onPageIdChange: (id: string) => {
+              setNotePaneLocal((prev) => {
+                const next = { ...prev, pageId: id };
+                setNotePanePrefs(activeProjectId, ev, next);
+                return next;
+              });
+            },
+            onClose: () => {
+              hideNotePaneForView(ev);
+            },
+            onWidthChangeEnd: (w: number) => {
+              setNotePaneLocal((prev) => {
+                const next = { ...prev, widthPx: w };
+                setNotePanePrefs(activeProjectId, ev, next);
+                return next;
+              });
+            },
+            onWikiCreate: (opts) => {
+              const props: Record<string, unknown> = { title: '', doc: '' };
+              if (opts?.parentId !== undefined) props.parentId = opts.parentId;
+              if (opts?.nodeType) props.nodeType = opts.nodeType;
+              return addEntity(wikiViewConfig.entityId, props);
+            },
+            onWikiDelete: handleNotesWikiDelete,
+            onWikiUpdate: modifyEntity,
+            onWikiEntityClick: (e) => setOverlayEntity(e),
+            onRefreshProject: refreshActiveProject,
+            onServerEntity: applyServerEntity,
+            searchQuery: searchQueryFromLocation,
+          };
+        })()
+      : null;
+
+  const headerNotesChrome =
+    notesOccludeSidebar && effectiveViewId
+      ? {
+          projects,
+          activeProjectId,
+          onProjectChange: (projectId: string) => {
+            setOverlayEntity(null);
+            navigate(`/p/${encodeURIComponent(projectId)}`, { replace: false });
+          },
+          visibleViews: manifest.views.filter((v) => v.type !== 'list'),
+          currentViewId: effectiveViewId,
+          onViewChange: (viewId: string) => {
+            setLastViewForProject(activeProjectId, viewId);
+            setOverlayEntity(null);
+            navigate(buildPath({ projectId: activeProjectId, viewId }), { replace: false });
+          },
+          onOpenProjectDetail: () => setProjectDetailDialogOpen(true),
+          onAddProject: () => sidebarRef.current?.openNewProject(),
+        }
+      : null;
+
   const handleNavigateEntity = (entityId: string) => {
     if (effectiveViewId) {
       navigate(buildPath({ projectId: activeProjectId, viewId: effectiveViewId, entityId }), { replace: false });
@@ -346,6 +549,7 @@ export function KeelWorkspace() {
   return (
     <div className="flex h-full min-h-0 flex-1 bg-zinc-950 text-white overflow-hidden">
       <Sidebar
+        ref={sidebarRef}
         projects={projects}
         activeProjectId={activeProjectId}
         onProjectChange={(projectId) => {
@@ -372,6 +576,7 @@ export function KeelWorkspace() {
             console.error('Failed to reorder views:', e);
           }
         }}
+        notesPaneOccluding={notesOccludeSidebar}
       />
 
       <div className="flex-1 min-w-0 flex flex-col">
@@ -386,6 +591,8 @@ export function KeelWorkspace() {
               : handleCreateEntity
           }
           onOpenBoardConfig={() => setBoardConfigOpen(true)}
+          viewTitleNotes={viewTitleNotesMenu}
+          notesChrome={headerNotesChrome}
         />
 
         <WorkspaceViewPanel
@@ -449,8 +656,20 @@ export function KeelWorkspace() {
           onServerEntity={applyServerEntity}
           searchQuery={searchQueryFromLocation}
           wikiCreateRef={wikiCreateRef}
+          notesPane={notesPaneForPanel}
         />
       </div>
+
+      <NotePanePagePickerDialog
+        open={notePanePickerOpen}
+        pages={wikiPagesForNotes}
+        targetViewId={notePanePickerTargetViewId}
+        onClose={() => {
+          setNotePanePickerOpen(false);
+          setNotePanePickerTargetViewId(null);
+        }}
+        onConfirm={handleNotePanePickerConfirm}
+      />
 
       <WorkspaceOverlays
         commandPaletteOpen={commandPaletteOpen}
@@ -524,6 +743,7 @@ export function KeelWorkspace() {
         onProgressClose={handleProgressClose}
         buildPath={buildPath}
         detailNavEntityIds={detailNavEntityIds}
+        entityDetailBackdropExcludeLeftPx={notesPaneForPanel?.widthPx ?? 0}
       />
     </div>
   );

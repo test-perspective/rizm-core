@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Entity } from '../../../types';
 import type { Me } from '../../../auth/types';
 import type { TaskComment } from '../../../utils/comments';
@@ -58,6 +58,20 @@ export const CommentsSection = ({
 }: CommentsSectionProps) => {
   const [commentDraft, setCommentDraft] = useState<string>('');
   const [commentDraftRev, setCommentDraftRev] = useState(0);
+  const [composerExpanded, setComposerExpanded] = useState(false);
+
+  useEffect(() => {
+    setCommentDraft('');
+    setCommentDraftRev((r) => r + 1);
+    setComposerExpanded(false);
+    onNewCommentDraftChange('');
+    // Reset local composer when switching entity; parent callback is latest from closure.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run on entity.id
+  }, [entity.id]);
+
+  const hasDraft =
+    !!String(commentDraft ?? '').trim() && !isBlockNoteDocBlank(commentDraft);
+  const showComposerEditor = canComment && (composerExpanded || hasDraft);
 
   const handleAdd = () => {
     const doc = String(commentDraft ?? '').trim();
@@ -65,6 +79,7 @@ export const CommentsSection = ({
     if (onAddComment(doc)) {
       setCommentDraft('');
       setCommentDraftRev((r) => r + 1);
+      setComposerExpanded(false);
       onNewCommentDraftChange('');
     }
   };
@@ -80,35 +95,50 @@ export const CommentsSection = ({
 
       <div className="bg-zinc-950 border border-zinc-800 rounded-lg overflow-hidden">
         <div className="p-3 border-b border-zinc-800 bg-zinc-900/30">
-          <div className="text-xs text-zinc-500 mb-2">Add a comment</div>
-          <div className="bg-zinc-950 border border-zinc-800 rounded-md overflow-hidden">
-            <div className="p-3 bg-zinc-950">
-              <RichTextEditor
-                key={`${entity.id}:commentDraft:${commentDraftRev}`}
-                value={commentDraft}
-                editable={canComment}
-                onChange={(docJson) => {
-                  setCommentDraft(docJson);
-                  onNewCommentDraftChange(docJson);
-                }}
-                entities={entities}
-                onEntityClick={onEntityClick}
-              />
-            </div>
-          </div>
-          <div className="mt-3 flex items-center justify-between gap-3">
-            <div className="text-xs text-zinc-600">
-              {canComment ? 'Enter in Wiki format (BlockNote).' : 'Read-only access cannot add comments.'}
-            </div>
+          {showComposerEditor ? (
+            <>
+              <div className="text-xs text-zinc-500 mb-2">Add a comment</div>
+              <div className="bg-zinc-950 border border-zinc-800 rounded-md overflow-hidden">
+                <div className="p-3 bg-zinc-950" data-testid="comment-composer-expanded">
+                  <RichTextEditor
+                    key={`${entity.id}:commentDraft:${commentDraftRev}`}
+                    value={commentDraft}
+                    editable={canComment}
+                    onChange={(docJson) => {
+                      setCommentDraft(docJson);
+                      onNewCommentDraftChange(docJson);
+                    }}
+                    entities={entities}
+                    onEntityClick={onEntityClick}
+                  />
+                </div>
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <div className="text-xs text-zinc-600">Enter in Wiki format (BlockNote).</div>
+                <button
+                  type="button"
+                  onClick={handleAdd}
+                  disabled={!canComment || !commentDraft.trim() || isBlockNoteDocBlank(commentDraft)}
+                  className="px-3 py-2 bg-violet-600 hover:bg-violet-500 disabled:bg-zinc-800 disabled:text-zinc-500 rounded-md transition-colors text-sm"
+                >
+                  Add
+                </button>
+              </div>
+            </>
+          ) : canComment ? (
             <button
               type="button"
-              onClick={handleAdd}
-              disabled={!canComment || !commentDraft.trim() || isBlockNoteDocBlank(commentDraft)}
-              className="px-3 py-2 bg-violet-600 hover:bg-violet-500 disabled:bg-zinc-800 disabled:text-zinc-500 rounded-md transition-colors text-sm"
+              data-testid="comment-composer-collapsed"
+              onClick={() => setComposerExpanded(true)}
+              className="w-full text-left rounded-md border border-zinc-800/70 bg-zinc-950/40 px-3 py-2 text-sm text-zinc-500 transition-colors hover:border-zinc-700 hover:bg-zinc-950/70 hover:text-zinc-400"
             >
-              Add
+              Write a comment...
             </button>
-          </div>
+          ) : (
+            <div className="rounded-md border border-transparent px-1 py-1.5 text-xs text-zinc-600">
+              Read-only access cannot add comments.
+            </div>
+          )}
         </div>
 
         <div className="p-3 space-y-3">

@@ -125,6 +125,26 @@ describe('EntityDetailPanel', () => {
     container.remove();
   });
 
+  it('renders a non-interactive left strip when backdropExcludeLeftPx is set (notes pane)', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<EntityDetailPanel {...baseProps} backdropExcludeLeftPx={240} />);
+    });
+
+    const strip = container.querySelector('[aria-hidden="true"]') as HTMLElement | null;
+    expect(strip).not.toBeNull();
+    expect(strip?.className).toContain('pointer-events-none');
+    expect(strip?.style.width).toBe('240px');
+
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
   it('calls onNavigateDetailPrev on ArrowLeft when provided', async () => {
     mockSchemaOpen = false;
     const onPrev = vi.fn();

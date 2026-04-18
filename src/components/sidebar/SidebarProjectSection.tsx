@@ -1,10 +1,11 @@
-import { MoreVertical } from 'lucide-react';
-import type { SidebarProps } from './sidebarTypes';
+import type { ProjectMeta } from '../../types';
+import { ProjectOverflowMenu } from './ProjectOverflowMenu';
 
-interface SidebarProjectSectionProps extends Pick<SidebarProps, 'projects' | 'activeProjectId' | 'onProjectChange' | 'onOpenProjectDetail'> {
-  menuOpen: boolean;
-  setMenuOpen: (v: boolean) => void;
-  menuRef: React.RefObject<HTMLDivElement>;
+interface SidebarProjectSectionProps {
+  projects: ProjectMeta[];
+  activeProjectId: string;
+  onProjectChange: (projectId: string) => void;
+  onOpenProjectDetail?: () => void;
   onAddProject: () => void;
 }
 
@@ -13,9 +14,6 @@ export function SidebarProjectSection({
   activeProjectId,
   onProjectChange,
   onOpenProjectDetail,
-  menuOpen,
-  setMenuOpen,
-  menuRef,
   onAddProject,
 }: SidebarProjectSectionProps) {
   return (
@@ -42,41 +40,11 @@ export function SidebarProjectSection({
               </option>
             ))}
           </select>
-          <div className="relative flex-shrink-0" ref={menuRef}>
-            <button
-              onClick={() => setMenuOpen(!menuOpen)}
-              className="p-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-md transition-colors"
-              title="Project menu"
-              type="button"
-            >
-              <MoreVertical className="w-4 h-4 text-zinc-200" />
-            </button>
-            {menuOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-zinc-900 border border-zinc-800 rounded-lg shadow-lg z-50">
-                <div className="py-1">
-                  {onOpenProjectDetail && (
-                    <button
-                      onClick={() => {
-                        onOpenProjectDetail();
-                        setMenuOpen(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-sm text-white hover:bg-zinc-800 transition-colors"
-                      type="button"
-                    >
-                      Project Details
-                    </button>
-                  )}
-                  <button
-                    onClick={onAddProject}
-                    className="w-full text-left px-4 py-2 text-sm text-white hover:bg-zinc-800 transition-colors"
-                    type="button"
-                  >
-                    Add Project
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          <ProjectOverflowMenu
+            onOpenProjectDetail={onOpenProjectDetail}
+            onAddProject={onAddProject}
+            menuButtonTestId="sidebar-project-overflow-menu"
+          />
         </div>
       </div>
     </div>

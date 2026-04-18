@@ -38,6 +38,7 @@ export const EntityDetailPanel = ({
   allowSchemaEdit = true,
   onNavigateDetailPrev,
   onNavigateDetailNext,
+  backdropExcludeLeftPx = 0,
 }: EntityDetailPanelProps) => {
   const {
     user,
@@ -189,10 +190,19 @@ export const EntityDetailPanel = ({
     );
   };
 
+  const excludeLeft = Math.max(0, Math.floor(backdropExcludeLeftPx));
+
   return (
-    <div className="fixed inset-0 z-40 flex justify-end">
+    <div className="fixed inset-0 z-40 flex w-full min-w-0 flex-row">
+      {excludeLeft > 0 ? (
+        <div
+          className="h-full shrink-0 pointer-events-none"
+          style={{ width: excludeLeft }}
+          aria-hidden
+        />
+      ) : null}
       <div
-        className="flex-1 bg-black/60 backdrop-blur-sm"
+        className="min-w-0 flex-1 bg-black/60 backdrop-blur-sm"
         onClick={handleClose}
       />
       <div

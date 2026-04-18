@@ -29,4 +29,8 @@ export interface EntityDetailPanelProps {
   onNavigateDetailPrev?: () => void;
   /** Optional: navigate to next issue in the current table page / board lane (ArrowRight). */
   onNavigateDetailNext?: () => void;
+  /**
+   * Pixels from the left viewport edge to skip dim/blur (REQ-288: embedded wiki notes pane stays sharp).
+   */
+  backdropExcludeLeftPx?: number;
 }

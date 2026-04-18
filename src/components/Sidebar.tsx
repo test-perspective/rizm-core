@@ -1,5 +1,5 @@
 import { useAuth } from '../auth/AuthContext';
-import { useMemo, useState, useRef, useEffect } from 'react';
+import { useMemo, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { NewProjectModal, type NewProjectType } from './sidebar/NewProjectModal';
 import type { SidebarProps } from './sidebar/sidebarTypes';
 import { isValidProjectKey, normalizeProjectKey } from './sidebar/sidebarUtils';
@@ -8,17 +8,25 @@ import { SidebarProjectSection } from './sidebar/SidebarProjectSection';
 import { SidebarViewsSection } from './sidebar/SidebarViewsSection';
 import { SidebarFooter } from './sidebar/SidebarFooter';
 
-export const Sidebar = ({
-  projects,
-  activeProjectId,
-  onProjectChange,
-  onCreateProject,
-  manifest,
-  currentView,
-  onViewChange,
-  onOpenProjectDetail,
-  onReorderViews,
-}: SidebarProps) => {
+export type SidebarHandle = {
+  openNewProject: () => void;
+};
+
+export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(function Sidebar(
+  {
+    projects,
+    activeProjectId,
+    onProjectChange,
+    onCreateProject,
+    manifest,
+    currentView,
+    onViewChange,
+    onOpenProjectDetail,
+    onReorderViews,
+    notesPaneOccluding = false,
+  },
+  ref
+) {
   const { user } = useAuth();
   const canEdit = !!user && user.role !== 'viewer';
   const [newProjectOpen, setNewProjectOpen] = useState(false);
@@ -30,8 +38,6 @@ export const Sidebar = ({
   const [newProjectPromptEnabled, setNewProjectPromptEnabled] = useState(false);
   const [keyAvailability, setKeyAvailability] = useState<'unknown' | 'available' | 'taken'>('unknown');
   const [keyAvailabilityChecking, setKeyAvailabilityChecking] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
 
   const { suggestProjectKey } = useProjectKeySuggestion(
     projects,
@@ -44,24 +50,12 @@ export const Sidebar = ({
     setKeyAvailabilityChecking
   );
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    if (menuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [menuOpen]);
-
   const visibleViews = useMemo(
     () => manifest.views.filter((view) => view.type !== 'list'),
     [manifest.views]
   );
 
-  const handleAddProject = () => {
+  const handleAddProject = useCallback(() => {
     const name = 'Development';
     setNewProjectName(name);
     setKeyManuallyEdited(false);
@@ -70,8 +64,44 @@ export const Sidebar = ({
     setNewProjectPrompt('');
     setNewProjectPromptEnabled(false);
     setNewProjectOpen(true);
-    setMenuOpen(false);
-  };
+  }, []);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      openNewProject: handleAddProject,
+    }),
+    [handleAddProject]
+  );
+
+  const modal = (
+    <NewProjectModal
+      isOpen={newProjectOpen}
+      newProjectName={newProjectName}
+      newProjectKey={newProjectKey}
+      keyManuallyEdited={keyManuallyEdited}
+      newProjectType={newProjectType}
+      newProjectPrompt={newProjectPrompt}
+      newProjectPromptEnabled={newProjectPromptEnabled}
+      normalizeProjectKey={normalizeProjectKey}
+      isValidProjectKey={isValidProjectKey}
+      onSuggestProjectKey={suggestProjectKey}
+      keyAvailability={keyAvailability}
+      keyAvailabilityChecking={keyAvailabilityChecking}
+      onClose={() => setNewProjectOpen(false)}
+      onCreateProject={onCreateProject}
+      setNewProjectName={setNewProjectName}
+      setNewProjectKey={setNewProjectKey}
+      setKeyManuallyEdited={setKeyManuallyEdited}
+      setNewProjectType={setNewProjectType}
+      setNewProjectPrompt={setNewProjectPrompt}
+      setNewProjectPromptEnabled={setNewProjectPromptEnabled}
+    />
+  );
+
+  if (notesPaneOccluding) {
+    return <>{modal}</>;
+  }
 
   return (
     <div className="w-64 bg-zinc-950 border-r border-zinc-800 flex flex-col">
@@ -80,9 +110,6 @@ export const Sidebar = ({
         activeProjectId={activeProjectId}
         onProjectChange={onProjectChange}
         onOpenProjectDetail={onOpenProjectDetail}
-        menuOpen={menuOpen}
-        setMenuOpen={setMenuOpen}
-        menuRef={menuRef}
         onAddProject={handleAddProject}
       />
 
@@ -96,28 +123,7 @@ export const Sidebar = ({
 
       {user && <SidebarFooter user={user} />}
 
-      <NewProjectModal
-        isOpen={newProjectOpen}
-        newProjectName={newProjectName}
-        newProjectKey={newProjectKey}
-        keyManuallyEdited={keyManuallyEdited}
-        newProjectType={newProjectType}
-        newProjectPrompt={newProjectPrompt}
-        newProjectPromptEnabled={newProjectPromptEnabled}
-        normalizeProjectKey={normalizeProjectKey}
-        isValidProjectKey={isValidProjectKey}
-        onSuggestProjectKey={suggestProjectKey}
-        keyAvailability={keyAvailability}
-        keyAvailabilityChecking={keyAvailabilityChecking}
-        onClose={() => setNewProjectOpen(false)}
-        onCreateProject={onCreateProject}
-        setNewProjectName={setNewProjectName}
-        setNewProjectKey={setNewProjectKey}
-        setKeyManuallyEdited={setKeyManuallyEdited}
-        setNewProjectType={setNewProjectType}
-        setNewProjectPrompt={setNewProjectPrompt}
-        setNewProjectPromptEnabled={setNewProjectPromptEnabled}
-      />
+      {modal}
     </div>
   );
-};
+});

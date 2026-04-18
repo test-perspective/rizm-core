@@ -1507,7 +1507,7 @@ dependencies = [
 
 [[package]]
 name = "keel-backend"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "argon2",

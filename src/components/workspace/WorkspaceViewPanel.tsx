@@ -3,6 +3,26 @@ import type { Entity, EntityDefinition, ProjectMeta, UserSummary, ViewConfig } f
 import { BoardView } from '../BoardView';
 import { TableView } from '../TableView';
 import { WikiView } from '../WikiView';
+import { EmbeddedWikiNotePane } from '../wiki/EmbeddedWikiNotePane';
+import { WorkspaceNoteSplit } from './WorkspaceNoteSplit';
+
+/** REQ-288: wiki side pane while on board/table */
+export type WorkspaceNotesPaneConfig = {
+  wikiViewId: string;
+  wikiPages: Entity[];
+  pageId: string | null;
+  widthPx: number;
+  onPageIdChange: (id: string) => void;
+  onClose: () => void;
+  onWidthChangeEnd: (widthPx: number) => void;
+  onWikiCreate: (opts?: { parentId?: string | null; nodeType?: 'page' | 'folder' }) => Entity;
+  onWikiDelete: (id: string) => void;
+  onWikiUpdate: (id: string, patch: Record<string, any>) => void;
+  onWikiEntityClick: (entity: Entity) => void;
+  onRefreshProject: () => void | Promise<unknown>;
+  onServerEntity: (entity: Entity, etag: string) => void;
+  searchQuery?: string;
+};
 
 type WorkspaceViewPanelProps = {
   currentView: ViewConfig;
@@ -35,6 +55,7 @@ type WorkspaceViewPanelProps = {
   onServerEntity: (entity: Entity, etag: string) => void;
   searchQuery?: string;
   wikiCreateRef?: MutableRefObject<(() => void) | null>;
+  notesPane?: WorkspaceNotesPaneConfig | null;
 };
 
 export function WorkspaceViewPanel({
@@ -67,7 +88,55 @@ export function WorkspaceViewPanel({
   onServerEntity,
   searchQuery,
   wikiCreateRef,
+  notesPane = null,
 }: WorkspaceViewPanelProps) {
+  const boardMain = (
+    <BoardView
+      entities={currentEntities}
+      view={currentView}
+      properties={currentEntity.properties}
+      projectId={activeProjectId}
+      scmIntegrationEnabled={scmIntegrationEnabled}
+      onEntityClick={(e) => {
+        if (effectiveViewId) {
+          onNavigateEntity(e.id);
+        }
+      }}
+      onEntityUpdate={onEntityUpdate}
+      onViewConfigUpdate={(updatedView: ViewConfig) => {
+        onViewConfigUpdate(updatedView);
+      }}
+      allEntities={entities}
+      usersById={usersById}
+      onRenameBoardColumn={onRenameBoardColumn}
+      columnRenameInProgress={boardColumnRenameBusy}
+      openDetailEntityId={detailUrlEntityId}
+      onBoardLaneEntityOrderForDetailChange={onDetailNavEntityOrderChange}
+    />
+  );
+
+  const tableMain = (
+    <TableView
+      entities={currentEntities}
+      view={currentView}
+      properties={currentEntity.properties}
+      onEntityUpdate={onEntityUpdate}
+      onUpsertPropertyOption={onUpsertPropertyOption}
+      onEntityClick={(e) => {
+        if (effectiveViewId) {
+          onNavigateEntity(e.id);
+        }
+      }}
+      allEntities={entities}
+      projectId={activeProjectId}
+      projectKey={activeProjectKey}
+      usersById={usersById}
+      onResolveUsers={onResolveUsers}
+      onReload={onRefreshProject}
+      onTablePageEntityOrderChange={onDetailNavEntityOrderChange}
+    />
+  );
+
   return (
     <div className="flex-1 min-w-0 min-h-0 overflow-hidden">
       {currentView.type === 'list' && (
@@ -78,51 +147,62 @@ export function WorkspaceViewPanel({
           </div>
         </div>
       )}
-      {currentView.type === 'board' && (
-        <BoardView
-          entities={currentEntities}
-          view={currentView}
-          properties={currentEntity.properties}
-          projectId={activeProjectId}
-          scmIntegrationEnabled={scmIntegrationEnabled}
-          onEntityClick={(e) => {
-            if (effectiveViewId) {
-              onNavigateEntity(e.id);
+      {currentView.type === 'board' &&
+        (notesPane ? (
+          <WorkspaceNoteSplit
+            widthPx={notesPane.widthPx}
+            onWidthChangeEnd={notesPane.onWidthChangeEnd}
+            left={
+              <EmbeddedWikiNotePane
+                projectId={activeProjectId}
+                wikiViewId={notesPane.wikiViewId}
+                wikiPages={notesPane.wikiPages}
+                allEntities={entities}
+                selectedPageId={notesPane.pageId}
+                onSelectPageId={notesPane.onPageIdChange}
+                onCreatePage={notesPane.onWikiCreate}
+                onDeletePage={notesPane.onWikiDelete}
+                onUpdatePage={notesPane.onWikiUpdate}
+                onRefreshProject={notesPane.onRefreshProject}
+                onWikiEntityClick={notesPane.onWikiEntityClick}
+                onServerEntity={notesPane.onServerEntity}
+                onCloseNotePane={notesPane.onClose}
+                searchQuery={notesPane.searchQuery}
+              />
             }
-          }}
-          onEntityUpdate={onEntityUpdate}
-          onViewConfigUpdate={(updatedView: ViewConfig) => {
-            onViewConfigUpdate(updatedView);
-          }}
-          allEntities={entities}
-          usersById={usersById}
-          onRenameBoardColumn={onRenameBoardColumn}
-          columnRenameInProgress={boardColumnRenameBusy}
-          openDetailEntityId={detailUrlEntityId}
-          onBoardLaneEntityOrderForDetailChange={onDetailNavEntityOrderChange}
-        />
-      )}
-      {currentView.type === 'table' && (
-        <TableView
-          entities={currentEntities}
-          view={currentView}
-          properties={currentEntity.properties}
-          onEntityUpdate={onEntityUpdate}
-          onUpsertPropertyOption={onUpsertPropertyOption}
-          onEntityClick={(e) => {
-            if (effectiveViewId) {
-              onNavigateEntity(e.id);
+            right={<div className="h-full min-h-0 min-w-0 overflow-hidden">{boardMain}</div>}
+          />
+        ) : (
+          boardMain
+        ))}
+      {currentView.type === 'table' &&
+        (notesPane ? (
+          <WorkspaceNoteSplit
+            widthPx={notesPane.widthPx}
+            onWidthChangeEnd={notesPane.onWidthChangeEnd}
+            left={
+              <EmbeddedWikiNotePane
+                projectId={activeProjectId}
+                wikiViewId={notesPane.wikiViewId}
+                wikiPages={notesPane.wikiPages}
+                allEntities={entities}
+                selectedPageId={notesPane.pageId}
+                onSelectPageId={notesPane.onPageIdChange}
+                onCreatePage={notesPane.onWikiCreate}
+                onDeletePage={notesPane.onWikiDelete}
+                onUpdatePage={notesPane.onWikiUpdate}
+                onRefreshProject={notesPane.onRefreshProject}
+                onWikiEntityClick={notesPane.onWikiEntityClick}
+                onServerEntity={notesPane.onServerEntity}
+                onCloseNotePane={notesPane.onClose}
+                searchQuery={notesPane.searchQuery}
+              />
             }
-          }}
-          allEntities={entities}
-          projectId={activeProjectId}
-          projectKey={activeProjectKey}
-          usersById={usersById}
-          onResolveUsers={onResolveUsers}
-          onReload={onRefreshProject}
-          onTablePageEntityOrderChange={onDetailNavEntityOrderChange}
-        />
-      )}
+            right={<div className="h-full min-h-0 min-w-0 overflow-hidden">{tableMain}</div>}
+          />
+        ) : (
+          tableMain
+        ))}
       {currentView.type === 'wiki' && (
         <WikiView
           projectId={activeProjectId}
@@ -145,4 +225,3 @@ export function WorkspaceViewPanel({
     </div>
   );
 }
-
