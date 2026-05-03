@@ -162,7 +162,12 @@ impl Db {
             Ok(c) => c,
             Err(_) => return Err(EntityWriteError::ServiceUnavailable),
         };
-        let tx = conn.transaction().map_err(|_| EntityWriteError::NotFound)?;
+        // IMMEDIATE acquires the write lock up-front so concurrent PATCHes
+        // serialise through busy_timeout instead of racing DEFERRED snapshots
+        // and hitting SQLITE_BUSY_SNAPSHOT (REQ-276).
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(sqlite_err_to_entity_write_error)?;
 
         let row: Option<(String, String, i64, i64, String)> = tx
             .query_row(
@@ -173,7 +178,7 @@ impl Db {
                 |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
             )
             .optional()
-            .map_err(|_| EntityWriteError::NotFound)?;
+            .map_err(sqlite_err_to_entity_write_error)?;
 
         let Some((id, entity_id, created_at, current_updated_at, props_json)) = row else {
             return Err(EntityWriteError::NotFound);
@@ -197,27 +202,30 @@ impl Db {
         }
 
         let now = crate::time::now_ms();
-        let next_json = serde_json::to_string(&props).map_err(|_| EntityWriteError::NotFound)?;
+        // Serialisation is deterministic for a valid JSON Map, but treat any
+        // failure as transient rather than silently turning it into a 404.
+        let next_json =
+            serde_json::to_string(&props).map_err(|_| EntityWriteError::ServiceUnavailable)?;
         tx.execute(
             "UPDATE entities SET updated_at = ?1, properties_json = ?2 WHERE project_id = ?3 AND id = ?4",
             params![now, next_json, project_id, entity_pk],
         )
-        .map_err(|_| EntityWriteError::NotFound)?;
+        .map_err(sqlite_err_to_entity_write_error)?;
 
         tx.execute(
             "UPDATE projects SET updated_at = ?1 WHERE id = ?2",
             params![now, project_id],
         )
-        .map_err(|_| EntityWriteError::NotFound)?;
+        .map_err(sqlite_err_to_entity_write_error)?;
 
         tx.execute(
             "INSERT INTO meta (key, value) VALUES ('version', ?1)
              ON CONFLICT(key) DO UPDATE SET value = excluded.value",
             params![now.to_string()],
         )
-        .map_err(|_| EntityWriteError::NotFound)?;
+        .map_err(sqlite_err_to_entity_write_error)?;
 
-        tx.commit().map_err(|_| EntityWriteError::NotFound)?;
+        tx.commit().map_err(sqlite_err_to_entity_write_error)?;
 
         Ok(Entity {
             id,
@@ -343,7 +351,11 @@ impl Db {
             Ok(c) => c,
             Err(_) => return Err(EntityWriteError::ServiceUnavailable),
         };
-        let tx = conn.transaction().map_err(|_| EntityWriteError::NotFound)?;
+        // IMMEDIATE for the same reason as `patch_entity_for_project`: avoid
+        // SQLITE_BUSY_SNAPSHOT under concurrent writers (REQ-276).
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(sqlite_err_to_entity_write_error)?;
 
         let current: Option<i64> = tx
             .query_row(
@@ -352,7 +364,7 @@ impl Db {
                 |r| r.get(0),
             )
             .optional()
-            .map_err(|_| EntityWriteError::NotFound)?;
+            .map_err(sqlite_err_to_entity_write_error)?;
 
         let Some(current_updated_at) = current else {
             return Err(EntityWriteError::NotFound);
@@ -367,24 +379,43 @@ impl Db {
             "DELETE FROM entities WHERE project_id = ?1 AND id = ?2",
             params![project_id, entity_pk],
         )
-        .map_err(|_| EntityWriteError::NotFound)?;
+        .map_err(sqlite_err_to_entity_write_error)?;
 
         let now = crate::time::now_ms();
         tx.execute(
             "UPDATE projects SET updated_at = ?1 WHERE id = ?2",
             params![now, project_id],
         )
-        .map_err(|_| EntityWriteError::NotFound)?;
+        .map_err(sqlite_err_to_entity_write_error)?;
 
         tx.execute(
             "INSERT INTO meta (key, value) VALUES ('version', ?1)
              ON CONFLICT(key) DO UPDATE SET value = excluded.value",
             params![now.to_string()],
         )
-        .map_err(|_| EntityWriteError::NotFound)?;
+        .map_err(sqlite_err_to_entity_write_error)?;
 
-        tx.commit().map_err(|_| EntityWriteError::NotFound)?;
+        tx.commit().map_err(sqlite_err_to_entity_write_error)?;
         Ok(())
+    }
+}
+
+/// Map an unexpected rusqlite error produced during an entity write to a
+/// transport-friendly `EntityWriteError`. Lock/busy conditions must surface as
+/// `ServiceUnavailable` (HTTP 503) so the client retries; silently reporting
+/// them as `NotFound` caused REQ-276 (optimistic UI kept while the server
+/// never persisted the change).
+fn sqlite_err_to_entity_write_error(e: rusqlite::Error) -> EntityWriteError {
+    match e {
+        rusqlite::Error::SqliteFailure(err, _)
+            if matches!(
+                err.code,
+                rusqlite::ErrorCode::DatabaseBusy | rusqlite::ErrorCode::DatabaseLocked
+            ) =>
+        {
+            EntityWriteError::ServiceUnavailable
+        }
+        _ => EntityWriteError::ServiceUnavailable,
     }
 }
 

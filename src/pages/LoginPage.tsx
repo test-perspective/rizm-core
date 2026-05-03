@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { isBackendEnabled } from '../utils/storage';
-import { apiFetch, apiJson, ApiError } from '../auth/api';
+import { apiFetch, ApiError } from '../auth/api';
 import { useAuth } from '../auth/AuthContext';
 
 export function LoginPage() {
@@ -20,37 +20,10 @@ export function LoginPage() {
     document.title = 'Rizm - Login';
   }, []);
 
-  // Check if dev-admin-login is enabled
-  useEffect(() => {
-    if (!backend) {
-      setDevAdminLoginEnabled(false);
-      return;
-    }
-    setCheckingDevAdmin(true);
-    apiJson<{ enabled: boolean }>('/api/auth/dev-admin-login', { method: 'GET' })
-      .then((res) => {
-        setDevAdminLoginEnabled(res.enabled);
-      })
-      .catch((e) => {
-        // 404 means disabled, which is fine
-        if (e instanceof ApiError && e.status === 404) {
-          setDevAdminLoginEnabled(false);
-        } else {
-          console.error('[auth] failed to check dev-admin-login status', e);
-          setDevAdminLoginEnabled(false);
-        }
-      })
-      .finally(() => {
-        setCheckingDevAdmin(false);
-      });
-  }, [backend]);
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [devAdminLoginEnabled, setDevAdminLoginEnabled] = useState(false);
-  const [checkingDevAdmin, setCheckingDevAdmin] = useState(false);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,31 +48,6 @@ export function LoginPage() {
     } catch (e) {
       console.error('[auth] login failed', e);
       setError('Login failed. Please check your email and password.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const onDevAdminLogin = async () => {
-    if (!backend) {
-      setError('Backend is not configured (VITE_KEEL_BACKEND_URL).');
-      return;
-    }
-    setSubmitting(true);
-    setError(null);
-    try {
-      const res = await apiFetch('/api/auth/dev-admin-login', {
-        method: 'POST',
-      });
-      if (!res.ok) {
-        const text = await res.text().catch(() => '');
-        throw new ApiError(res.status, text || `HTTP ${res.status}`);
-      }
-      await refresh();
-      nav(from, { replace: true });
-    } catch (e) {
-      console.error('[auth] dev-admin-login failed', e);
-      setError('Admin login failed.');
     } finally {
       setSubmitting(false);
     }
@@ -151,22 +99,6 @@ export function LoginPage() {
             {submitting ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
-
-        {devAdminLoginEnabled && (
-          <div className="mt-4 pt-4 border-t border-zinc-800">
-            <button
-              disabled={submitting || !backend || checkingDevAdmin}
-              onClick={onDevAdminLogin}
-              className="w-full px-4 py-2 bg-zinc-700 hover:bg-zinc-600 disabled:bg-zinc-800 disabled:text-zinc-500 rounded-md text-sm font-medium transition-colors"
-              type="button"
-            >
-              {submitting ? 'Signing in...' : 'Sign in as Admin'}
-            </button>
-            <p className="mt-2 text-xs text-zinc-500 text-center">
-              For development/demo: Sign in as admin without password
-            </p>
-          </div>
-        )}
       </div>
     </div>
   );

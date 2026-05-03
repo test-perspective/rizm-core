@@ -1,4 +1,4 @@
-import React, { act } from 'react';
+import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';

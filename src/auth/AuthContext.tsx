@@ -13,6 +13,25 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+let autoLoginInFlight: Promise<boolean> | null = null;
+
+async function tryDevAdminLogin(): Promise<boolean> {
+  if (autoLoginInFlight) return autoLoginInFlight;
+  autoLoginInFlight = (async () => {
+    try {
+      const res = await apiFetch('/api/auth/dev-admin-login', { method: 'POST' }, true);
+      return res.ok;
+    } catch {
+      return false;
+    } finally {
+      setTimeout(() => {
+        autoLoginInFlight = null;
+      }, 0);
+    }
+  })();
+  return autoLoginInFlight;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<Me | null>(null);
@@ -28,7 +47,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(me);
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
-        // Anonymous user - allow to continue
+        const ok = await tryDevAdminLogin();
+        if (ok) {
+          try {
+            const me = await apiJson<Me>('/api/auth/me', undefined, true);
+            setUser(me);
+            return;
+          } catch {
+            // fall through to anonymous
+          }
+        }
         setUser(null);
         return;
       }

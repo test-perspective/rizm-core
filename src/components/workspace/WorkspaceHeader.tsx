@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react';
-import type { EntityDefinition, ProjectMeta, ViewConfig } from '../../types';
+import type { Entity, EntityDefinition, ProjectMeta, ViewConfig } from '../../types';
 import { BoardViewMenu, type ViewTitleNotesMenu } from '../BoardViewMenu';
 import { ProjectOverflowMenu } from '../sidebar/ProjectOverflowMenu';
 
