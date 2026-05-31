@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 use crate::auth::Role;
-use crate::models::{Permission, PolicyDefaults, Project, ProjectConfig, ProjectPolicy, ProjectManifest};
+use crate::models::{
+    Permission, PolicyDefaults, Project, ProjectConfig, ProjectManifest, ProjectPolicy,
+};
 
 pub(super) fn normalize_project_key(s: &str) -> String {
     s.trim().to_uppercase()
@@ -114,7 +116,9 @@ mod tests {
     #[test]
     fn test_suggest_project_key_skips_taken() {
         let taken = ["DEV".to_string(), "NEW".to_string()];
-        let key = suggest_project_key("Development", |candidate| taken.contains(&candidate.to_string()));
+        let key = suggest_project_key("Development", |candidate| {
+            taken.contains(&candidate.to_string())
+        });
         assert_ne!(key, "DEV");
         assert_ne!(key, "NEW");
         assert_eq!(key.len(), 3);

@@ -64,7 +64,10 @@ pub fn router() -> Router<AppState> {
             "/api/admin/db-backup/snapshots",
             get(snapshots::list_snapshots).post(snapshots::create_snapshot),
         )
-        .route("/api/admin/db-backup/restore", post(restore::restore_snapshot))
+        .route(
+            "/api/admin/db-backup/restore",
+            post(restore::restore_snapshot),
+        )
 }
 
 pub async fn maybe_run_scheduled_backup(state: &AppState) {

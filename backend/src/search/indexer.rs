@@ -6,8 +6,8 @@ use rusqlite::params;
 use zerocopy::AsBytes;
 
 use crate::app_state::AppState;
-use crate::models::Entity;
 use crate::db::Db;
+use crate::models::Entity;
 
 use super::text_extract::{chunk_text, extract_entity_text};
 
@@ -24,7 +24,9 @@ fn with_embedder<T>(f: impl FnOnce(&mut TextEmbedding) -> anyhow::Result<T>) -> 
             .map(Mutex::new)
     });
     let mutex = cell.as_ref().map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    let mut guard = mutex.lock().map_err(|_| anyhow::anyhow!("embedding lock poisoned"))?;
+    let mut guard = mutex
+        .lock()
+        .map_err(|_| anyhow::anyhow!("embedding lock poisoned"))?;
     f(&mut guard)
 }
 
@@ -54,7 +56,9 @@ pub fn upsert_entity(db: &Db, project_id: &str, entity: &Entity) -> anyhow::Resu
         return Ok(());
     }
     let text = extract_entity_text(entity);
-    let full_text = format!("{} {}", text.title, text.content).trim().to_string();
+    let full_text = format!("{} {}", text.title, text.content)
+        .trim()
+        .to_string();
     let chunks = chunk_text(&full_text, CHUNK_MAX_CHARS, CHUNK_OVERLAP);
     if chunks.is_empty() {
         let conn = db.pool.get().context("get sqlite conn")?;
@@ -177,7 +181,8 @@ pub fn enqueue_entity_delete(state: AppState, project_id: String, entity_pk: Str
     tokio::spawn(async move {
         let _gate = service_gate.read().await;
         let db = db_lock.read().await.clone();
-        let result = tokio::task::spawn_blocking(move || delete_entity(&db, &project_id, &entity_pk)).await;
+        let result =
+            tokio::task::spawn_blocking(move || delete_entity(&db, &project_id, &entity_pk)).await;
         if let Err(err) = result {
             tracing::warn!(error = ?err, "indexer delete task join failed");
         } else if let Ok(Err(err)) = result {

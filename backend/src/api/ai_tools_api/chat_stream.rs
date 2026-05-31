@@ -1,10 +1,4 @@
-use axum::{
-    body::Body,
-    extract::State,
-    http::header,
-    response::Response,
-    Extension, Json,
-};
+use axum::{body::Body, extract::State, http::header, response::Response, Extension, Json};
 use bytes::Bytes;
 use std::convert::Infallible;
 use std::time::Instant;
@@ -19,8 +13,8 @@ use crate::auth::AuthedUser;
 use crate::time;
 use crate::ApiError;
 
-use super::support::{build_ai_audit_meta_json, build_chat_system_prompt, build_history_messages};
 use super::resolve_llm_config_chat;
+use super::support::{build_ai_audit_meta_json, build_chat_system_prompt, build_history_messages};
 use super::ChatRequest;
 
 pub(super) async fn chat_with_tools_stream(
@@ -77,7 +71,11 @@ pub(super) async fn chat_with_tools_stream(
             .as_ref()
             .filter(|s| !s.trim().is_empty())
             .cloned()
-            .or_else(|| db.get_active_project_id_for_user(&user.user_id).ok().flatten());
+            .or_else(|| {
+                db.get_active_project_id_for_user(&user.user_id)
+                    .ok()
+                    .flatten()
+            });
         let project_key: Option<String> = effective_project_id
             .as_ref()
             .and_then(|pid| db.get_project_key_by_id(pid).ok().flatten());
@@ -144,9 +142,7 @@ pub(super) async fn chat_with_tools_stream(
         );
 
         let _ = progress
-            .send(AiProgressEvent::ChatResult {
-                message: content,
-            })
+            .send(AiProgressEvent::ChatResult { message: content })
             .await;
     });
 
@@ -154,8 +150,14 @@ pub(super) async fn chat_with_tools_stream(
     let body = Body::from_stream(stream);
     let mut response = Response::new(body);
     let headers = response.headers_mut();
-    headers.insert(header::CONTENT_TYPE, header::HeaderValue::from_static("application/x-ndjson"));
-    headers.insert(header::CACHE_CONTROL, header::HeaderValue::from_static("no-cache"));
+    headers.insert(
+        header::CONTENT_TYPE,
+        header::HeaderValue::from_static("application/x-ndjson"),
+    );
+    headers.insert(
+        header::CACHE_CONTROL,
+        header::HeaderValue::from_static("no-cache"),
+    );
     headers.insert(
         header::HeaderName::from_static("x-accel-buffering"),
         header::HeaderValue::from_static("no"),

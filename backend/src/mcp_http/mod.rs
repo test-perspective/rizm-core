@@ -1,10 +1,4 @@
-use axum::{
-    extract::State,
-    http::StatusCode,
-    response::IntoResponse,
-    routing::get,
-    Json, Router,
-};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::get, Json, Router};
 use serde_json::Value;
 
 use crate::app_state::AppState;
@@ -20,7 +14,10 @@ pub fn router() -> Router<AppState> {
 }
 
 async fn get_mcp() -> impl IntoResponse {
-    (StatusCode::METHOD_NOT_ALLOWED, "GET is not enabled on this MCP endpoint")
+    (
+        StatusCode::METHOD_NOT_ALLOWED,
+        "GET is not enabled on this MCP endpoint",
+    )
 }
 
 async fn post_mcp(
@@ -35,8 +32,8 @@ async fn post_mcp(
     let now = crate::time::now_ms();
     let _ = (state.db.read().await).touch_user_mcp_api_key_last_used(&user.user_id, now);
 
-    let (id, method, params) =
-        crate::mcp::jsonrpc::parse_jsonrpc_request(&req).map_err(|_| ApiError::bad_request("invalid json-rpc request"))?;
+    let (id, method, params) = crate::mcp::jsonrpc::parse_jsonrpc_request(&req)
+        .map_err(|_| ApiError::bad_request("invalid json-rpc request"))?;
 
     let Some(id) = id else {
         return Ok(StatusCode::ACCEPTED.into_response());

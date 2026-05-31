@@ -13,8 +13,8 @@ mod generators;
 
 use args::parse_args;
 use generators::{
-    assign_users_to_groups, generate_groups, generate_projects, generate_tasks, generate_users, generate_wiki_pages,
-    poisson_approx, set_project_policy,
+    assign_users_to_groups, generate_groups, generate_projects, generate_tasks, generate_users,
+    generate_wiki_pages, poisson_approx, set_project_policy,
 };
 
 fn main() -> anyhow::Result<()> {
@@ -27,7 +27,10 @@ fn main() -> anyhow::Result<()> {
     println!("  Users: {}", config.users);
     println!("  Groups: {}", config.groups);
     println!("  Avg tasks per project: {}", config.avg_tasks_per_project);
-    println!("  Avg wiki pages per project: {}", config.avg_wiki_pages_per_project);
+    println!(
+        "  Avg wiki pages per project: {}",
+        config.avg_wiki_pages_per_project
+    );
 
     if config.wipe && Path::new(&config.db_path).exists() {
         std::fs::remove_file(&config.db_path)
@@ -35,7 +38,8 @@ fn main() -> anyhow::Result<()> {
         println!("Removed existing DB file");
     }
 
-    let db = Db::new(&config.db_path).with_context(|| format!("Failed to initialize DB: {}", config.db_path))?;
+    let db = Db::new(&config.db_path)
+        .with_context(|| format!("Failed to initialize DB: {}", config.db_path))?;
 
     let user_ids = generate_users(&db, config.users)?;
     println!("Generated {} users", user_ids.len());
@@ -62,9 +66,19 @@ fn main() -> anyhow::Result<()> {
         generate_tasks(&db, project_id, &project_key, task_count, &user_ids)?;
 
         let wiki_count = poisson_approx(config.avg_wiki_pages_per_project);
-        generate_wiki_pages(&db, project_id, &project_key, wiki_count, task_count, &user_ids)?;
+        generate_wiki_pages(
+            &db,
+            project_id,
+            &project_key,
+            wiki_count,
+            task_count,
+            &user_ids,
+        )?;
 
-        println!("  Project {}: {} tasks, {} wiki pages", project_key, task_count, wiki_count);
+        println!(
+            "  Project {}: {} tasks, {} wiki pages",
+            project_key, task_count, wiki_count
+        );
     }
 
     println!("Demo data generation complete!");

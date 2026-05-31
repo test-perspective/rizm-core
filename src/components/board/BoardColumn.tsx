@@ -36,6 +36,7 @@ export const BoardColumn = ({
   scmLoading,
   onScmRefresh,
   onRenameColumn,
+  onCreateEntityInColumn,
 }: {
   columnId: string;
   title: string;
@@ -59,6 +60,7 @@ export const BoardColumn = ({
   scmLoading?: boolean;
   onScmRefresh?: () => void;
   onRenameColumn?: (from: string, to: string) => void | Promise<void>;
+  onCreateEntityInColumn?: (columnId: string) => void;
 }) => {
   const dialog = useAppDialog();
   const dividerById = new Map<string, BoardDivider>();
@@ -204,6 +206,20 @@ export const BoardColumn = ({
           );
         })}
       </SortableContext>
+      {onCreateEntityInColumn && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onCreateEntityInColumn(columnId);
+          }}
+          className="mt-1 w-full rounded-md px-2 py-2 text-left text-sm text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+          type="button"
+          title="Create in this lane"
+          data-testid={`board-lane-create-${columnId}`}
+        >
+          + Create
+        </button>
+      )}
     </BoardColumnShell>
   );
 };

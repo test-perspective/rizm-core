@@ -25,7 +25,11 @@ pub(super) fn wiki_sort_key(e: &Entity) -> (i64, i64, String) {
     (order, e.created_at, e.id.clone())
 }
 
-pub(super) fn rewrite_project_in_attachment_urls(s: &str, from_proj: &str, to_proj: &str) -> String {
+pub(super) fn rewrite_project_in_attachment_urls(
+    s: &str,
+    from_proj: &str,
+    to_proj: &str,
+) -> String {
     if from_proj == to_proj {
         return s.to_string();
     }

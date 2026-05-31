@@ -93,7 +93,10 @@ async fn get_system_info_includes_attachment_and_fastembed_cache() {
 
     assert_eq!(result.0.attachments.total_size_bytes, 350);
     assert_eq!(result.0.attachments.per_project.len(), 1);
-    assert_eq!(result.0.attachments.per_project[0].project_id, DEFAULT_PROJECT_ID);
+    assert_eq!(
+        result.0.attachments.per_project[0].project_id,
+        DEFAULT_PROJECT_ID
+    );
     assert_eq!(result.0.attachments.per_project[0].project_name, "Default");
     assert_eq!(result.0.attachments.per_project[0].attachment_count, 2);
     assert_eq!(result.0.attachments.per_project[0].total_size_bytes, 350);
@@ -138,7 +141,10 @@ async fn list_audit_logs_includes_actor_user_email() {
     assert!(!result.0.is_empty());
     let row = result.0.first().unwrap();
     assert_eq!(row.actor_user_id.as_deref(), Some(user.id.as_str()));
-    assert_eq!(row.actor_user_email.as_deref(), Some("audit-test@example.local"));
+    assert_eq!(
+        row.actor_user_email.as_deref(),
+        Some("audit-test@example.local")
+    );
 }
 
 #[tokio::test]

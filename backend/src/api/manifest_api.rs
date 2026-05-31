@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, State, Extension},
+    extract::{Extension, Path, State},
     http::{header, HeaderMap, StatusCode},
     routing::get,
     Json, Router,
@@ -55,7 +55,9 @@ async fn put_manifest(
         .map(|s| s.trim().trim_matches('"').to_string())
         .unwrap_or_default();
     if if_match.is_empty() {
-        return Err(ApiError::precondition_required("If-Match header is required"));
+        return Err(ApiError::precondition_required(
+            "If-Match header is required",
+        ));
     }
 
     let db = state.db.read().await;
@@ -79,4 +81,3 @@ async fn put_manifest(
     out.insert(header::ETAG, format!("\"{}\"", new_etag).parse().unwrap());
     Ok((StatusCode::NO_CONTENT, out))
 }
-

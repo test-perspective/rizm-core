@@ -16,9 +16,10 @@ use axum::Extension;
 const PROVIDER_BITBUCKET: &str = "bitbucket";
 mod support;
 use support::{
-    bitbucket_client_env, bitbucket_create_branch, bitbucket_create_pull_request, bitbucket_get_mainbranch,
-    bitbucket_list_branches, bitbucket_public_base_url, exchange_bitbucket_token, is_bitbucket_auth_error,
-    load_bitbucket_config_and_token, pkce_challenge_s256, random_urlsafe,
+    bitbucket_client_env, bitbucket_create_branch, bitbucket_create_pull_request,
+    bitbucket_get_mainbranch, bitbucket_list_branches, bitbucket_public_base_url,
+    exchange_bitbucket_token, is_bitbucket_auth_error, load_bitbucket_config_and_token,
+    pkce_challenge_s256, random_urlsafe,
 };
 
 #[derive(Debug, Deserialize)]
@@ -131,7 +132,10 @@ struct BitbucketStoredToken {
 /// Bitbucket redirects the browser here without a SPA `fetch`; session cookies are host-bound.
 /// This route must not require session auth — user id comes from the one-time `oauth_states` row.
 pub fn public_bitbucket_oauth_router() -> Router<AppState> {
-    Router::new().route("/api/scm/bitbucket/oauth/callback", get(bitbucket_oauth_callback))
+    Router::new().route(
+        "/api/scm/bitbucket/oauth/callback",
+        get(bitbucket_oauth_callback),
+    )
 }
 
 pub fn router() -> Router<AppState> {
@@ -148,7 +152,10 @@ pub fn router() -> Router<AppState> {
             "/api/projects/:project_id/scm/bitbucket/pullrequests",
             axum::routing::post(create_bitbucket_pull_request),
         )
-        .route("/api/scm/bitbucket/oauth/status", get(bitbucket_oauth_status))
+        .route(
+            "/api/scm/bitbucket/oauth/status",
+            get(bitbucket_oauth_status),
+        )
         .route("/api/scm/bitbucket/oauth/start", get(bitbucket_oauth_start))
 }
 
@@ -158,7 +165,9 @@ async fn get_project_scm_config(
     Extension(user): Extension<AuthedUser>,
 ) -> Result<Json<Option<ProjectScmConfigResponse>>, ApiError> {
     let db = state.db.read().await;
-    if !crate::permissions::can_read(&db, &project_id, Some(&user)).map_err(|_| ApiError::internal())? {
+    if !crate::permissions::can_read(&db, &project_id, Some(&user))
+        .map_err(|_| ApiError::internal())?
+    {
         return Err(ApiError::forbidden("insufficient permissions"));
     }
     let row = db
@@ -178,7 +187,9 @@ async fn put_project_scm_config(
     Json(req): Json<PutProjectScmConfigRequest>,
 ) -> Result<StatusCode, ApiError> {
     let db = state.db.read().await;
-    if !crate::permissions::can_write(&db, &project_id, Some(&user)).map_err(|_| ApiError::internal())? {
+    if !crate::permissions::can_write(&db, &project_id, Some(&user))
+        .map_err(|_| ApiError::internal())?
+    {
         return Err(ApiError::forbidden("insufficient permissions"));
     }
     if req.provider != PROVIDER_BITBUCKET {
@@ -303,15 +314,19 @@ async fn list_bitbucket_branches(
     Query(query): Query<BranchesQuery>,
     Extension(user): Extension<AuthedUser>,
 ) -> Result<Json<BranchesResponse>, ApiError> {
-    if !crate::permissions::can_read(&*state.db.read().await, &project_id, Some(&user)).map_err(|_| ApiError::internal())? {
+    if !crate::permissions::can_read(&*state.db.read().await, &project_id, Some(&user))
+        .map_err(|_| ApiError::internal())?
+    {
         return Err(ApiError::forbidden("insufficient permissions"));
     }
-    let (cfg, token) = load_bitbucket_config_and_token(&state, &project_id, &user.user_id, false).await?;
+    let (cfg, token) =
+        load_bitbucket_config_and_token(&state, &project_id, &user.user_id, false).await?;
     let q = query.q.as_deref();
     let branches = match bitbucket_list_branches(&cfg, &token, q).await {
         Ok(branches) => branches,
         Err(err) if is_bitbucket_auth_error(&err) => {
-            let (cfg, token) = load_bitbucket_config_and_token(&state, &project_id, &user.user_id, true).await?;
+            let (cfg, token) =
+                load_bitbucket_config_and_token(&state, &project_id, &user.user_id, true).await?;
             bitbucket_list_branches(&cfg, &token, q).await?
         }
         Err(err) => return Err(err),
@@ -319,12 +334,16 @@ async fn list_bitbucket_branches(
     let mainbranch = match bitbucket_get_mainbranch(&cfg, &token).await {
         Ok(mb) => mb,
         Err(err) if is_bitbucket_auth_error(&err) => {
-            let (cfg, token) = load_bitbucket_config_and_token(&state, &project_id, &user.user_id, true).await?;
+            let (cfg, token) =
+                load_bitbucket_config_and_token(&state, &project_id, &user.user_id, true).await?;
             bitbucket_get_mainbranch(&cfg, &token).await.ok().flatten()
         }
         _ => None,
     };
-    Ok(Json(BranchesResponse { branches, mainbranch }))
+    Ok(Json(BranchesResponse {
+        branches,
+        mainbranch,
+    }))
 }
 
 async fn create_bitbucket_branch(
@@ -333,17 +352,22 @@ async fn create_bitbucket_branch(
     Extension(user): Extension<AuthedUser>,
     Json(req): Json<CreateBranchRequest>,
 ) -> Result<Json<CreateBranchResponse>, ApiError> {
-    if !crate::permissions::can_write(&*state.db.read().await, &project_id, Some(&user)).map_err(|_| ApiError::internal())? {
+    if !crate::permissions::can_write(&*state.db.read().await, &project_id, Some(&user))
+        .map_err(|_| ApiError::internal())?
+    {
         return Err(ApiError::forbidden("insufficient permissions"));
     }
     if req.name.trim().is_empty() || req.base_branch.trim().is_empty() {
         return Err(ApiError::bad_request("name and baseBranch are required"));
     }
-    let (cfg, token) = load_bitbucket_config_and_token(&state, &project_id, &user.user_id, false).await?;
-    let (name, url) = match bitbucket_create_branch(&cfg, &token, &req.name, &req.base_branch).await {
+    let (cfg, token) =
+        load_bitbucket_config_and_token(&state, &project_id, &user.user_id, false).await?;
+    let (name, url) = match bitbucket_create_branch(&cfg, &token, &req.name, &req.base_branch).await
+    {
         Ok(result) => result,
         Err(err) if is_bitbucket_auth_error(&err) => {
-            let (cfg, token) = load_bitbucket_config_and_token(&state, &project_id, &user.user_id, true).await?;
+            let (cfg, token) =
+                load_bitbucket_config_and_token(&state, &project_id, &user.user_id, true).await?;
             bitbucket_create_branch(&cfg, &token, &req.name, &req.base_branch).await?
         }
         Err(err) => return Err(err),
@@ -357,17 +381,26 @@ async fn create_bitbucket_pull_request(
     Extension(user): Extension<AuthedUser>,
     Json(req): Json<CreatePullRequestRequest>,
 ) -> Result<Json<CreatePullRequestResponse>, ApiError> {
-    if !crate::permissions::can_write(&*state.db.read().await, &project_id, Some(&user)).map_err(|_| ApiError::internal())? {
+    if !crate::permissions::can_write(&*state.db.read().await, &project_id, Some(&user))
+        .map_err(|_| ApiError::internal())?
+    {
         return Err(ApiError::forbidden("insufficient permissions"));
     }
-    if req.source_branch.trim().is_empty() || req.destination_branch.trim().is_empty() || req.title.trim().is_empty() {
-        return Err(ApiError::bad_request("sourceBranch, destinationBranch, and title are required"));
+    if req.source_branch.trim().is_empty()
+        || req.destination_branch.trim().is_empty()
+        || req.title.trim().is_empty()
+    {
+        return Err(ApiError::bad_request(
+            "sourceBranch, destinationBranch, and title are required",
+        ));
     }
-    let (cfg, token) = load_bitbucket_config_and_token(&state, &project_id, &user.user_id, false).await?;
+    let (cfg, token) =
+        load_bitbucket_config_and_token(&state, &project_id, &user.user_id, false).await?;
     let (id, title, url) = match bitbucket_create_pull_request(&cfg, &token, &req).await {
         Ok(result) => result,
         Err(err) if is_bitbucket_auth_error(&err) => {
-            let (cfg, token) = load_bitbucket_config_and_token(&state, &project_id, &user.user_id, true).await?;
+            let (cfg, token) =
+                load_bitbucket_config_and_token(&state, &project_id, &user.user_id, true).await?;
             bitbucket_create_pull_request(&cfg, &token, &req).await?
         }
         Err(err) => return Err(err),

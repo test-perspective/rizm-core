@@ -65,6 +65,7 @@ fn grant_project_user_access_sets_write_then_none_removes() {
     assert_eq!(parsed_rev.get("ok").and_then(|v| v.as_bool()), Some(true));
 
     let raw_pol2 = execute_admin_tool(&state, &actor, &get_pol).expect("get policy 2");
-    let pol2: crate::models::ProjectPolicy = serde_json::from_str(&raw_pol2).expect("policy json 2");
+    let pol2: crate::models::ProjectPolicy =
+        serde_json::from_str(&raw_pol2).expect("policy json 2");
     assert!(!pol2.project_defaults.users.contains_key(&created.id));
 }

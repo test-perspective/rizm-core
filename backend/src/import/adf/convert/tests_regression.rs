@@ -35,7 +35,11 @@ fn tpd4_paragraph_then_ordered_list_stays_numbered_after_import_reparse_chain() 
         .iter()
         .filter(|b| b.get("type").and_then(|t| t.as_str()) == Some("numberedListItem"))
         .count();
-    assert!(top_numbered >= 2, "expected top-level numbered list items: {}", after);
+    assert!(
+        top_numbered >= 2,
+        "expected top-level numbered list items: {}",
+        after
+    );
     assert!(
         !blocks
             .iter()
@@ -80,7 +84,11 @@ fn tpd196_ordered_list_keeps_numbered_items_after_import_reparse_chain() {
         .iter()
         .filter(|b| b.get("type").and_then(|t| t.as_str()) == Some("numberedListItem"))
         .count();
-    assert!(numbered_count >= 1, "need top-level numbered items: {}", after);
+    assert!(
+        numbered_count >= 1,
+        "need top-level numbered items: {}",
+        after
+    );
 
     fn count_numbered_deep(blocks: &[Value]) -> usize {
         let mut n = 0usize;
@@ -94,7 +102,11 @@ fn tpd196_ordered_list_keeps_numbered_items_after_import_reparse_chain() {
         }
         n
     }
-    assert!(count_numbered_deep(&blocks) >= 3, "nested doc should keep ≥3 numbered items: {}", after);
+    assert!(
+        count_numbered_deep(&blocks) >= 3,
+        "nested doc should keep ≥3 numbered items: {}",
+        after
+    );
 
     for b in &blocks {
         if b.get("type").and_then(|t| t.as_str()) != Some("heading") {
@@ -156,7 +168,10 @@ fn tpd155_code_block_survives_import_reparse_chain() {
 
     let blocks: Vec<Value> = serde_json::from_str(&after).unwrap();
     assert_eq!(
-        blocks.first().and_then(|b| b.get("type")).and_then(|t| t.as_str()),
+        blocks
+            .first()
+            .and_then(|b| b.get("type"))
+            .and_then(|t| t.as_str()),
         Some("codeBlock"),
         "first block must stay codeBlock: {}",
         after

@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react';
+import { Menu, Plus } from 'lucide-react';
 import type { Entity, EntityDefinition, ProjectMeta, ViewConfig } from '../../types';
 import { BoardViewMenu, type ViewTitleNotesMenu } from '../BoardViewMenu';
 import { ProjectOverflowMenu } from '../sidebar/ProjectOverflowMenu';
@@ -25,6 +25,8 @@ type WorkspaceHeaderProps = {
   viewTitleNotes?: ViewTitleNotesMenu | null;
   /** REQ-288: when sidebar is hidden for notes pane, show project/view controls + project menu here */
   notesChrome?: WorkspaceNotesChromeProps | null;
+  /** REQ-286: when set (mobile), show a hamburger button before the title to open the sidebar drawer. */
+  onOpenMobileSidebar?: () => void;
 };
 
 export function WorkspaceHeader({
@@ -36,6 +38,7 @@ export function WorkspaceHeader({
   onOpenBoardConfig,
   viewTitleNotes = null,
   notesChrome = null,
+  onOpenMobileSidebar,
 }: WorkspaceHeaderProps) {
   const showTitleOverflow =
     currentView.type === 'board' || currentView.type === 'table';
@@ -82,6 +85,17 @@ export function WorkspaceHeader({
       )}
       <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-4">
         <div className="min-w-0 flex items-center gap-3">
+          {onOpenMobileSidebar && (
+            <button
+              type="button"
+              data-testid="mobile-sidebar-toggle"
+              aria-label="Open navigation"
+              onClick={onOpenMobileSidebar}
+              className="-ml-2 p-2 rounded-md text-zinc-300 hover:text-white hover:bg-zinc-900"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          )}
           <h1 className="text-2xl font-bold text-white">{currentView.name}</h1>
           {showTitleOverflow && (
             <BoardViewMenu

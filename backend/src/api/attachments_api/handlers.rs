@@ -91,7 +91,10 @@ pub(super) async fn upload_attachments(
 
         let file_name = field.file_name().unwrap_or("file").to_string();
         let file_name = sanitize_filename(&file_name);
-        let mime_type = field.content_type().map(|s| s.to_string()).filter(|s| !s.trim().is_empty());
+        let mime_type = field
+            .content_type()
+            .map(|s| s.to_string())
+            .filter(|s| !s.trim().is_empty());
 
         let attachment_id = Uuid::new_v4().to_string();
         let path = attachment_path(&root, &project_id, &attachment_id);
@@ -116,7 +119,9 @@ pub(super) async fn upload_attachments(
                 continue;
             }
             size += chunk.len() as i64;
-            f.write_all(&chunk).await.map_err(|_| ApiError::internal())?;
+            f.write_all(&chunk)
+                .await
+                .map_err(|_| ApiError::internal())?;
         }
         f.flush().await.map_err(|_| ApiError::internal())?;
 
@@ -157,79 +162,83 @@ pub(super) async fn upload_attachments(
         }
     };
 
-    let updated = match db
-        .patch_entity_for_project(&project_id, &entity_pk, existing.updated_at, patch)
-    {
-        Ok(updated) => updated,
-        Err(crate::db::EntityWriteError::NotFound) => {
-            cleanup_created_files(&state);
-            return Err(ApiError::not_found("not found"));
-        }
-        Err(crate::db::EntityWriteError::ServiceUnavailable) => {
-            cleanup_created_files(&state);
-            return Err(ApiError::service_unavailable("database temporarily unavailable"));
-        }
-        Err(crate::db::EntityWriteError::Conflict { .. }) => {
-            // Re-fetch the latest entity and retry with merged attachments.
-            let latest = match db
-                .get_entity_for_project(&project_id, &entity_pk)
-                .map_err(|_| ApiError::internal())?
-            {
-                Some(e) => e,
-                None => {
-                    cleanup_created_files(&state);
-                    return Err(ApiError::not_found("not found"));
-                }
-            };
-
-            if !is_attachment_supported_entity(&latest) {
+    let updated =
+        match db.patch_entity_for_project(&project_id, &entity_pk, existing.updated_at, patch) {
+            Ok(updated) => updated,
+            Err(crate::db::EntityWriteError::NotFound) => {
                 cleanup_created_files(&state);
-                return Err(ApiError::bad_request(
-                    "attachments are supported for tasks and wiki pages only",
+                return Err(ApiError::not_found("not found"));
+            }
+            Err(crate::db::EntityWriteError::ServiceUnavailable) => {
+                cleanup_created_files(&state);
+                return Err(ApiError::service_unavailable(
+                    "database temporarily unavailable",
                 ));
             }
+            Err(crate::db::EntityWriteError::Conflict { .. }) => {
+                // Re-fetch the latest entity and retry with merged attachments.
+                let latest = match db
+                    .get_entity_for_project(&project_id, &entity_pk)
+                    .map_err(|_| ApiError::internal())?
+                {
+                    Some(e) => e,
+                    None => {
+                        cleanup_created_files(&state);
+                        return Err(ApiError::not_found("not found"));
+                    }
+                };
 
-            let mut latest_attachments = read_attachments_from_entity(&latest);
-            let mut latest_ids: HashSet<String> = latest_attachments
-                .iter()
-                .map(|a| a.id.clone())
-                .collect();
-            let created_id_set: HashSet<String> = created_ids.iter().cloned().collect();
+                if !is_attachment_supported_entity(&latest) {
+                    cleanup_created_files(&state);
+                    return Err(ApiError::bad_request(
+                        "attachments are supported for tasks and wiki pages only",
+                    ));
+                }
 
-            for meta in &next_attachments {
-                if created_id_set.contains(&meta.id) && !latest_ids.contains(&meta.id) {
-                    latest_ids.insert(meta.id.clone());
-                    latest_attachments.push(meta.clone());
+                let mut latest_attachments = read_attachments_from_entity(&latest);
+                let mut latest_ids: HashSet<String> =
+                    latest_attachments.iter().map(|a| a.id.clone()).collect();
+                let created_id_set: HashSet<String> = created_ids.iter().cloned().collect();
+
+                for meta in &next_attachments {
+                    if created_id_set.contains(&meta.id) && !latest_ids.contains(&meta.id) {
+                        latest_ids.insert(meta.id.clone());
+                        latest_attachments.push(meta.clone());
+                    }
+                }
+
+                let mut retry_patch = serde_json::Map::new();
+                retry_patch.insert(
+                    "attachments".to_string(),
+                    serde_json::to_value(&latest_attachments).unwrap_or(Value::Array(vec![])),
+                );
+
+                match db.patch_entity_for_project(
+                    &project_id,
+                    &entity_pk,
+                    latest.updated_at,
+                    retry_patch,
+                ) {
+                    Ok(updated) => updated,
+                    Err(crate::db::EntityWriteError::NotFound) => {
+                        cleanup_created_files(&state);
+                        return Err(ApiError::not_found("not found"));
+                    }
+                    Err(crate::db::EntityWriteError::ServiceUnavailable) => {
+                        cleanup_created_files(&state);
+                        return Err(ApiError::service_unavailable(
+                            "database temporarily unavailable",
+                        ));
+                    }
+                    Err(crate::db::EntityWriteError::Conflict { current_updated_at }) => {
+                        cleanup_created_files(&state);
+                        return Err(ApiError::precondition_failed(format!(
+                            "conflict (current updatedAt = {current_updated_at})"
+                        )));
+                    }
                 }
             }
-
-            let mut retry_patch = serde_json::Map::new();
-            retry_patch.insert(
-                "attachments".to_string(),
-                serde_json::to_value(&latest_attachments).unwrap_or(Value::Array(vec![])),
-            );
-
-            match db
-                .patch_entity_for_project(&project_id, &entity_pk, latest.updated_at, retry_patch)
-            {
-                Ok(updated) => updated,
-                Err(crate::db::EntityWriteError::NotFound) => {
-                    cleanup_created_files(&state);
-                    return Err(ApiError::not_found("not found"));
-                }
-                Err(crate::db::EntityWriteError::ServiceUnavailable) => {
-                    cleanup_created_files(&state);
-                    return Err(ApiError::service_unavailable("database temporarily unavailable"));
-                }
-                Err(crate::db::EntityWriteError::Conflict { current_updated_at }) => {
-                    cleanup_created_files(&state);
-                    return Err(ApiError::precondition_failed(format!(
-                        "conflict (current updatedAt = {current_updated_at})"
-                    )));
-                }
-            }
-        }
-    };
+        };
 
     let mut headers = HeaderMap::new();
     headers.insert(header::ETAG, etag_for_entity(&updated).parse().unwrap());
@@ -266,7 +275,9 @@ pub(super) async fn get_attachment(
 
     let root = attachments_root_from_db_path(&state.db_path);
     let path = attachment_path(&root, &project_id, &meta.id);
-    let bytes = tokio::fs::read(&path).await.map_err(|_| ApiError::not_found("not found"))?;
+    let bytes = tokio::fs::read(&path)
+        .await
+        .map_err(|_| ApiError::not_found("not found"))?;
 
     let mut headers = HeaderMap::new();
     if let Some(mime) = meta.mime_type.as_deref() {
@@ -274,8 +285,14 @@ pub(super) async fn get_attachment(
             headers.insert(header::CONTENT_TYPE, v);
         }
     }
-    let cd = format!("inline; filename=\"{}\"", sanitize_filename(&meta.file_name));
-    headers.insert(header::CONTENT_DISPOSITION, HeaderValue::from_str(&cd).unwrap());
+    let cd = format!(
+        "inline; filename=\"{}\"",
+        sanitize_filename(&meta.file_name)
+    );
+    headers.insert(
+        header::CONTENT_DISPOSITION,
+        HeaderValue::from_str(&cd).unwrap(),
+    );
     Ok((headers, Body::from(bytes)))
 }
 
@@ -323,7 +340,9 @@ pub(super) async fn delete_attachment(
         .map_err(|e| match e {
             crate::db::EntityWriteError::NotFound => ApiError::not_found("not found"),
             crate::db::EntityWriteError::Conflict { current_updated_at } => {
-                ApiError::precondition_failed(format!("conflict (current updatedAt = {current_updated_at})"))
+                ApiError::precondition_failed(format!(
+                    "conflict (current updatedAt = {current_updated_at})"
+                ))
             }
             crate::db::EntityWriteError::ServiceUnavailable => {
                 ApiError::service_unavailable("database temporarily unavailable")

@@ -17,9 +17,18 @@ pub struct ProjectionResponse {
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum ProjectedData {
-    List { visible_properties: Vec<String>, entities: Vec<Entity> },
-    Board { group_by: String, columns: Vec<BoardColumn> },
-    Table { visible_properties: Vec<String>, entities: Vec<Entity> },
+    List {
+        visible_properties: Vec<String>,
+        entities: Vec<Entity>,
+    },
+    Board {
+        group_by: String,
+        columns: Vec<BoardColumn>,
+    },
+    Table {
+        visible_properties: Vec<String>,
+        entities: Vec<Entity>,
+    },
 }
 
 #[derive(Debug, Serialize)]
@@ -29,7 +38,11 @@ pub struct BoardColumn {
     pub entities: Vec<Entity>,
 }
 
-pub fn project(manifest: &ProjectManifest, entities: &[Entity], view_id: &str) -> Option<ProjectionResponse> {
+pub fn project(
+    manifest: &ProjectManifest,
+    entities: &[Entity],
+    view_id: &str,
+) -> Option<ProjectionResponse> {
     let view = manifest.views.iter().find(|v| v.id == view_id)?;
     let _entity_def = manifest.entities.iter().find(|e| e.id == view.entity_id)?;
     let mut list: Vec<Entity> = entities
@@ -62,7 +75,10 @@ pub fn project(manifest: &ProjectManifest, entities: &[Entity], view_id: &str) -
             })
         }
         ViewType::Board => {
-            let group_by = view.group_by.clone().unwrap_or_else(|| "status".to_string());
+            let group_by = view
+                .group_by
+                .clone()
+                .unwrap_or_else(|| "status".to_string());
             let ordered_keys = manifest
                 .entities
                 .iter()
@@ -73,7 +89,8 @@ pub fn project(manifest: &ProjectManifest, entities: &[Entity], view_id: &str) -
 
             let mut buckets: HashMap<String, Vec<Entity>> = HashMap::new();
             for e in list {
-                let key = value_to_key(e.properties.get(&group_by)).unwrap_or_else(|| "Uncategorized".to_string());
+                let key = value_to_key(e.properties.get(&group_by))
+                    .unwrap_or_else(|| "Uncategorized".to_string());
                 buckets.entry(key).or_default().push(e);
             }
 
@@ -82,9 +99,15 @@ pub fn project(manifest: &ProjectManifest, entities: &[Entity], view_id: &str) -
             for k in ordered_keys {
                 if let Some(mut es) = buckets.remove(&k) {
                     sort_entities_for_board(&mut es);
-                    columns.push(BoardColumn { key: k, entities: es });
+                    columns.push(BoardColumn {
+                        key: k,
+                        entities: es,
+                    });
                 } else {
-                    columns.push(BoardColumn { key: k, entities: vec![] });
+                    columns.push(BoardColumn {
+                        key: k,
+                        entities: vec![],
+                    });
                 }
             }
 
@@ -94,7 +117,10 @@ pub fn project(manifest: &ProjectManifest, entities: &[Entity], view_id: &str) -
                 rest.insert(k, es);
             }
             for (k, es) in rest {
-                columns.push(BoardColumn { key: k, entities: es });
+                columns.push(BoardColumn {
+                    key: k,
+                    entities: es,
+                });
             }
 
             Some(ProjectionResponse {
@@ -151,7 +177,11 @@ fn sort_entities(list: &mut [Entity], sort_by: Option<&str>, sort_order: Option<
         let ka = sort_key(a, sort_by);
         let kb = sort_key(b, sort_by);
         let ord = cmp_value(&ka, &kb);
-        if desc { ord.reverse() } else { ord }
+        if desc {
+            ord.reverse()
+        } else {
+            ord
+        }
     });
 }
 
@@ -167,7 +197,10 @@ fn sort_key(e: &Entity, sort_by: &str) -> Value {
 fn cmp_value(a: &Value, b: &Value) -> std::cmp::Ordering {
     use std::cmp::Ordering;
     match (a, b) {
-        (Value::Number(na), Value::Number(nb)) => na.as_f64().partial_cmp(&nb.as_f64()).unwrap_or(Ordering::Equal),
+        (Value::Number(na), Value::Number(nb)) => na
+            .as_f64()
+            .partial_cmp(&nb.as_f64())
+            .unwrap_or(Ordering::Equal),
         (Value::String(sa), Value::String(sb)) => sa.cmp(sb),
         (Value::Bool(ba), Value::Bool(bb)) => ba.cmp(bb),
         (Value::Null, Value::Null) => Ordering::Equal,
@@ -191,10 +224,16 @@ fn value_to_key(v: Option<&Value>) -> Option<String> {
 mod tests {
     use super::*;
     use crate::models::{
-        EntityDefinition, ProjectManifest, PropertyDefinition, PropertyType, SortOrder, ViewConfig, ViewType,
+        EntityDefinition, ProjectManifest, PropertyDefinition, PropertyType, SortOrder, ViewConfig,
+        ViewType,
     };
 
-    fn entity(id: &str, created_at: i64, updated_at: i64, props: serde_json::Value) -> crate::models::Entity {
+    fn entity(
+        id: &str,
+        created_at: i64,
+        updated_at: i64,
+        props: serde_json::Value,
+    ) -> crate::models::Entity {
         crate::models::Entity {
             id: id.to_string(),
             entity_id: "e".to_string(),
@@ -280,9 +319,24 @@ mod tests {
         };
 
         let entities = vec![
-            entity("1", 1, 10, serde_json::json!({"status": "Todo", "title": "t1"})),
-            entity("2", 2, 20, serde_json::json!({"status": "Todo", "title": "t2"})),
-            entity("3", 3, 15, serde_json::json!({"status": "Done", "title": "t3"})),
+            entity(
+                "1",
+                1,
+                10,
+                serde_json::json!({"status": "Todo", "title": "t1"}),
+            ),
+            entity(
+                "2",
+                2,
+                20,
+                serde_json::json!({"status": "Todo", "title": "t2"}),
+            ),
+            entity(
+                "3",
+                3,
+                15,
+                serde_json::json!({"status": "Done", "title": "t3"}),
+            ),
             entity("4", 4, 5, serde_json::json!({"title": "no status"})),
         ];
 

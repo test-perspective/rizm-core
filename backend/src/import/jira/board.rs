@@ -15,9 +15,11 @@ pub async fn fetch_board_id(config: &Value, project_key: &str) -> Option<String>
     let boards_res = client::request(config, "GET", &path, None).await.ok()?;
     let boards = boards_res.get("values")?.as_array()?.clone();
     let first = boards.first()?;
-    first
-        .get("id")
-        .and_then(|v| v.as_i64().map(|n| n.to_string()).or_else(|| v.as_str().map(String::from)))
+    first.get("id").and_then(|v| {
+        v.as_i64()
+            .map(|n| n.to_string())
+            .or_else(|| v.as_str().map(String::from))
+    })
 }
 
 /// Fetch all issue keys from board backlog (Agile API). Returns empty set on error.
@@ -119,7 +121,11 @@ pub async fn reorder_statuses_by_board(
     .await;
 
     let boards = match boards_res {
-        Ok(v) => v.get("values").and_then(|x| x.as_array()).cloned().unwrap_or_default(),
+        Ok(v) => v
+            .get("values")
+            .and_then(|x| x.as_array())
+            .cloned()
+            .unwrap_or_default(),
         Err(_) => return id_to_status.into_values().collect(),
     };
 

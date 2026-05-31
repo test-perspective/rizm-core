@@ -139,11 +139,7 @@ fn has_lone_asterisk_after(line: &str, mut i: usize) -> bool {
             }
             return true;
         }
-        let step = line[i..]
-            .chars()
-            .next()
-            .map(|c| c.len_utf8())
-            .unwrap_or(1);
+        let step = line[i..].chars().next().map(|c| c.len_utf8()).unwrap_or(1);
         i += step;
     }
     false

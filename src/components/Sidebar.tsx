@@ -24,6 +24,7 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(function Sidebar(
     onOpenProjectDetail,
     onReorderViews,
     notesPaneOccluding = false,
+    onAfterNavigate,
   },
   ref
 ) {
@@ -104,11 +105,17 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(function Sidebar(
   }
 
   return (
-    <div className="w-64 bg-zinc-950 border-r border-zinc-800 flex flex-col">
+    // REQ-286: h-full so when rendered inside the mobile Drawer the zinc-950 bg covers
+    // the entire drawer height — without this, content below the footer falls through to
+    // the Paper background (and any MUI elevation overlay) and looks washed-out gray.
+    <div className="w-64 h-full bg-zinc-950 border-r border-zinc-800 flex flex-col">
       <SidebarProjectSection
         projects={projects}
         activeProjectId={activeProjectId}
-        onProjectChange={onProjectChange}
+        onProjectChange={(projectId) => {
+          onProjectChange(projectId);
+          onAfterNavigate?.();
+        }}
         onOpenProjectDetail={onOpenProjectDetail}
         onAddProject={handleAddProject}
       />
@@ -117,7 +124,10 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(function Sidebar(
         visibleViews={visibleViews}
         currentView={currentView}
         canEdit={canEdit}
-        onViewChange={onViewChange}
+        onViewChange={(viewId) => {
+          onViewChange(viewId);
+          onAfterNavigate?.();
+        }}
         onReorderViews={onReorderViews}
       />
 

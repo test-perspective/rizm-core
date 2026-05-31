@@ -8,18 +8,57 @@ import { AssistantDialog } from './me/AssistantDialog';
 import { ChangePasswordDialog } from './me/ChangePasswordDialog';
 import { McpApiKeyDialog } from './me/McpApiKeyDialog';
 import { DashboardAndLogsPanel } from './me/DashboardAndLogsPanel';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 export function MePage() {
   const { user, logout, refresh } = useAuth();
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [mcpApiKeyOpen, setMcpApiKeyOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     document.title = 'Rizm - Settings';
   }, []);
 
   if (!user) return null;
+
+  // REQ-286: on mobile, the /me screen is intentionally minimal — just the user
+  // identity and Logout. AI Assistant, Account/Change Password, Integrations,
+  // Dashboard & Logs, and Admin sections are desktop-only.
+  if (isMobile) {
+    return (
+      <div className="box-border w-full shrink-0 bg-zinc-950 text-white px-6 pt-6 pb-24">
+        <header className="flex items-center justify-between mb-6">
+          <Link
+            to="/"
+            className="flex items-center gap-2 text-sm text-zinc-300 hover:text-white transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </Link>
+          <h1 className="text-xl font-bold">Settings</h1>
+          <span className="w-10" aria-hidden />
+        </header>
+
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-center gap-3">
+          <UserAvatar email={user.email} size="md" />
+          <div className="min-w-0 flex-1">
+            <div className="text-sm text-white truncate">{user.email}</div>
+            <div className="text-xs text-zinc-500">role: {user.role}</div>
+          </div>
+        </div>
+
+        <button
+          onClick={() => logout()}
+          className="mt-6 w-full flex items-center justify-center gap-2 px-4 py-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-lg text-sm text-zinc-200 transition-colors"
+        >
+          <LogOut className="w-4 h-4" />
+          Logout
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="box-border w-full shrink-0 bg-zinc-950 text-white px-6 pt-6 sm:px-8 sm:pt-8 md:px-10 md:pt-10 pb-24 sm:pb-28 md:pb-32">

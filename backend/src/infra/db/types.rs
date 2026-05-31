@@ -109,4 +109,3 @@ pub struct GroupRecord {
     pub created_at: i64,
     pub updated_at: i64,
 }
-

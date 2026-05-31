@@ -6,8 +6,8 @@ pub use bitbucket_api::{
     bitbucket_list_branches,
 };
 pub use oauth::{
-    bitbucket_client_env, bitbucket_public_base_url, exchange_bitbucket_token, is_bitbucket_auth_error,
-    load_bitbucket_config_and_token, pkce_challenge_s256, random_urlsafe,
+    bitbucket_client_env, bitbucket_public_base_url, exchange_bitbucket_token,
+    is_bitbucket_auth_error, load_bitbucket_config_and_token, pkce_challenge_s256, random_urlsafe,
 };
 
 #[cfg(test)]

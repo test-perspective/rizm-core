@@ -67,21 +67,27 @@ pub(super) async fn get_system_info(
     let sqlite_db_file_size_bytes = metadata.len();
 
     let db = state.db.read().await;
-    let attachment_per = db.get_attachment_usage_per_project().map_err(|_| ApiError::internal())?;
-    let attachment_total = db.get_attachment_usage_total().map_err(|_| ApiError::internal())?;
+    let attachment_per = db
+        .get_attachment_usage_per_project()
+        .map_err(|_| ApiError::internal())?;
+    let attachment_total = db
+        .get_attachment_usage_total()
+        .map_err(|_| ApiError::internal())?;
     let attachments = SystemInfoAttachments {
         total_size_bytes: attachment_total,
         per_project: attachment_per
             .into_iter()
-            .map(|(project_id, name_opt, attachment_count, total_size_bytes)| {
-                let project_name = name_opt.unwrap_or_else(|| project_id.clone());
-                SystemInfoAttachmentsPerProject {
-                    project_id,
-                    project_name,
-                    attachment_count,
-                    total_size_bytes,
-                }
-            })
+            .map(
+                |(project_id, name_opt, attachment_count, total_size_bytes)| {
+                    let project_name = name_opt.unwrap_or_else(|| project_id.clone());
+                    SystemInfoAttachmentsPerProject {
+                        project_id,
+                        project_name,
+                        attachment_count,
+                        total_size_bytes,
+                    }
+                },
+            )
             .collect(),
     };
 

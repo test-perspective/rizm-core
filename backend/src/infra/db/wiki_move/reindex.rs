@@ -78,7 +78,8 @@ pub(super) fn reindex_siblings_under_parent(
         props.insert(
             "__keelOrder".to_string(),
             serde_json::Value::Number(
-                serde_json::Number::from_f64(new_order).unwrap_or_else(|| serde_json::Number::from(0)),
+                serde_json::Number::from_f64(new_order)
+                    .unwrap_or_else(|| serde_json::Number::from(0)),
             ),
         );
         let json = serde_json::to_string(&props).context("serialize props")?;
@@ -119,7 +120,8 @@ pub(super) fn apply_sibling_order(
         props.insert(
             "__keelOrder".to_string(),
             serde_json::Value::Number(
-                serde_json::Number::from_f64(new_order).unwrap_or_else(|| serde_json::Number::from(0)),
+                serde_json::Number::from_f64(new_order)
+                    .unwrap_or_else(|| serde_json::Number::from(0)),
             ),
         );
         props.insert(

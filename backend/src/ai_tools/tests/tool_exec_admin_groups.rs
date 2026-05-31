@@ -20,13 +20,18 @@ fn add_member_to_group_group_not_found_returns_error() {
     };
     let raw = execute_admin_tool(&state, &actor, &call).expect("add_member_to_group");
     let parsed: JsonValue = serde_json::from_str(&raw).expect("parse json");
-    assert_eq!(parsed.get("error").and_then(|v| v.as_str()), Some("group not found"));
+    assert_eq!(
+        parsed.get("error").and_then(|v| v.as_str()),
+        Some("group not found")
+    );
 }
 
 #[test]
 fn add_member_to_group_user_not_found_returns_error() {
     let (_dir, db) = tmp_db();
-    let group_id = db.create_user_group("Test Group", None).expect("create group");
+    let group_id = db
+        .create_user_group("Test Group", None)
+        .expect("create group");
     let state = app_state(db);
     let actor = admin_user();
 
@@ -37,7 +42,10 @@ fn add_member_to_group_user_not_found_returns_error() {
     };
     let raw = execute_admin_tool(&state, &actor, &call).expect("add_member_to_group");
     let parsed: JsonValue = serde_json::from_str(&raw).expect("parse json");
-    assert_eq!(parsed.get("error").and_then(|v| v.as_str()), Some("user not found"));
+    assert_eq!(
+        parsed.get("error").and_then(|v| v.as_str()),
+        Some("user not found")
+    );
 }
 
 #[test]

@@ -1,5 +1,6 @@
-import type { MutableRefObject } from 'react';
+import { useState, type MutableRefObject } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
+import { Drawer } from '@mui/material';
 import { Sidebar, type SidebarHandle } from '../Sidebar';
 import { WorkspaceHeader } from './WorkspaceHeader';
 import { WorkspaceViewPanel, type WorkspaceNotesPaneConfig } from './WorkspaceViewPanel';
@@ -13,6 +14,7 @@ import {
   setLastViewForProject,
   setLastWikiPageForProjectView,
 } from '../../workspace/storage';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 type BuildPath = (args: { projectId: string; viewId: string; entityId?: string | null }) => string;
 
@@ -77,7 +79,7 @@ export type WorkspaceBodyProps = {
   setNotePanePickerOpen: (v: boolean) => void;
   setNotePanePickerTargetViewId: (v: string | null) => void;
   handleCreateProject: (opts: any) => void;
-  handleCreateEntity: () => void;
+  handleCreateEntity: (options?: { groupByValue?: string }) => void;
   handleNavigateEntity: (entityId: string) => void;
   handleSearchResultSelect: (result: SearchResult, query: string) => void;
   handleNotePanePickerConfirm: (pageId: string, targetViewId: string) => void;
@@ -179,36 +181,66 @@ export function WorkspaceBody(props: WorkspaceBodyProps) {
     deleteProject,
   } = props;
 
+  const isMobile = useIsMobile();
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  const sidebarElement = (
+    <Sidebar
+      ref={sidebarRef}
+      projects={projects}
+      activeProjectId={activeProjectId}
+      onProjectChange={(projectId) => {
+        setOverlayEntity(null);
+        navigate(`/p/${encodeURIComponent(projectId)}`, { replace: false });
+      }}
+      onCreateProject={handleCreateProject}
+      manifest={manifest}
+      currentView={effectiveViewId ?? currentView?.id ?? ''}
+      onViewChange={(viewId) => {
+        setLastViewForProject(activeProjectId, viewId);
+        setOverlayEntity(null);
+        navigate(buildPath({ projectId: activeProjectId, viewId }), { replace: false });
+      }}
+      onOpenProjectDetail={() => setProjectDetailDialogOpen(true)}
+      onReorderViews={(orderedViewIds) => {
+        if (!manifest) return;
+        try {
+          const next = reorderViews(manifest, orderedViewIds);
+          updateManifest(next);
+        } catch (e) {
+          console.error('Failed to reorder views:', e);
+        }
+      }}
+      notesPaneOccluding={notesOccludeSidebar}
+      onAfterNavigate={isMobile ? () => setMobileSidebarOpen(false) : undefined}
+    />
+  );
+
   return (
     <div className="flex h-full min-h-0 flex-1 bg-zinc-950 text-white overflow-hidden">
-      <Sidebar
-        ref={sidebarRef}
-        projects={projects}
-        activeProjectId={activeProjectId}
-        onProjectChange={(projectId) => {
-          setOverlayEntity(null);
-          navigate(`/p/${encodeURIComponent(projectId)}`, { replace: false });
-        }}
-        onCreateProject={handleCreateProject}
-        manifest={manifest}
-        currentView={effectiveViewId ?? currentView?.id ?? ''}
-        onViewChange={(viewId) => {
-          setLastViewForProject(activeProjectId, viewId);
-          setOverlayEntity(null);
-          navigate(buildPath({ projectId: activeProjectId, viewId }), { replace: false });
-        }}
-        onOpenProjectDetail={() => setProjectDetailDialogOpen(true)}
-        onReorderViews={(orderedViewIds) => {
-          if (!manifest) return;
-          try {
-            const next = reorderViews(manifest, orderedViewIds);
-            updateManifest(next);
-          } catch (e) {
-            console.error('Failed to reorder views:', e);
-          }
-        }}
-        notesPaneOccluding={notesOccludeSidebar}
-      />
+      {isMobile ? (
+        <Drawer
+          open={mobileSidebarOpen}
+          onClose={() => setMobileSidebarOpen(false)}
+          variant="temporary"
+          ModalProps={{ keepMounted: true }}
+          PaperProps={{
+            sx: {
+              width: 256,
+              backgroundColor: 'rgb(9 9 11)',
+              // REQ-286: kill MUI's dark-mode Paper elevation overlay (a white linear
+              // gradient on the background-image) so the drawer matches the rest of the
+              // app's solid zinc-950 background.
+              backgroundImage: 'none',
+              borderRight: '1px solid rgb(39 39 42)',
+            },
+          }}
+        >
+          {sidebarElement}
+        </Drawer>
+      ) : (
+        sidebarElement
+      )}
 
       <div className="flex-1 min-w-0 flex flex-col">
         <WorkspaceHeader
@@ -224,6 +256,9 @@ export function WorkspaceBody(props: WorkspaceBodyProps) {
           onOpenBoardConfig={() => setBoardConfigOpen(true)}
           viewTitleNotes={viewTitleNotesMenu}
           notesChrome={headerNotesChrome}
+          onOpenMobileSidebar={
+            isMobile && !notesOccludeSidebar ? () => setMobileSidebarOpen(true) : undefined
+          }
         />
 
         <WorkspaceViewPanel
@@ -250,6 +285,9 @@ export function WorkspaceBody(props: WorkspaceBodyProps) {
           onRefreshProject={refreshActiveProject}
           onRenameBoardColumn={handleRenameBoardColumn}
           boardColumnRenameBusy={boardColumnRenameBusy}
+          onCreateEntityInBoardColumn={(columnId) =>
+            handleCreateEntity({ groupByValue: columnId })
+          }
           onWikiSelect={(id) => {
             if (effectiveViewId) {
               setLastWikiPageForProjectView(activeProjectId, effectiveViewId, id);

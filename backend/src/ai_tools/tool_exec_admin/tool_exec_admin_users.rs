@@ -9,10 +9,20 @@ use crate::time;
 use crate::ApiError;
 
 pub fn list_users(state: &AppState, args: &Value) -> Result<String, ApiError> {
-    let inactive_only = args.get("inactiveOnly").and_then(|v| v.as_bool()).unwrap_or(false);
-    let include_disabled = args.get("includeDisabled").and_then(|v| v.as_bool()).unwrap_or(false);
+    let inactive_only = args
+        .get("inactiveOnly")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let include_disabled = args
+        .get("includeDisabled")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
 
-    let users = state.db.blocking_read().list_users().map_err(|_| ApiError::internal())?;
+    let users = state
+        .db
+        .blocking_read()
+        .list_users()
+        .map_err(|_| ApiError::internal())?;
     let filtered: Vec<_> = users
         .into_iter()
         .filter(|u| {
@@ -50,7 +60,12 @@ pub fn get_user(state: &AppState, args: &Value) -> Result<String, ApiError> {
         return Ok(json!({ "error": "userId is required" }).to_string());
     }
 
-    let user = match state.db.blocking_read().get_user_by_id(user_id).map_err(|_| ApiError::internal())? {
+    let user = match state
+        .db
+        .blocking_read()
+        .get_user_by_id(user_id)
+        .map_err(|_| ApiError::internal())?
+    {
         Some(u) => u,
         None => return Ok(json!({ "error": "user not found" }).to_string()),
     };
@@ -73,7 +88,11 @@ pub fn get_user(state: &AppState, args: &Value) -> Result<String, ApiError> {
     .to_string())
 }
 
-pub fn bulk_delete_users(state: &AppState, actor: &AuthedUser, args: &Value) -> Result<String, ApiError> {
+pub fn bulk_delete_users(
+    state: &AppState,
+    actor: &AuthedUser,
+    args: &Value,
+) -> Result<String, ApiError> {
     let ids = args
         .get("userIds")
         .and_then(|v| v.as_array())
@@ -92,7 +111,12 @@ pub fn bulk_delete_users(state: &AppState, actor: &AuthedUser, args: &Value) -> 
     let mut errors = Vec::new();
 
     for user_id in ids {
-        let user = match state.db.blocking_read().get_user_by_id(&user_id).map_err(|_| ApiError::internal())? {
+        let user = match state
+            .db
+            .blocking_read()
+            .get_user_by_id(&user_id)
+            .map_err(|_| ApiError::internal())?
+        {
             Some(u) => u,
             None => {
                 errors.push(format!("user {} not found", user_id));
@@ -101,14 +125,22 @@ pub fn bulk_delete_users(state: &AppState, actor: &AuthedUser, args: &Value) -> 
         };
 
         if user.role == "admin" && !user.is_disabled {
-            let count = state.db.blocking_read().count_admin_users().map_err(|_| ApiError::internal())?;
+            let count = state
+                .db
+                .blocking_read()
+                .count_admin_users()
+                .map_err(|_| ApiError::internal())?;
             if count <= 1 {
                 errors.push(format!("cannot delete the last admin user ({})", user_id));
                 continue;
             }
         }
 
-        if let Err(e) = state.db.blocking_read().delete_user_and_clear_assignee_references(&user_id) {
+        if let Err(e) = state
+            .db
+            .blocking_read()
+            .delete_user_and_clear_assignee_references(&user_id)
+        {
             errors.push(format!("{user_id}: {}", e));
             continue;
         }
@@ -154,7 +186,9 @@ pub fn create_user(state: &AppState, actor: &AuthedUser, args: &Value) -> Result
 
     let (password, temp_password) = match args.get("initialPassword").and_then(|v| v.as_str()) {
         Some(p) if p.trim().len() >= 12 => (p.trim().to_string(), None),
-        Some(_) => return Ok(json!({ "error": "password must be at least 12 characters" }).to_string()),
+        Some(_) => {
+            return Ok(json!({ "error": "password must be at least 12 characters" }).to_string())
+        }
         _ => {
             let t = generate_temp_password();
             (t.clone(), Some(t))
@@ -201,11 +235,20 @@ pub fn update_user(state: &AppState, actor: &AuthedUser, args: &Value) -> Result
         return Ok(json!({ "error": "userId is required" }).to_string());
     }
 
-    if state.db.blocking_read().get_user_by_id(user_id).map_err(|_| ApiError::internal())?.is_none() {
+    if state
+        .db
+        .blocking_read()
+        .get_user_by_id(user_id)
+        .map_err(|_| ApiError::internal())?
+        .is_none()
+    {
         return Ok(json!({ "error": "user not found" }).to_string());
     }
 
-    let role = args.get("role").and_then(|v| v.as_str()).map(|s| s.trim().to_lowercase());
+    let role = args
+        .get("role")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_lowercase());
     let role = role.as_ref().and_then(|r| match r.as_str() {
         "admin" => Some(Role::Admin),
         "editor" => Some(Role::Editor),
@@ -215,7 +258,9 @@ pub fn update_user(state: &AppState, actor: &AuthedUser, args: &Value) -> Result
     let is_disabled = args.get("isDisabled").and_then(|v| v.as_bool());
 
     if role.is_none() && is_disabled.is_none() {
-        return Ok(json!({ "error": "at least one of role or isDisabled is required" }).to_string());
+        return Ok(
+            json!({ "error": "at least one of role or isDisabled is required" }).to_string(),
+        );
     }
 
     if let Err(e) = state.db.blocking_read().update_user_role_disabled(
@@ -242,7 +287,11 @@ pub fn update_user(state: &AppState, actor: &AuthedUser, args: &Value) -> Result
     Ok(json!({ "ok": true }).to_string())
 }
 
-pub fn reset_password(state: &AppState, actor: &AuthedUser, args: &Value) -> Result<String, ApiError> {
+pub fn reset_password(
+    state: &AppState,
+    actor: &AuthedUser,
+    args: &Value,
+) -> Result<String, ApiError> {
     let user_id = args
         .get("userId")
         .and_then(|v| v.as_str())
@@ -252,8 +301,14 @@ pub fn reset_password(state: &AppState, actor: &AuthedUser, args: &Value) -> Res
         return Ok(json!({ "error": "userId is required" }).to_string());
     }
 
-    let generate_temp = args.get("generateTemp").and_then(|v| v.as_bool()).unwrap_or(false);
-    let new_password = args.get("newPassword").and_then(|v| v.as_str()).map(|s| s.trim());
+    let generate_temp = args
+        .get("generateTemp")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let new_password = args
+        .get("newPassword")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim());
 
     let (password, temp_password) = if generate_temp {
         let t = generate_temp_password();
@@ -264,7 +319,9 @@ pub fn reset_password(state: &AppState, actor: &AuthedUser, args: &Value) -> Res
         }
         (p.to_string(), None)
     } else {
-        return Ok(json!({ "error": "either generateTemp or newPassword is required" }).to_string());
+        return Ok(
+            json!({ "error": "either generateTemp or newPassword is required" }).to_string(),
+        );
     };
 
     let password_hash = hash_password(&password);

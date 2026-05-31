@@ -375,7 +375,8 @@ export function RichTextEditor({
   }, [editable]);
 
   return (
-    <div className={className} ref={containerRef}>
+    // REQ-286: min-w-0 lets the editor shrink inside flex parents (mobile: avoids horizontal overflow).
+    <div className={`min-w-0 ${className ?? ''}`} ref={containerRef}>
       <div className="text-[14px] [&_.bn-editor]:text-[14px]">
         <StatusEditContext.Provider value={statusEditContextValue}>
           <BlockNoteView

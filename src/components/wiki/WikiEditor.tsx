@@ -131,8 +131,8 @@ export function WikiEditor({
           onChange={onUpdateDoc}
           className={
             editable
-              ? 'bg-zinc-900 [&_.bn-editor]:!bg-zinc-900 [&_.bn-container]:!bg-zinc-900'
-              : 'bg-black [&_.bn-editor]:!bg-black [&_.bn-container]:!bg-black'
+              ? 'wiki-rich-text-editor bg-zinc-900 [&_.bn-editor]:!bg-zinc-900 [&_.bn-container]:!bg-zinc-900'
+              : 'wiki-rich-text-editor bg-black [&_.bn-editor]:!bg-black [&_.bn-container]:!bg-black'
           }
           entities={entities}
           onEntityClick={onEntityClick}

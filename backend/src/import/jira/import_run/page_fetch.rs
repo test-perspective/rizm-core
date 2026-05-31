@@ -52,7 +52,11 @@ pub(super) async fn fetch_next_page(
         Ok(FetchedPage {
             issues,
             has_more,
-            page_total: if page_total > 0 { Some(page_total) } else { None },
+            page_total: if page_total > 0 {
+                Some(page_total)
+            } else {
+                None
+            },
         })
     } else {
         let mut body = serde_json::json!({

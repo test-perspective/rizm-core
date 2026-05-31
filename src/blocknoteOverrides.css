@@ -70,3 +70,13 @@
   font-size: 0.68rem;
   line-height: 1.15;
 }
+
+/* REQ-298: Wiki bold text should appear visibly heavier than body text. */
+.wiki-rich-text-editor .bn-container {
+  font-synthesis: weight style;
+}
+
+.wiki-rich-text-editor .bn-inline-content strong,
+.wiki-rich-text-editor .bn-inline-content b {
+  font-weight: 700;
+}

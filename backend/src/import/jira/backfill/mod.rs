@@ -3,9 +3,10 @@
 use serde_json::{Map, Value};
 
 use crate::import::adf::{
-    is_blocknote_doc_json_string, jira_import_string_to_blocknote_doc, maybe_expand_jira_emoticons_in_blocknote,
-    maybe_reparse_blocknote_from_flat_markdown, maybe_reparse_blocknote_jira_list_misparsed,
-    maybe_reparse_blocknote_wrapped_markdown, maybe_sanitize_jira_wiki_mangled_links,
+    is_blocknote_doc_json_string, jira_import_string_to_blocknote_doc,
+    maybe_expand_jira_emoticons_in_blocknote, maybe_reparse_blocknote_from_flat_markdown,
+    maybe_reparse_blocknote_jira_list_misparsed, maybe_reparse_blocknote_wrapped_markdown,
+    maybe_sanitize_jira_wiki_mangled_links,
 };
 
 /// After optional link/quote sanitization, run Markdown/wiki re-parse passes on the same string.
@@ -23,7 +24,9 @@ fn try_upgrade_blocknote_jira_string(desc: &str) -> Option<String> {
 
 /// Build a property patch for one entity: convert non-BlockNote `Description` and comment `doc` strings when possible.
 /// Returns `None` when nothing needs updating.
-pub fn compute_jira_markdown_backfill_patch(props: &Map<String, Value>) -> Option<Map<String, Value>> {
+pub fn compute_jira_markdown_backfill_patch(
+    props: &Map<String, Value>,
+) -> Option<Map<String, Value>> {
     let mut patch = Map::new();
 
     if let Some(Value::String(desc)) = props.get("Description") {

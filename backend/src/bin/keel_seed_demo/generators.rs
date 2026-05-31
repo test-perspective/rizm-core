@@ -7,7 +7,9 @@ use keel_backend::models::{Permission, PolicyDefaults, Project, ProjectConfig, P
 use keel_backend::time;
 use serde_json::json;
 
-use super::content::{generate_task_description, generate_task_title, generate_wiki_doc, generate_wiki_title};
+use super::content::{
+    generate_task_description, generate_task_title, generate_wiki_doc, generate_wiki_title,
+};
 
 pub(super) fn generate_users(db: &Db, count: usize) -> anyhow::Result<Vec<String>> {
     let password = "change-this-password";
@@ -46,7 +48,11 @@ pub(super) fn generate_groups(db: &Db, count: usize) -> anyhow::Result<Vec<Strin
     Ok(group_ids)
 }
 
-pub(super) fn assign_users_to_groups(db: &Db, user_ids: &[String], group_ids: &[String]) -> anyhow::Result<()> {
+pub(super) fn assign_users_to_groups(
+    db: &Db,
+    user_ids: &[String],
+    group_ids: &[String],
+) -> anyhow::Result<()> {
     if group_ids.is_empty() {
         return Ok(());
     }
@@ -98,7 +104,11 @@ pub(super) fn generate_projects(db: &Db, count: usize) -> anyhow::Result<Vec<Str
     Ok(project_ids)
 }
 
-pub(super) fn set_project_policy(db: &Db, project_id: &str, user_ids: &[String]) -> anyhow::Result<()> {
+pub(super) fn set_project_policy(
+    db: &Db,
+    project_id: &str,
+    user_ids: &[String],
+) -> anyhow::Result<()> {
     let mut users = HashMap::new();
     for user_id in user_ids {
         users.insert(user_id.clone(), Permission::Write);

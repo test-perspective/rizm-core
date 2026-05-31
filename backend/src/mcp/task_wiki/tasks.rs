@@ -28,7 +28,10 @@ pub fn list_tasks_for_user(
         .with_context(|| format!("list entities for project {}", project.id))?;
 
     let mut tasks: Vec<Value> = Vec::new();
-    for e in entities.into_iter().filter(|e| e.entity_id == "task" || e.entity_id == "item") {
+    for e in entities
+        .into_iter()
+        .filter(|e| e.entity_id == "task" || e.entity_id == "item")
+    {
         let task_key = e
             .properties
             .get("taskKey")
@@ -85,14 +88,7 @@ pub fn search_tasks_for_user(
     if has_property_filters {
         let project = resolve_project(state, user, project_key, project_id)?;
         let results = search_tasks_by_properties(
-            state,
-            user,
-            &project,
-            query,
-            labels,
-            status,
-            priority,
-            limit,
+            state, user, &project, query, labels, status, priority, limit,
         )?;
         return Ok(results);
     }
@@ -111,16 +107,8 @@ pub fn search_tasks_for_user(
         ("global", None)
     };
 
-    let results = run_search(
-        state,
-        user,
-        query,
-        scope,
-        pid.as_deref(),
-        &["task"],
-        limit,
-    )
-    .map_err(|e| anyhow::anyhow!("{e:?}"))?;
+    let results = run_search(state, user, query, scope, pid.as_deref(), &["task"], limit)
+        .map_err(|e| anyhow::anyhow!("{e:?}"))?;
 
     Ok(serialize_search_results(&results))
 }

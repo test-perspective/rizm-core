@@ -29,7 +29,9 @@ pub fn base_url(config: &Value) -> Result<String, ImportEngineError> {
         .ok_or_else(|| ImportEngineError::InvalidConfig("baseUrl is required".to_string()))?;
     let url = url.trim().trim_end_matches('/');
     if url.is_empty() {
-        return Err(ImportEngineError::InvalidConfig("baseUrl cannot be empty".to_string()));
+        return Err(ImportEngineError::InvalidConfig(
+            "baseUrl cannot be empty".to_string(),
+        ));
     }
     Ok(url.to_string())
 }
@@ -81,7 +83,12 @@ pub async fn request(
     let mut req = match method {
         "GET" => client.get(&url),
         "POST" => client.post(&url),
-        _ => return Err(ImportEngineError::Internal(format!("unsupported method {}", method))),
+        _ => {
+            return Err(ImportEngineError::Internal(format!(
+                "unsupported method {}",
+                method
+            )))
+        }
     };
 
     req = req

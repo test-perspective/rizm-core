@@ -4,8 +4,8 @@ use serde_json::Value;
 
 use super::context::AdfImportContext;
 
-mod marks;
 mod inline;
+mod marks;
 mod media;
 mod nodes;
 
@@ -17,7 +17,10 @@ mod tests_regression;
 use nodes::adf_blocks_from_node;
 
 /// Convert ADF with optional Jira attachment resolution for embedded media.
-pub fn adf_to_blocknote_doc_with_context(adf: &Value, ctx: Option<&AdfImportContext>) -> Option<String> {
+pub fn adf_to_blocknote_doc_with_context(
+    adf: &Value,
+    ctx: Option<&AdfImportContext>,
+) -> Option<String> {
     let content = adf.get("content").and_then(|c| c.as_array())?;
     let mut blocks: Vec<Value> = Vec::new();
 

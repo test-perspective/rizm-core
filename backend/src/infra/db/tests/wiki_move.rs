@@ -87,30 +87,20 @@ fn wiki_move_subtree_cross_project_moves_entities_collab_and_attachments() {
     .expect("collab");
 
     let out = db
-        .move_wiki_page_subtree(
-            &db_path,
-            "pm1",
-            "wiki-root",
-            "pm2",
-            None,
-            None,
-            "u1",
-        )
+        .move_wiki_page_subtree(&db_path, "pm1", "wiki-root", "pm2", None, None, "u1")
         .expect("move");
 
     assert!(out.moved_page_ids.contains(&"wiki-root".to_string()));
     assert!(out.moved_page_ids.contains(&"wiki-child".to_string()));
 
-    assert!(
-        db.get_entity_for_project("pm2", "wiki-root")
-            .expect("get")
-            .is_some()
-    );
-    assert!(
-        db.get_entity_for_project("pm1", "wiki-root")
-            .expect("get")
-            .is_none()
-    );
+    assert!(db
+        .get_entity_for_project("pm2", "wiki-root")
+        .expect("get")
+        .is_some());
+    assert!(db
+        .get_entity_for_project("pm1", "wiki-root")
+        .expect("get")
+        .is_none());
 
     let collab = db
         .get_wiki_collab_state_for_project("pm2", "wiki-root")

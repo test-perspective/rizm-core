@@ -177,7 +177,10 @@ async fn get_dashboard_feed(
         .get_user_dashboard_policy_json(&user.user_id)
         .map_err(|_| ApiError::internal())?
         .unwrap_or_else(|| DEFAULT_DASHBOARD_POLICY_JSON.to_string());
-    let policy: DashboardPolicy = serde_json::from_str(&policy_json).unwrap_or(DashboardPolicy { version: Some(1), sections: vec![] });
+    let policy: DashboardPolicy = serde_json::from_str(&policy_json).unwrap_or(DashboardPolicy {
+        version: Some(1),
+        sections: vec![],
+    });
 
     // Fetch activity logs.
     let logs = db
@@ -185,7 +188,13 @@ async fn get_dashboard_feed(
         .map_err(|_| ApiError::internal())?;
 
     // Group by (project_id, entity_type, entity_id).
-    let mut grouped: HashMap<(String, String, String), (ActivityMeta, Vec<(crate::db::AuditLogRecord, Option<Value>)>)> = HashMap::new();
+    let mut grouped: HashMap<
+        (String, String, String),
+        (
+            ActivityMeta,
+            Vec<(crate::db::AuditLogRecord, Option<Value>)>,
+        ),
+    > = HashMap::new();
     for log in logs {
         let Some(meta_raw) = log.meta_json.clone() else {
             continue;
@@ -198,8 +207,16 @@ async fn get_dashboard_feed(
             continue;
         }
         let changes = meta.changes.clone();
-        let key = (meta.project_id.clone(), meta.entity_type.clone(), meta.entity_id.clone());
-        grouped.entry(key).or_insert_with(|| (meta, vec![])).1.push((log, changes));
+        let key = (
+            meta.project_id.clone(),
+            meta.entity_type.clone(),
+            meta.entity_id.clone(),
+        );
+        grouped
+            .entry(key)
+            .or_insert_with(|| (meta, vec![]))
+            .1
+            .push((log, changes));
     }
 
     let actor_ids: Vec<String> = grouped
@@ -216,8 +233,14 @@ async fn get_dashboard_feed(
     // Convert to parent nodes (children sorted by created_at desc already from query).
     let mut parents: Vec<DashboardParentNode> = Vec::new();
     for ((_pid, _etype, _eid), (meta, rows)) in grouped {
-        let project_name = project_name_by_id.get(&meta.project_id).cloned().unwrap_or_else(|| meta.project_id.clone());
-        let key = format!("{}:{}:{}", meta.project_id, meta.entity_type, meta.entity_id);
+        let project_name = project_name_by_id
+            .get(&meta.project_id)
+            .cloned()
+            .unwrap_or_else(|| meta.project_id.clone());
+        let key = format!(
+            "{}:{}:{}",
+            meta.project_id, meta.entity_type, meta.entity_id
+        );
         let children = rows
             .into_iter()
             .map(|(r, changes)| DashboardChildNode {
@@ -225,7 +248,10 @@ async fn get_dashboard_feed(
                 action: r.action,
                 created_at: r.created_at,
                 actor_user_id: r.actor_user_id.clone(),
-                actor_user_email: r.actor_user_id.as_ref().and_then(|id| email_by_id.get(id).cloned()),
+                actor_user_email: r
+                    .actor_user_id
+                    .as_ref()
+                    .and_then(|id| email_by_id.get(id).cloned()),
                 changes,
             })
             .collect::<Vec<_>>();
@@ -244,14 +270,18 @@ async fn get_dashboard_feed(
     let mut parents = filter_self_updates(&user.user_id, parents);
 
     // Sort parents by most recent child update.
-    parents.sort_by_key(|p| std::cmp::Reverse(p.children.first().map(|c| c.created_at).unwrap_or(0)));
+    parents
+        .sort_by_key(|p| std::cmp::Reverse(p.children.first().map(|c| c.created_at).unwrap_or(0)));
 
     // Evaluate per-section filtering + limits.
     let mut entity_cache: HashMap<(String, String), Option<crate::models::Entity>> = HashMap::new();
     let mut out_sections: Vec<DashboardSectionResponse> = Vec::new();
     let mut seen_parent_keys: HashSet<String> = HashSet::new();
     for s in policy.sections {
-        let limits = s.limits.unwrap_or(SectionLimits { parents: None, children_per_parent: None });
+        let limits = s.limits.unwrap_or(SectionLimits {
+            parents: None,
+            children_per_parent: None,
+        });
         let max_parents = limits.parents.unwrap_or(50) as usize;
         let max_children = limits.children_per_parent.unwrap_or(10) as usize;
 
@@ -274,10 +304,14 @@ async fn get_dashboard_feed(
         }
 
         let title = normalize_section_title(&s.id, s.title);
-        out_sections.push(DashboardSectionResponse { id: s.id, title, items });
+        out_sections.push(DashboardSectionResponse {
+            id: s.id,
+            title,
+            items,
+        });
     }
 
-    Ok(Json(DashboardFeedResponse { sections: out_sections }))
+    Ok(Json(DashboardFeedResponse {
+        sections: out_sections,
+    }))
 }
-
-

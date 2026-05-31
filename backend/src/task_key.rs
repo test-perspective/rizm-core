@@ -16,9 +16,7 @@ pub fn parse_task_key_and_project(raw: &str) -> Result<(String, String)> {
         bail!("empty");
     }
     let upper = raw.to_uppercase();
-    let (prefix, rest) = upper
-        .split_once('-')
-        .context("missing '-'")?;
+    let (prefix, rest) = upper.split_once('-').context("missing '-'")?;
     if !is_valid_project_key(prefix) {
         bail!("invalid projectKey prefix");
     }

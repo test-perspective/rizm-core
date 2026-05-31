@@ -25,6 +25,7 @@ interface SortableBoardColumnProps {
   scmLoading?: boolean;
   onScmRefresh?: () => void;
   onRenameColumn?: (from: string, to: string) => void | Promise<void>;
+  onCreateEntityInColumn?: (columnId: string) => void;
 }
 
 export const SortableBoardColumn = ({
@@ -49,6 +50,7 @@ export const SortableBoardColumn = ({
   scmLoading,
   onScmRefresh,
   onRenameColumn,
+  onCreateEntityInColumn,
 }: SortableBoardColumnProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: columnId,
@@ -85,6 +87,7 @@ export const SortableBoardColumn = ({
         scmLoading={scmLoading}
         onScmRefresh={onScmRefresh}
         onRenameColumn={onRenameColumn}
+        onCreateEntityInColumn={onCreateEntityInColumn}
       />
     </div>
   );

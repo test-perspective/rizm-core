@@ -61,7 +61,7 @@ export const RichTextPropertyInput = ({
             e.stopPropagation();
             setContentExpanded((v) => !v);
           }}
-          className="shrink-0 p-0.5 rounded-md text-zinc-400 hover:text-zinc-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+          className="shrink-0 p-2 sm:p-0.5 rounded-md text-zinc-400 hover:text-zinc-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
         >
           {contentExpanded ? (
             <ChevronDown className="w-4 h-4 shrink-0" aria-hidden />
@@ -119,7 +119,7 @@ export const RichTextPropertyInput = ({
                   onCommit?.();
                   setIsEditing(false);
                 }}
-                className="p-1 text-zinc-400 hover:text-zinc-200"
+                className="p-2 sm:p-1 text-zinc-400 hover:text-zinc-200"
                 title="Done"
               >
                 <Check className="w-4 h-4" />

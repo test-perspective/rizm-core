@@ -38,12 +38,19 @@ fn backfill_repairs_paragraph_only_with_jira_code_and_h3_wiki_lines() {
     let mut props = serde_json::Map::new();
     props.insert("Description".to_string(), Value::String(wrapped));
     let patch = compute_jira_markdown_backfill_patch(&props).expect("patch");
-    let desc = patch.get("Description").and_then(|v| v.as_str()).expect("desc");
+    let desc = patch
+        .get("Description")
+        .and_then(|v| v.as_str())
+        .expect("desc");
     assert!(!desc.contains("{code"), "should strip code macro: {}", desc);
     assert!(desc.contains("pipelines"), "{}", desc);
     assert!(desc.contains("\"codeBlock\""), "{}", desc);
     assert!(desc.contains("\"language\":\"yaml\""), "{}", desc);
-    assert!(desc.contains("\"heading\""), "h3. should become heading: {}", desc);
+    assert!(
+        desc.contains("\"heading\""),
+        "h3. should become heading: {}",
+        desc
+    );
     assert!(desc.contains("Build sizes"), "{}", desc);
     assert!(desc.contains("bulletListItem"), "{}", desc);
 }
@@ -78,9 +85,16 @@ fn backfill_runs_reparse_after_sanitize_when_both_apply() {
     let mut props = serde_json::Map::new();
     props.insert("Description".to_string(), Value::String(wrapped));
     let patch = compute_jira_markdown_backfill_patch(&props).expect("patch");
-    let desc = patch.get("Description").and_then(|v| v.as_str()).expect("desc");
+    let desc = patch
+        .get("Description")
+        .and_then(|v| v.as_str())
+        .expect("desc");
     assert!(desc.contains("https://a.com/b"), "sanitized href: {}", desc);
-    assert!(desc.contains("\"heading\""), "h3. should upgrade after sanitize: {}", desc);
+    assert!(
+        desc.contains("\"heading\""),
+        "h3. should upgrade after sanitize: {}",
+        desc
+    );
     assert!(desc.contains("After sanitize"), "{}", desc);
 }
 
@@ -106,8 +120,15 @@ fn backfill_upgrades_mixed_top_level_blocks_when_flattened_is_markdown() {
     let mut props = serde_json::Map::new();
     props.insert("Description".to_string(), Value::String(wrapped));
     let patch = compute_jira_markdown_backfill_patch(&props).expect("patch");
-    let desc = patch.get("Description").and_then(|v| v.as_str()).expect("desc");
-    assert!(desc.contains("heading") || desc.contains("bulletListItem"), "{}", desc);
+    let desc = patch
+        .get("Description")
+        .and_then(|v| v.as_str())
+        .expect("desc");
+    assert!(
+        desc.contains("heading") || desc.contains("bulletListItem"),
+        "{}",
+        desc
+    );
 }
 
 #[test]
@@ -127,7 +148,10 @@ fn backfill_upgrades_paragraph_only_blocknote_holding_markdown() {
     let mut props = serde_json::Map::new();
     props.insert("Description".to_string(), Value::String(wrapped));
     let patch = compute_jira_markdown_backfill_patch(&props).expect("patch");
-    let desc = patch.get("Description").and_then(|v| v.as_str()).expect("desc");
+    let desc = patch
+        .get("Description")
+        .and_then(|v| v.as_str())
+        .expect("desc");
     assert!(desc.contains("heading"), "{}", desc);
     assert!(desc.contains("bulletListItem"), "{}", desc);
 }
@@ -157,11 +181,20 @@ fn backfill_repairs_split_double_star_subbullet_after_bullet() {
     let mut props = serde_json::Map::new();
     props.insert("Description".to_string(), Value::String(bad));
     let patch = compute_jira_markdown_backfill_patch(&props).expect("patch");
-    let desc = patch.get("Description").and_then(|v| v.as_str()).expect("desc");
+    let desc = patch
+        .get("Description")
+        .and_then(|v| v.as_str())
+        .expect("desc");
     let v: Value = serde_json::from_str(desc).expect("parse");
     let arr = v.as_array().expect("array");
-    assert_eq!(arr[0].get("type").and_then(Value::as_str), Some("bulletListItem"));
-    let ch = arr[0].get("children").and_then(Value::as_array).expect("nested");
+    assert_eq!(
+        arr[0].get("type").and_then(Value::as_str),
+        Some("bulletListItem")
+    );
+    let ch = arr[0]
+        .get("children")
+        .and_then(Value::as_array)
+        .expect("nested");
     assert!(!ch.is_empty(), "expected nested bullet: {}", desc);
 }
 
@@ -190,7 +223,10 @@ fn backfill_repairs_split_star_subbullet_and_normalizes_jira_template_token() {
     let mut props = serde_json::Map::new();
     props.insert("Description".to_string(), Value::String(bad));
     let patch = compute_jira_markdown_backfill_patch(&props).expect("patch");
-    let desc = patch.get("Description").and_then(|v| v.as_str()).expect("desc");
+    let desc = patch
+        .get("Description")
+        .and_then(|v| v.as_str())
+        .expect("desc");
     assert!(
         !desc.contains("{{fetchPageName}}"),
         "template should be normalized: {}",
@@ -225,11 +261,20 @@ fn backfill_repairs_jira_subbullet_stored_as_following_paragraph() {
     let mut props = serde_json::Map::new();
     props.insert("Description".to_string(), Value::String(bad));
     let patch = compute_jira_markdown_backfill_patch(&props).expect("patch");
-    let desc = patch.get("Description").and_then(|v| v.as_str()).expect("desc");
+    let desc = patch
+        .get("Description")
+        .and_then(|v| v.as_str())
+        .expect("desc");
     let v: Value = serde_json::from_str(desc).expect("parse patched");
     let arr = v.as_array().expect("array");
-    assert_eq!(arr[0].get("type").and_then(Value::as_str), Some("bulletListItem"));
-    let ch = arr[0].get("children").and_then(Value::as_array).expect("children");
+    assert_eq!(
+        arr[0].get("type").and_then(Value::as_str),
+        Some("bulletListItem")
+    );
+    let ch = arr[0]
+        .get("children")
+        .and_then(Value::as_array)
+        .expect("children");
     assert!(
         !ch.is_empty(),
         "expected nested bullet under first item: {}",

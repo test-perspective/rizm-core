@@ -6,6 +6,44 @@ export const LIST_ITEM_TYPES = new Set([
   'toggleListItem',
 ]);
 
+const MARKDOWN_BLOCK_PATTERNS = [
+  /^\s{0,3}#{1,6}\s+\S/m,
+  /^\s{0,3}(?:[-*+])\s+\S/m,
+  /^\s{0,3}\d+[.)]\s+\S/m,
+  /^\s{0,3}>\s+\S/m,
+  /^\s{0,3}(?:```|~~~)/m,
+  /^\s*\|.+\|\s*$/m,
+  /^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/m,
+  /^\s{0,3}(?:-{3,}|\*{3,}|_{3,})\s*$/m,
+];
+
+const MARKDOWN_INLINE_PATTERNS = [
+  /(^|[^\w])(?:\*\*|__)[^\s][\s\S]{0,200}?[^\s](?:\*\*|__)([^\w]|$)/,
+  /(^|[^\w])(?:~~)[^\s][\s\S]{0,200}?[^\s](?:~~)([^\w]|$)/,
+  /(^|[^\w])`[^`\s][^`]*`([^\w]|$)/,
+  /!?\[[^\]]+\]\([^)]+\)/,
+];
+
+const HTML_RICH_STRUCTURE_PATTERN = /<(?:table|img|figure|picture|video|audio|iframe|svg)\b/i;
+const BLOCKNOTE_CLIPBOARD_PATTERN = /\b(?:data-pm-slice|ProseMirror|bn-(?:block|editor|inline-content))\b/i;
+
+export function looksLikeMarkdownPlainText(text: unknown): text is string {
+  if (typeof text !== 'string') return false;
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  return (
+    MARKDOWN_BLOCK_PATTERNS.some((pattern) => pattern.test(trimmed)) ||
+    MARKDOWN_INLINE_PATTERNS.some((pattern) => pattern.test(trimmed))
+  );
+}
+
+export function shouldPastePlainTextInsteadOfHtml(plainText: unknown, html: unknown): plainText is string {
+  if (typeof plainText !== 'string' || !plainText.trim()) return false;
+  if (typeof html !== 'string' || !html.trim()) return false;
+  if (HTML_RICH_STRUCTURE_PATTERN.test(html)) return false;
+  return BLOCKNOTE_CLIPBOARD_PATTERN.test(html);
+}
+
 export function isInlineContentEmpty(content: unknown): boolean {
   if (!Array.isArray(content)) return true;
   if (content.length === 0) return true;

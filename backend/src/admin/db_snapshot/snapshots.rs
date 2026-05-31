@@ -152,7 +152,9 @@ pub(super) fn resolve_snapshot_path(db_path: &str, file_name: &str) -> Result<Pa
     }
     let full = dir.join(base);
     let canon_dir = dir.canonicalize().map_err(|_| ApiError::internal())?;
-    let canon_file = full.canonicalize().map_err(|_| ApiError::not_found("snapshot not found"))?;
+    let canon_file = full
+        .canonicalize()
+        .map_err(|_| ApiError::not_found("snapshot not found"))?;
     if !canon_file.starts_with(&canon_dir) {
         return Err(ApiError::bad_request("invalid fileName"));
     }

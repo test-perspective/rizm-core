@@ -3,6 +3,7 @@ import type { Entity, ViewConfig } from '../../types';
 import {
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -129,6 +130,13 @@ export function useBoardViewDnd(params: UseBoardViewDndParams) {
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    // REQ-286: cards/columns expose dedicated drag handles on mobile (grip icons that have
+    // `touch-action: none`). The card body keeps `touch-action: auto` so the browser pans
+    // the board when the user swipes anywhere except the grip. Distance-based activation
+    // matches the PointerSensor config so the grip drag feels immediate after a small
+    // intentional movement; a pure tap on the grip never activates and `stopPropagation`
+    // on the grip click means it also does not open the detail panel.
+    useSensor(TouchSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 

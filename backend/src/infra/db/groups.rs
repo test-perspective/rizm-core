@@ -51,7 +51,11 @@ impl Db {
         Ok(group)
     }
 
-    pub fn create_user_group(&self, name: &str, description: Option<&str>) -> anyhow::Result<String> {
+    pub fn create_user_group(
+        &self,
+        name: &str,
+        description: Option<&str>,
+    ) -> anyhow::Result<String> {
         let conn = self.pool.get().context("get sqlite conn")?;
         let id = Uuid::new_v4().to_string();
         let now_ms = crate::time::now_ms();
@@ -65,7 +69,12 @@ impl Db {
         Ok(id)
     }
 
-    pub fn update_user_group(&self, group_id: &str, name: &str, description: Option<&str>) -> anyhow::Result<()> {
+    pub fn update_user_group(
+        &self,
+        group_id: &str,
+        name: &str,
+        description: Option<&str>,
+    ) -> anyhow::Result<()> {
         let conn = self.pool.get().context("get sqlite conn")?;
         let now_ms = crate::time::now_ms();
 
@@ -139,4 +148,3 @@ impl Db {
         Ok(user_ids)
     }
 }
-

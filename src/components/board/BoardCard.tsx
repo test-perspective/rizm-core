@@ -3,7 +3,7 @@ import type { Entity, PropertyDefinition, ScmBranchInfo, ScmProjectConfig, ScmPu
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Menu, MenuItem } from '@mui/material';
-import { MoreVertical, ArrowUpToLine, ArrowDownToLine } from 'lucide-react';
+import { MoreVertical, ArrowUpToLine, ArrowDownToLine, GripVertical } from 'lucide-react';
 import { CreateBranchDialog } from '../scm/CreateBranchDialog';
 import { CreatePullRequestDialog } from '../scm/CreatePullRequestDialog';
 import {
@@ -13,6 +13,7 @@ import {
   toScmPullRequestInfo,
 } from '../../utils/scm';
 import { CardContent } from './BoardCardContent';
+import { useIsMobile } from '../../hooks/useIsMobile';
 export { CardContent } from './BoardCardContent';
 
 export const SortableCard = ({
@@ -58,6 +59,8 @@ export const SortableCard = ({
     transition,
     isDragging,
   } = useSortable({ id: entity.id });
+
+  const isMobile = useIsMobile();
 
   const [contextMenuAnchor, setContextMenuAnchor] = useState<{ x: number; y: number } | null>(null);
   const skipClickRef = useRef(false);
@@ -123,19 +126,51 @@ export const SortableCard = ({
       ref={setNodeRef}
       style={style}
       className={[
+        // REQ-286: on mobile the card body keeps `touch-action: auto` so the browser
+        // handles swipes as scrolling/panning. Drag is initiated only from the grip
+        // handle (rendered below), which has its own `touch-none` + listeners. On desktop
+        // (md+) we keep the whole-card listeners so the existing click-and-drag UX is
+        // preserved. The `md:touch-none` is essentially a no-op for mouse but documents
+        // intent.
         variant === 'row'
-          ? 'bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2 hover:border-zinc-700 transition-colors group cursor-pointer touch-none select-none relative'
-          : 'bg-zinc-900 border border-zinc-800 rounded-lg p-3 hover:border-zinc-700 transition-colors group cursor-pointer touch-none select-none relative',
+          ? 'bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2 hover:border-zinc-700 transition-colors group cursor-pointer touch-auto md:touch-none select-none relative'
+          : 'bg-zinc-900 border border-zinc-800 rounded-lg p-3 hover:border-zinc-700 transition-colors group cursor-pointer touch-auto md:touch-none select-none relative',
+        isMobile && variant !== 'row' ? 'pl-9' : '',
         isDragging ? 'opacity-30' : '',
       ].join(' ')}
       onClick={handleClick}
       onMouseDown={handleMouseDown}
       onContextMenu={handleContextMenu}
       {...attributes}
-      {...listeners}
+      {...(isMobile ? {} : listeners)}
     >
+      {isMobile && (
+        <span
+          // REQ-286: dedicated drag handle for mobile. Mirrors the column-header grip
+          // pattern (touch-none + dnd listeners) so the rest of the card can be panned
+          // by the browser. stopPropagation on click so a tap on the grip doesn't open
+          // the entity detail panel.
+          className={[
+            'absolute z-10 inline-flex items-center justify-center cursor-grab touch-none select-none text-zinc-500 active:cursor-grabbing',
+            variant === 'row' ? 'left-1 top-1/2 -translate-y-1/2 w-6 h-8' : 'left-1 top-1 w-7 h-7',
+          ].join(' ')}
+          {...listeners}
+          onClick={(e) => e.stopPropagation()}
+          aria-label="Drag to move card"
+        >
+          <GripVertical className="w-4 h-4" aria-hidden />
+        </span>
+      )}
       {onMoveCard && (
-        <div className="absolute top-2 right-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity z-10" ref={moveMenuRef}>
+        <div
+          // REQ-286: on mobile, hover does not exist — always show the 3-dot menu so users
+          // can move cards without long-press DnD. Desktop keeps the on-hover affordance.
+          className={[
+            'absolute top-2 right-2 shrink-0 transition-opacity z-10',
+            isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+          ].join(' ')}
+          ref={moveMenuRef}
+        >
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -143,7 +178,8 @@ export const SortableCard = ({
             }}
             onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
-            className="p-1 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded transition-colors"
+            onTouchStart={(e) => e.stopPropagation()}
+            className="p-2 sm:p-1 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded transition-colors"
             type="button"
             aria-label="Menu"
           >

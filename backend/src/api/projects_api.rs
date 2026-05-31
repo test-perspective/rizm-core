@@ -13,12 +13,14 @@ use crate::auth::{AuthedUser, Role};
 use crate::models::{Permission, PolicyDefaults, Project, ProjectConfig, ProjectPolicy};
 use crate::permissions::{can_read, can_write};
 use crate::search::indexer::enqueue_reindex_project;
-use crate::ApiError;
 use crate::time;
-use std::collections::HashMap;
+use crate::ApiError;
 use axum::Extension;
 use rand::Rng;
-use support::{can_create_project, is_valid_project_key, normalize_project_key, suggest_project_key};
+use std::collections::HashMap;
+use support::{
+    can_create_project, is_valid_project_key, normalize_project_key, suggest_project_key,
+};
 
 mod support;
 
@@ -61,7 +63,10 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/projects", get(list_projects))
         .route("/api/projects/key-suggestion", get(suggest_project_key_api))
-        .route("/api/projects/key-availability", get(check_project_key_availability))
+        .route(
+            "/api/projects/key-availability",
+            get(check_project_key_availability),
+        )
         .route(
             "/api/projects/:project_id/state",
             get(get_project_state).put(put_project_state),
@@ -74,9 +79,7 @@ async fn list_projects(
     Extension(user): Extension<AuthedUser>,
 ) -> Result<Json<ProjectsIndexResponse>, ApiError> {
     let db = state.db.read().await;
-    let rows = db
-        .list_projects_meta()
-        .map_err(|_| ApiError::internal())?;
+    let rows = db.list_projects_meta().map_err(|_| ApiError::internal())?;
 
     let mut projects = Vec::new();
     for (id, name, project_key, lifecycle_status, created_at, updated_at) in rows {
@@ -119,7 +122,10 @@ async fn get_project_state(
     if !can_read(&db, &project_id, Some(&user)).map_err(|_| ApiError::internal())? {
         return Err(ApiError::forbidden("insufficient permissions"));
     }
-    let mut project = match db.get_project_state(&project_id).map_err(|_| ApiError::internal())? {
+    let mut project = match db
+        .get_project_state(&project_id)
+        .map_err(|_| ApiError::internal())?
+    {
         None => return Err(ApiError::not_found("not found")),
         Some(p) => p,
     };
@@ -131,8 +137,7 @@ async fn get_project_state(
         .unwrap_or_else(|| "0".to_string());
 
     // Persist active project selection on read (per-user).
-    db
-        .set_active_project_id_for_user(&project_id, &user.user_id)
+    db.set_active_project_id_for_user(&project_id, &user.user_id)
         .map_err(|_| ApiError::internal())?;
 
     // Reduce payload: wiki doc is fetched on demand via wiki endpoints.
@@ -142,7 +147,10 @@ async fn get_project_state(
         }
     }
 
-    Ok(Json(ProjectStateResponse { project, manifest_etag }))
+    Ok(Json(ProjectStateResponse {
+        project,
+        manifest_etag,
+    }))
 }
 
 async fn put_project_state(
@@ -169,7 +177,9 @@ async fn put_project_state(
         return Err(ApiError::bad_request("project.projectKey is required"));
     }
     if !is_valid_project_key(&key) {
-        return Err(ApiError::bad_request("project.projectKey must be 3-10 chars (A-Z0-9)"));
+        return Err(ApiError::bad_request(
+            "project.projectKey must be 3-10 chars (A-Z0-9)",
+        ));
     }
     project.project_key = Some(key);
 
@@ -200,16 +210,16 @@ async fn put_project_state(
         }
     }
 
-    db
-        .replace_project_state(project.clone())
-        .map_err(|e| {
-            let s = e.to_string();
-            if s.contains("idx_projects_project_key") || s.contains("UNIQUE constraint failed: projects.project_key") {
-                ApiError::bad_request("project.projectKey must be unique")
-            } else {
-                ApiError::internal()
-            }
-        })?;
+    db.replace_project_state(project.clone()).map_err(|e| {
+        let s = e.to_string();
+        if s.contains("idx_projects_project_key")
+            || s.contains("UNIQUE constraint failed: projects.project_key")
+        {
+            ApiError::bad_request("project.projectKey must be unique")
+        } else {
+            ApiError::internal()
+        }
+    })?;
 
     enqueue_reindex_project(state.clone(), project_id.clone());
 
@@ -224,8 +234,7 @@ async fn put_project_state(
                 anonymous: Permission::None,
             },
         };
-        db
-            .set_project_policy(&project_id, policy)
+        db.set_project_policy(&project_id, policy)
             .map_err(|_| ApiError::internal())?;
 
         // Log activity for new project creation
@@ -258,8 +267,7 @@ async fn put_project_state(
     }
 
     // Treat the saved project as active (per-user).
-    db
-        .set_active_project_id_for_user(&project_id, &user.user_id)
+    db.set_active_project_id_for_user(&project_id, &user.user_id)
         .map_err(|_| ApiError::internal())?;
 
     Ok(StatusCode::NO_CONTENT)
@@ -319,16 +327,19 @@ async fn check_project_key_availability(
 ) -> Result<Json<CheckProjectKeyAvailabilityResponse>, ApiError> {
     let key = normalize_project_key(params.key.trim());
     if key.is_empty() || !is_valid_project_key(&key) {
-        return Err(ApiError::bad_request("project.projectKey must be 3-10 chars (A-Z0-9)"));
+        return Err(ApiError::bad_request(
+            "project.projectKey must be 3-10 chars (A-Z0-9)",
+        ));
     }
     let db = state.db.read().await;
     let exists = db
         .get_project_id_by_key(&key)
         .map_err(|_| ApiError::internal())?
         .is_some();
-    Ok(Json(CheckProjectKeyAvailabilityResponse { available: !exists }))
+    Ok(Json(CheckProjectKeyAvailabilityResponse {
+        available: !exists,
+    }))
 }
-
 
 async fn delete_project(
     State(state): State<AppState>,
@@ -379,4 +390,3 @@ async fn delete_project(
 
     Ok(StatusCode::NO_CONTENT)
 }
-

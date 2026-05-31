@@ -35,4 +35,3 @@ pub struct AuthedUser {
     pub last_login_at: Option<i64>,
     pub session_id: String,
 }
-

@@ -9,7 +9,11 @@ use crate::task_key::parse_task_key_and_project;
 use super::jsonrpc::read_string_arg;
 use super::markdown::markdown_to_blocknote_doc;
 
-pub async fn tools_call(state: &AppState, user: &AuthedUser, params: Value) -> anyhow::Result<Value> {
+pub async fn tools_call(
+    state: &AppState,
+    user: &AuthedUser,
+    params: Value,
+) -> anyhow::Result<Value> {
     let obj = params
         .as_object()
         .context("tools/call params must be an object")?;
@@ -40,17 +44,118 @@ pub async fn tools_call(state: &AppState, user: &AuthedUser, params: Value) -> a
         .map_err(|e| anyhow::anyhow!("tools_call worker: {e}"))?
 }
 
-fn tools_call_blocking(state: &AppState, user: &AuthedUser, name: &str, args: &Value) -> anyhow::Result<Value> {
+fn tools_call_blocking(
+    state: &AppState,
+    user: &AuthedUser,
+    name: &str,
+    args: &Value,
+) -> anyhow::Result<Value> {
     match name {
         "read_entity" => {
             let entity_id = read_string_arg(args, &["entity_id", "entityId"])
                 .context("missing required argument: entity_id")?;
             let props = read_entity_by_task_key_for_user(state, user, &entity_id)?;
-            let text = serde_json::to_string_pretty(&props).context("serialize entity properties")?;
+            let text =
+                serde_json::to_string_pretty(&props).context("serialize entity properties")?;
             Ok(super::jsonrpc::tool_text_result(text))
         }
         "add_comment" => {
             let text = add_comment_for_target(state, user, args)?;
+            Ok(super::jsonrpc::tool_text_result(text))
+        }
+        "create_task" => {
+            let pk = read_string_arg(args, &["projectKey", "project_key"]);
+            let pid = read_string_arg(args, &["projectId", "project_id"]);
+            let title =
+                read_string_arg(args, &["title"]).context("missing required argument: title")?;
+            let description = read_string_arg(args, &["description", "body", "content"]);
+            let status = read_string_arg(args, &["status"]);
+            let priority = read_string_arg(args, &["priority"]);
+            let labels = super::jsonrpc::read_string_array_arg(args, &["labels"]);
+            let task_key = read_string_arg(args, &["taskKey", "task_key"]);
+            let text = super::task_wiki::create_task_for_user(
+                state,
+                user,
+                pk.as_deref(),
+                pid.as_deref(),
+                &title,
+                description.as_deref(),
+                status.as_deref(),
+                priority.as_deref(),
+                labels.as_deref(),
+                task_key.as_deref(),
+            )?;
+            Ok(super::jsonrpc::tool_text_result(text))
+        }
+        "update_task" => {
+            let task_key = read_string_arg(args, &["taskKey", "task_key", "entity_id", "entityId"])
+                .context("missing required argument: taskKey")?;
+            let title = read_string_arg(args, &["title"]);
+            let description = read_string_arg(args, &["description", "body", "content"]);
+            let status = read_string_arg(args, &["status"]);
+            let priority = read_string_arg(args, &["priority"]);
+            let labels = super::jsonrpc::read_string_array_arg(args, &["labels"]);
+            let patch = args.get("patch").and_then(Value::as_object);
+            let text = super::task_wiki::update_task_for_user(
+                state,
+                user,
+                &task_key,
+                title.as_deref(),
+                description.as_deref(),
+                status.as_deref(),
+                priority.as_deref(),
+                labels.as_deref(),
+                patch,
+            )?;
+            Ok(super::jsonrpc::tool_text_result(text))
+        }
+        "list_projects" => {
+            let text = super::project_tools::list_projects_for_user(state, user)?;
+            Ok(super::jsonrpc::tool_text_result(text))
+        }
+        "search_projects" => {
+            let query = read_string_arg(args, &["query", "q"])
+                .context("missing required argument: query")?;
+            let text = super::project_tools::search_projects_for_user(state, user, &query)?;
+            Ok(super::jsonrpc::tool_text_result(text))
+        }
+        "get_project_manifest" => {
+            let pk = read_string_arg(args, &["projectKey", "project_key"]);
+            let pid = read_string_arg(args, &["projectId", "project_id"]);
+            let text = super::project_tools::get_project_manifest_for_user(
+                state,
+                user,
+                pk.as_deref(),
+                pid.as_deref(),
+            )?;
+            Ok(super::jsonrpc::tool_text_result(text))
+        }
+        "get_current_datetime" => {
+            let text = super::project_tools::get_current_datetime()?;
+            Ok(super::jsonrpc::tool_text_result(text))
+        }
+        "apply_manifest" => {
+            let pk = read_string_arg(args, &["projectKey", "project_key"]);
+            let pid = read_string_arg(args, &["projectId", "project_id"]);
+            let manifest = args
+                .get("manifest")
+                .cloned()
+                .context("missing required argument: manifest")?;
+            let if_match = read_string_arg(args, &["ifMatch", "if_match"]);
+            let dry_run = args.get("dryRun").and_then(Value::as_bool).unwrap_or(true);
+            let source = read_string_arg(args, &["source"]);
+            let message = read_string_arg(args, &["message"]);
+            let text = super::project_tools::apply_manifest_for_user(
+                state,
+                user,
+                pk.as_deref(),
+                pid.as_deref(),
+                manifest,
+                if_match.as_deref(),
+                dry_run,
+                source.as_deref(),
+                message.as_deref(),
+            )?;
             Ok(super::jsonrpc::tool_text_result(text))
         }
         "list_tasks" => {
@@ -62,7 +167,11 @@ fn tools_call_blocking(state: &AppState, user: &AuthedUser, name: &str, args: &V
                 .unwrap_or(50)
                 .clamp(1, 100) as usize;
             let text = super::task_wiki::list_tasks_for_user(
-                state, user, pk.as_deref(), pid.as_deref(), limit,
+                state,
+                user,
+                pk.as_deref(),
+                pid.as_deref(),
+                limit,
             )?;
             Ok(super::jsonrpc::tool_text_result(text))
         }
@@ -109,7 +218,12 @@ fn tools_call_blocking(state: &AppState, user: &AuthedUser, name: &str, args: &V
                 .unwrap_or(10)
                 .clamp(1, 20) as usize;
             let text = super::task_wiki::search_wiki_for_user(
-                state, user, &query, pk.as_deref(), pid.as_deref(), limit,
+                state,
+                user,
+                &query,
+                pk.as_deref(),
+                pid.as_deref(),
+                limit,
             )?;
             Ok(super::jsonrpc::tool_text_result(text))
         }
@@ -119,16 +233,20 @@ fn tools_call_blocking(state: &AppState, user: &AuthedUser, name: &str, args: &V
             let page_id = read_string_arg(args, &["pageId", "page_id"]);
             let title = read_string_arg(args, &["wikiPageTitle", "wiki_page_title", "title"]);
             let text = super::task_wiki::get_wiki_page_for_user(
-                state, user, pk.as_deref(), pid.as_deref(),
-                page_id.as_deref(), title.as_deref(),
+                state,
+                user,
+                pk.as_deref(),
+                pid.as_deref(),
+                page_id.as_deref(),
+                title.as_deref(),
             )?;
             Ok(super::jsonrpc::tool_text_result(text))
         }
         "create_wiki_page" => {
             let pk = read_string_arg(args, &["projectKey", "project_key"]);
             let pid = read_string_arg(args, &["projectId", "project_id"]);
-            let title = read_string_arg(args, &["title"])
-                .context("missing required argument: title")?;
+            let title =
+                read_string_arg(args, &["title"]).context("missing required argument: title")?;
             let content = read_string_arg(args, &["content", "body"]);
             let text = super::task_wiki::create_wiki_page_for_user(
                 state,
@@ -140,7 +258,9 @@ fn tools_call_blocking(state: &AppState, user: &AuthedUser, name: &str, args: &V
             )?;
             Ok(super::jsonrpc::tool_text_result(text))
         }
-        _ => Ok(super::jsonrpc::tool_error_result(format!("unknown tool: {name}"))),
+        _ => Ok(super::jsonrpc::tool_error_result(format!(
+            "unknown tool: {name}"
+        ))),
     }
 }
 
@@ -149,8 +269,10 @@ pub fn read_entity_by_task_key_for_user(
     user: &AuthedUser,
     task_key: &str,
 ) -> anyhow::Result<serde_json::Map<String, Value>> {
-    let (project_key, canonical_task_key) = parse_task_key_and_project(task_key)
-        .with_context(|| format!("invalid entity_id (expected taskKey like PROJ-123): {task_key}"))?;
+    let (project_key, canonical_task_key) =
+        parse_task_key_and_project(task_key).with_context(|| {
+            format!("invalid entity_id (expected taskKey like PROJ-123): {task_key}")
+        })?;
 
     let db = state.db.blocking_read();
     let project = db
@@ -183,7 +305,11 @@ pub fn read_entity_by_task_key_for_user(
     Ok(task.properties.clone())
 }
 
-pub fn add_comment_for_target(state: &AppState, user: &AuthedUser, args: &Value) -> anyhow::Result<String> {
+pub fn add_comment_for_target(
+    state: &AppState,
+    user: &AuthedUser,
+    args: &Value,
+) -> anyhow::Result<String> {
     let target_type = read_string_arg(args, &["targetType", "target_type"])
         .unwrap_or_else(|| "task".to_string())
         .to_lowercase();
@@ -282,7 +408,9 @@ fn resolve_wiki_target_for_write(
         anyhow::bail!("wiki page not found");
     }
 
-    if let Some(page_id) = read_string_arg(args, &["wikiPageId", "wiki_page_id", "pageId", "page_id"]) {
+    if let Some(page_id) =
+        read_string_arg(args, &["wikiPageId", "wiki_page_id", "pageId", "page_id"])
+    {
         let wiki = wiki_entities
             .into_iter()
             .find(|e| e.id == page_id)
@@ -299,7 +427,9 @@ fn resolve_wiki_target_for_write(
             .map(|s| s == title.as_str())
             .unwrap_or(false)
     });
-    let first = matches.next().ok_or_else(|| anyhow::anyhow!("wiki page not found for title={title}"))?;
+    let first = matches
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("wiki page not found for title={title}"))?;
     if matches.next().is_some() {
         anyhow::bail!("wiki page title is ambiguous: {title}");
     }
@@ -354,7 +484,9 @@ fn append_comment_with_retry(
             Ok(updated) => return Ok(updated),
             Err(crate::db::EntityWriteError::Conflict { .. }) if attempt == 0 => continue,
             Err(crate::db::EntityWriteError::Conflict { current_updated_at }) => {
-                anyhow::bail!("conflict while updating comments (current updatedAt={current_updated_at})")
+                anyhow::bail!(
+                    "conflict while updating comments (current updatedAt={current_updated_at})"
+                )
             }
             Err(crate::db::EntityWriteError::NotFound) => anyhow::bail!("entity not found"),
             Err(crate::db::EntityWriteError::ServiceUnavailable) => {

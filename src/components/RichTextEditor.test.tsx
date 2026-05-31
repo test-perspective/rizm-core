@@ -309,6 +309,144 @@ describe('RichTextEditor', () => {
     container.remove();
   });
 
+  it('pasteHandler prefers markdown for asterisk lists even when clipboard also has HTML', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<RichTextEditor value="[]" editable={true} onChange={() => {}} />);
+    });
+
+    const insertInlineContentMock = vi.fn();
+    const pasteMarkdownMock = vi.fn();
+    const defaultPasteHandlerMock = vi.fn().mockReturnValue(true);
+    const markdown = '* 455\n  * asasa\n  * fdfdf';
+    const event = {
+      preventDefault: vi.fn(),
+      clipboardData: {
+        getData: (t: string) =>
+          t === 'text/plain'
+            ? markdown
+            : t === 'text/html'
+              ? '<div>* 455<br>&nbsp;&nbsp;* asasa<br>&nbsp;&nbsp;* fdfdf</div>'
+              : '',
+      },
+    } as unknown as ClipboardEvent;
+
+    const result = lastCreateOptions?.pasteHandler({
+      event,
+      editor: {
+        getTextCursorPosition: () => ({
+          block: { id: 'list-1', type: 'bulletListItem', content: [] },
+        }),
+        insertInlineContent: insertInlineContentMock,
+        pasteHTML: vi.fn(),
+        pasteMarkdown: pasteMarkdownMock,
+      },
+      defaultPasteHandler: defaultPasteHandlerMock,
+    });
+
+    expect(result).toBe(true);
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(pasteMarkdownMock).toHaveBeenCalledWith(markdown);
+    expect(insertInlineContentMock).not.toHaveBeenCalled();
+    expect(defaultPasteHandlerMock).not.toHaveBeenCalled();
+
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it('pasteHandler prefers markdown tables from generated answers even when HTML exists', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<RichTextEditor value="[]" editable={true} onChange={() => {}} />);
+    });
+
+    const pasteMarkdownMock = vi.fn();
+    const defaultPasteHandlerMock = vi.fn().mockReturnValue(true);
+    const markdown = '| Name | Value |\n| --- | --- |\n| alpha | 1 |';
+    const event = {
+      preventDefault: vi.fn(),
+      clipboardData: {
+        getData: (t: string) =>
+          t === 'text/plain'
+            ? markdown
+            : t === 'text/html'
+              ? '<div><pre>| Name | Value |<br>| --- | --- |<br>| alpha | 1 |</pre></div>'
+              : '',
+      },
+    } as unknown as ClipboardEvent;
+
+    const result = lastCreateOptions?.pasteHandler({
+      event,
+      editor: {
+        pasteHTML: vi.fn(),
+        pasteMarkdown: pasteMarkdownMock,
+      },
+      defaultPasteHandler: defaultPasteHandlerMock,
+    });
+
+    expect(result).toBe(true);
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(pasteMarkdownMock).toHaveBeenCalledWith(markdown);
+    expect(defaultPasteHandlerMock).not.toHaveBeenCalled();
+
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it('pasteHandler keeps Confluence HTML table paste on the default HTML path', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<RichTextEditor value="[]" editable={true} onChange={() => {}} />);
+    });
+
+    const pasteMarkdownMock = vi.fn();
+    const defaultPasteHandlerMock = vi.fn().mockReturnValue(true);
+    const event = {
+      clipboardData: {
+        getData: (t: string) =>
+          t === 'text/plain'
+            ? 'Name\tValue\nalpha\t1'
+            : t === 'text/html'
+              ? '<table><tbody><tr><th>Name</th><th>Value</th></tr><tr><td>alpha</td><td>1</td></tr></tbody></table>'
+              : '',
+      },
+    } as unknown as ClipboardEvent;
+
+    const result = lastCreateOptions?.pasteHandler({
+      event,
+      editor: {
+        pasteHTML: vi.fn(),
+        pasteMarkdown: pasteMarkdownMock,
+      },
+      defaultPasteHandler: defaultPasteHandlerMock,
+    });
+
+    expect(result).toBe(true);
+    expect(pasteMarkdownMock).not.toHaveBeenCalled();
+    expect(defaultPasteHandlerMock).toHaveBeenCalledWith({
+      prioritizeMarkdownOverHTML: true,
+      plainTextAsMarkdown: true,
+    });
+
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
   it('keeps empty bullet list item type by using temporary paste guard and then cleans it up', async () => {
     const container = document.createElement('div');
     document.body.appendChild(container);

@@ -65,7 +65,10 @@ fn merge_adf_base_styles_into_segment(seg: &mut Value, base: &Map<String, Value>
     }
 }
 
-pub(super) fn merge_adf_base_styles_into_segments(mut segments: Vec<Value>, base_styles: &Value) -> Vec<Value> {
+pub(super) fn merge_adf_base_styles_into_segments(
+    mut segments: Vec<Value>,
+    base_styles: &Value,
+) -> Vec<Value> {
     let Some(base_obj) = base_styles.as_object() else {
         return segments;
     };

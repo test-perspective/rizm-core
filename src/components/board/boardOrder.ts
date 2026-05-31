@@ -99,3 +99,22 @@ export const computeOrderForNewEntityAtTopInLane = (laneEntities: Entity[]): num
   return minOrder - ORDER_GAP;
 };
 
+/**
+ * Compute order value for a new entity to be placed at the bottom of a lane.
+ * Returns a value greater than the maximum existing order in the lane when orders exist.
+ * When the lane has entities but none have orders yet, returns null so the new entity
+ * sorts last by createdAt among peers without __keelOrder.
+ */
+export const computeOrderForNewEntityAtBottomInLane = (laneEntities: Entity[]): number | null => {
+  const existingOrders = laneEntities
+    .map((e) => getOrder(e))
+    .filter((o): o is number => o !== null);
+
+  if (existingOrders.length === 0) {
+    return laneEntities.length === 0 ? 0 : null;
+  }
+
+  const maxOrder = Math.max(...existingOrders);
+  return maxOrder + ORDER_GAP;
+};
+

@@ -291,9 +291,13 @@ pub(crate) fn migrate(conn: &rusqlite::Connection) -> anyhow::Result<()> {
             let sql = if default == "NULL" {
                 format!("ALTER TABLE import_jobs ADD COLUMN {} INTEGER", col)
             } else {
-                format!("ALTER TABLE import_jobs ADD COLUMN {} INTEGER {}", col, default)
+                format!(
+                    "ALTER TABLE import_jobs ADD COLUMN {} INTEGER {}",
+                    col, default
+                )
             };
-            conn.execute(&sql, []).context(format!("add import_jobs.{}", col))?;
+            conn.execute(&sql, [])
+                .context(format!("add import_jobs.{}", col))?;
         }
     }
 

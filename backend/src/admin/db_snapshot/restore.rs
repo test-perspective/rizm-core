@@ -59,7 +59,9 @@ fn copy_snapshot_over_db_file(snapshot: &Path, db_path: &str) -> anyhow::Result<
     Err(anyhow::anyhow!(
         "failed to copy snapshot over database file after {} attempts: {}",
         RESTORE_COPY_MAX_ATTEMPTS,
-        last_err.map(|e| e.to_string()).unwrap_or_else(|| "unknown".into())
+        last_err
+            .map(|e| e.to_string())
+            .unwrap_or_else(|| "unknown".into())
     ))
 }
 
@@ -69,7 +71,11 @@ fn remove_wal_shm(db_path: &str) {
 }
 
 /// Replace live DB: close pool, copy snapshot over main file, reopen pool.
-fn restore_db_files(db_lock: Arc<RwLock<Db>>, db_path: &str, snapshot: &Path) -> anyhow::Result<()> {
+fn restore_db_files(
+    db_lock: Arc<RwLock<Db>>,
+    db_path: &str,
+    snapshot: &Path,
+) -> anyhow::Result<()> {
     let temp_db_path = format!("{}.restore-staging-{}.sqlite3", db_path, std::process::id());
     let _ = std::fs::remove_file(&temp_db_path);
 

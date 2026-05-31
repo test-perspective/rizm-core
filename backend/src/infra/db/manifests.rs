@@ -10,12 +10,19 @@ use super::{Db, ManifestWriteError};
 mod visibility;
 
 impl Db {
-    pub fn get_manifest_with_etag(&self, project_id: &str) -> anyhow::Result<Option<(ProjectManifest, String)>> {
+    pub fn get_manifest_with_etag(
+        &self,
+        project_id: &str,
+    ) -> anyhow::Result<Option<(ProjectManifest, String)>> {
         let mut conn = self.pool.get().context("get sqlite conn")?;
 
         // Ensure project exists.
         let project_exists: Option<String> = conn
-            .query_row("SELECT id FROM projects WHERE id = ?1", params![project_id], |r| r.get(0))
+            .query_row(
+                "SELECT id FROM projects WHERE id = ?1",
+                params![project_id],
+                |r| r.get(0),
+            )
             .optional()
             .context("check project exists")?;
         if project_exists.is_none() {
@@ -45,7 +52,9 @@ impl Db {
                 )
                 .optional()
                 .context("select project updated_at for etag")?;
-            updated_at.map(|t| t.to_string()).unwrap_or_else(|| "0".to_string())
+            updated_at
+                .map(|t| t.to_string())
+                .unwrap_or_else(|| "0".to_string())
         };
         Ok(Some((manifest, etag)))
     }
@@ -63,11 +72,17 @@ impl Db {
             Ok(c) => c,
             Err(_) => return Err(ManifestWriteError::NotFound),
         };
-        let tx = conn.transaction().map_err(|_| ManifestWriteError::NotFound)?;
+        let tx = conn
+            .transaction()
+            .map_err(|_| ManifestWriteError::NotFound)?;
 
         // Ensure project exists.
         let project_exists: Option<String> = tx
-            .query_row("SELECT id FROM projects WHERE id = ?1", params![project_id], |r| r.get(0))
+            .query_row(
+                "SELECT id FROM projects WHERE id = ?1",
+                params![project_id],
+                |r| r.get(0),
+            )
             .optional()
             .map_err(|_| ManifestWriteError::NotFound)?;
         if project_exists.is_none() {
@@ -94,7 +109,9 @@ impl Db {
                 )
                 .optional()
                 .map_err(|_| ManifestWriteError::NotFound)?;
-            updated_at.map(|t| t.to_string()).unwrap_or_else(|| "0".to_string())
+            updated_at
+                .map(|t| t.to_string())
+                .unwrap_or_else(|| "0".to_string())
         };
         if current_etag != expected_etag {
             return Err(ManifestWriteError::Conflict { current_etag });
@@ -305,7 +322,8 @@ impl Db {
             .ok_or_else(|| anyhow::anyhow!("version not found"))?;
 
         // Validate it still matches current ProjectManifest shape.
-        let _: ProjectManifest = serde_json::from_str(&target_json).context("deserialize target manifest")?;
+        let _: ProjectManifest =
+            serde_json::from_str(&target_json).context("deserialize target manifest")?;
 
         let parent_id: Option<String> = tx
             .query_row(
@@ -362,6 +380,4 @@ impl Db {
         tx.commit().context("commit tx")?;
         Ok(())
     }
-
 }
-

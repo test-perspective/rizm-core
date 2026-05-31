@@ -37,7 +37,10 @@ pub fn enforce_origin_allow_list(headers: &HeaderMap) -> Result<(), ApiError> {
     Err(ApiError::forbidden("forbidden origin"))
 }
 
-pub async fn authenticate_bearer(state: &AppState, headers: &HeaderMap) -> Result<AuthedUser, ApiError> {
+pub async fn authenticate_bearer(
+    state: &AppState,
+    headers: &HeaderMap,
+) -> Result<AuthedUser, ApiError> {
     let auth = headers
         .get(header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())

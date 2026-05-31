@@ -26,7 +26,11 @@ pub fn build_llm_error_message(status: u16, body: &str) -> String {
     };
     let detail = serde_json::from_str::<Value>(body)
         .ok()
-        .and_then(|v| v.get("error").and_then(|e| e.get("message")).and_then(|m| m.as_str().map(String::from)))
+        .and_then(|v| {
+            v.get("error")
+                .and_then(|e| e.get("message"))
+                .and_then(|m| m.as_str().map(String::from))
+        })
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty());
     match detail {
@@ -52,7 +56,8 @@ pub struct DeepseekConfig {
 
 pub fn deepseek_config() -> DeepseekConfig {
     DeepseekConfig {
-        base_url: std::env::var("KEEL_DEEPSEEK_BASE_URL").unwrap_or_else(|_| "https://api.deepseek.com".to_string()),
+        base_url: std::env::var("KEEL_DEEPSEEK_BASE_URL")
+            .unwrap_or_else(|_| "https://api.deepseek.com".to_string()),
         model: std::env::var("KEEL_DEEPSEEK_MODEL").unwrap_or_else(|_| "deepseek-chat".to_string()),
         timeout_secs: std::env::var("KEEL_DEEPSEEK_TIMEOUT_SECS")
             .ok()
@@ -67,12 +72,16 @@ pub fn deepseek_config() -> DeepseekConfig {
 
 pub fn resolve_deepseek_api_key(req_key: Option<&str>) -> Result<String, ApiError> {
     let req_key = req_key.map(|s| s.trim()).filter(|s| !s.is_empty());
-    let env_key = std::env::var("KEEL_DEEPSEEK_API_KEY").ok().map(|s| s.trim().to_string());
-    let env_key = env_key.as_deref().map(|s| s.trim()).filter(|s| !s.is_empty());
-    req_key
-        .or(env_key)
-        .map(|s| s.to_string())
-        .ok_or_else(|| ApiError::bad_request("deepseek api key is not set (set in UI or KEEL_DEEPSEEK_API_KEY)"))
+    let env_key = std::env::var("KEEL_DEEPSEEK_API_KEY")
+        .ok()
+        .map(|s| s.trim().to_string());
+    let env_key = env_key
+        .as_deref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty());
+    req_key.or(env_key).map(|s| s.to_string()).ok_or_else(|| {
+        ApiError::bad_request("deepseek api key is not set (set in UI or KEEL_DEEPSEEK_API_KEY)")
+    })
 }
 
 /// Unified LLM config for OpenAI-compatible providers (Open Router, DeepSeek, Ollama).
@@ -89,7 +98,9 @@ impl LlmConfig {
     pub fn for_openrouter(model: String, api_key: String) -> Result<Self, ApiError> {
         let api_key = api_key.trim().to_string();
         if api_key.is_empty() {
-            return Err(ApiError::bad_request("Open Router API key is required (set in LLM settings)"));
+            return Err(ApiError::bad_request(
+                "Open Router API key is required (set in LLM settings)",
+            ));
         }
         Ok(Self {
             base_url: std::env::var("KEEL_OPENROUTER_BASE_URL")
@@ -114,11 +125,11 @@ impl LlmConfig {
     }
 
     pub fn for_ollama(model_override: Option<String>) -> Self {
-        let ollama_url = std::env::var("KEEL_OLLAMA_URL").unwrap_or_else(|_| "http://localhost:11434".to_string());
+        let ollama_url = std::env::var("KEEL_OLLAMA_URL")
+            .unwrap_or_else(|_| "http://localhost:11434".to_string());
         let base_url = format!("{}/v1", ollama_url.trim_end_matches('/'));
         let model = model_override.unwrap_or_else(|| {
-            std::env::var("KEEL_OLLAMA_MODEL")
-                .unwrap_or_else(|_| "llama3.2".to_string())
+            std::env::var("KEEL_OLLAMA_MODEL").unwrap_or_else(|_| "llama3.2".to_string())
         });
         Self {
             base_url,
@@ -132,7 +143,6 @@ impl LlmConfig {
         }
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub(super) struct ToolCall {
@@ -196,7 +206,10 @@ pub async fn chat_with_tools(
             "response_format": response_format.clone()
         });
 
-        let mut req = client.post(&endpoint).header("Accept", "application/json").json(&body);
+        let mut req = client
+            .post(&endpoint)
+            .header("Accept", "application/json")
+            .json(&body);
         if let Some(ref key) = config.api_key {
             if !key.is_empty() {
                 req = req.bearer_auth(key);
@@ -222,7 +235,10 @@ pub async fn chat_with_tools(
             return Err(ApiError::bad_request(msg));
         }
 
-        let raw: Value = res.json().await.map_err(|_| ApiError::bad_request("invalid response from llm provider"))?;
+        let raw: Value = res
+            .json()
+            .await
+            .map_err(|_| ApiError::bad_request("invalid response from llm provider"))?;
         let choice = raw
             .get("choices")
             .and_then(|c| c.as_array())
@@ -238,8 +254,16 @@ pub async fn chat_with_tools(
                                 .and_then(|m| m.get("reasoning_content"))
                                 .and_then(|v| v.as_str())
                         })
-                        .or_else(|| c0.get("message").and_then(|m| m.get("reasoning")).and_then(|v| v.as_str()))
-                        .or_else(|| c0.get("message").and_then(|m| m.get("thinking")).and_then(|v| v.as_str()))
+                        .or_else(|| {
+                            c0.get("message")
+                                .and_then(|m| m.get("reasoning"))
+                                .and_then(|v| v.as_str())
+                        })
+                        .or_else(|| {
+                            c0.get("message")
+                                .and_then(|m| m.get("thinking"))
+                                .and_then(|v| v.as_str())
+                        })
                 })
                 .map(str::trim)
                 .filter(|s| !s.is_empty())
@@ -322,7 +346,19 @@ pub async fn deepseek_chat_with_tools(
         timeout_secs: config.timeout_secs,
         connect_timeout_secs: config.connect_timeout_secs,
     };
-    chat_with_tools(state, user, llm_config, messages, response_format, max_loops, progress, cancel_rx, None, false).await
+    chat_with_tools(
+        state,
+        user,
+        llm_config,
+        messages,
+        response_format,
+        max_loops,
+        progress,
+        cancel_rx,
+        None,
+        false,
+    )
+    .await
 }
 
 #[cfg(test)]

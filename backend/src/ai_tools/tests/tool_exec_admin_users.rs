@@ -50,7 +50,10 @@ fn list_users_inactive_only_filters() {
     let raw = execute_admin_tool(&state, &user, &call).expect("list_users");
     let parsed: JsonValue = serde_json::from_str(&raw).expect("parse json");
     let empty: Vec<JsonValue> = vec![];
-    let users = parsed.get("users").and_then(|v| v.as_array()).unwrap_or(&empty);
+    let users = parsed
+        .get("users")
+        .and_then(|v| v.as_array())
+        .unwrap_or(&empty);
     assert!(users.is_empty(), "fresh db has no disabled users");
 }
 
@@ -72,9 +75,14 @@ fn get_user_returns_user_with_last_login_at() {
     let parsed: JsonValue = serde_json::from_str(&raw).expect("parse json");
     let user_obj = parsed.get("user");
     assert!(user_obj.is_some(), "should return user");
-    assert!(user_obj.and_then(|u| u.get("lastLoginAt")).is_some(), "should include lastLoginAt");
+    assert!(
+        user_obj.and_then(|u| u.get("lastLoginAt")).is_some(),
+        "should include lastLoginAt"
+    );
     assert_eq!(
-        user_obj.and_then(|u| u.get("email")).and_then(|v| v.as_str()),
+        user_obj
+            .and_then(|u| u.get("email"))
+            .and_then(|v| v.as_str()),
         Some("get-user-test@example.local")
     );
 }
@@ -92,5 +100,8 @@ fn get_user_not_found_returns_error() {
     };
     let raw = execute_admin_tool(&state, &user, &call).expect("get_user");
     let parsed: JsonValue = serde_json::from_str(&raw).expect("parse json");
-    assert_eq!(parsed.get("error").and_then(|v| v.as_str()), Some("user not found"));
+    assert_eq!(
+        parsed.get("error").and_then(|v| v.as_str()),
+        Some("user not found")
+    );
 }

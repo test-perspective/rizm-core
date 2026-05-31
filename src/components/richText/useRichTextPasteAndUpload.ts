@@ -3,6 +3,8 @@ import {
   TEMP_PASTE_GUARD_CHAR,
   LIST_ITEM_TYPES,
   isInlineContentEmpty,
+  looksLikeMarkdownPlainText,
+  shouldPastePlainTextInsteadOfHtml,
   stripFirstTemporaryPasteGuard,
   findBlockById,
 } from './richTextEditorPasteHelpers';
@@ -27,9 +29,38 @@ export function useRichTextPasteAndUpload(
         insertInlineContent: (content: string) => void;
         updateBlock: (id: string, props: { content: unknown }) => void;
         pasteHTML: (html: string) => void;
+        pasteMarkdown?: (markdown: string) => void;
       };
-      defaultPasteHandler: () => boolean;
+      defaultPasteHandler: (context?: {
+        prioritizeMarkdownOverHTML?: boolean;
+        plainTextAsMarkdown?: boolean;
+      }) => boolean | undefined;
     }) => {
+      const html = event.clipboardData?.getData?.('text/html');
+      const plainText = event.clipboardData?.getData?.('text/plain');
+      const hasTransientHtmlImage =
+        !!html && (html.includes('data:image/') || html.includes('blob:'));
+
+      if (
+        !hasTransientHtmlImage &&
+        looksLikeMarkdownPlainText(plainText) &&
+        typeof ed.pasteMarkdown === 'function'
+      ) {
+        event.preventDefault();
+        ed.pasteMarkdown(plainText);
+        return true;
+      }
+
+      if (
+        !hasTransientHtmlImage &&
+        shouldPastePlainTextInsteadOfHtml(plainText, html) &&
+        typeof ed.pasteMarkdown === 'function'
+      ) {
+        event.preventDefault();
+        ed.pasteMarkdown(plainText);
+        return true;
+      }
+
       const currentBlock = ed.getTextCursorPosition?.().block;
       const requiresPasteGuard =
         !!currentBlock &&
@@ -68,12 +99,11 @@ export function useRichTextPasteAndUpload(
         }, 0);
       };
 
-      const html = event.clipboardData?.getData?.('text/html');
       if (
         attachmentProjectId &&
         attachmentEntityPk &&
         html &&
-        (html.includes('data:image/') || html.includes('blob:'))
+        hasTransientHtmlImage
       ) {
         event.preventDefault();
         replaceTransientImageUrlsInHtml(html, uploadFile)
@@ -86,7 +116,10 @@ export function useRichTextPasteAndUpload(
         return true;
       }
 
-      const handled = defaultPasteHandler();
+      const handled = defaultPasteHandler({
+        prioritizeMarkdownOverHTML: true,
+        plainTextAsMarkdown: true,
+      });
       cleanupPasteGuard();
       return handled;
     },

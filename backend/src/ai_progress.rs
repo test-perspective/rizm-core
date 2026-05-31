@@ -13,17 +13,27 @@ pub struct ScmConfigResult {
 #[derive(Debug, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum AiProgressEvent {
-    Phase { message: String },
-    ToolCall { name: String },
-    LlmOutput { text: String },
+    Phase {
+        message: String,
+    },
+    ToolCall {
+        name: String,
+    },
+    LlmOutput {
+        text: String,
+    },
     Result {
         manifest: ProjectManifest,
         #[serde(rename = "scmConfig")]
         #[serde(skip_serializing_if = "Option::is_none")]
         scm_config: Option<ScmConfigResult>,
     },
-    ChatResult { message: String },
-    Error { message: String },
+    ChatResult {
+        message: String,
+    },
+    Error {
+        message: String,
+    },
 }
 
 #[derive(Clone, Debug)]

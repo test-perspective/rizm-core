@@ -50,8 +50,8 @@ async fn get_task_by_key(
     State(state): State<AppState>,
     Path(task_key): Path<String>,
 ) -> Result<Json<TaskLookupResponse>, ApiError> {
-    let (project_key, canonical_task_key) =
-        parse_task_key_and_project(&task_key).map_err(|_| ApiError::bad_request("invalid taskKey"))?;
+    let (project_key, canonical_task_key) = parse_task_key_and_project(&task_key)
+        .map_err(|_| ApiError::bad_request("invalid taskKey"))?;
 
     let db = state.db.read().await;
     let project = db
@@ -187,7 +187,10 @@ mod tests {
 
         // Reference target entity (e.g. assigneeId -> this entity.id).
         let user_props: serde_json::Map<String, serde_json::Value> =
-            serde_json::json!({ "name": "Alice" }).as_object().cloned().unwrap_or_default();
+            serde_json::json!({ "name": "Alice" })
+                .as_object()
+                .cloned()
+                .unwrap_or_default();
         let _user = db
             .create_entity_for_project("p1", Some("u1"), "user", user_props)
             .expect("create user entity");
@@ -236,7 +239,11 @@ mod tests {
         // Only *Id suffix keys are resolved.
         assert!(resp.labels.property_refs.contains_key("assigneeId"));
         assert!(!resp.labels.property_refs.contains_key("owner"));
-        let assignee = resp.labels.property_refs.get("assigneeId").expect("assigneeId ref");
+        let assignee = resp
+            .labels
+            .property_refs
+            .get("assigneeId")
+            .expect("assigneeId ref");
         assert_eq!(assignee.id, "u1");
         assert_eq!(assignee.entity_id, "user");
         assert_eq!(assignee.label, "Alice");
@@ -262,4 +269,3 @@ mod tests {
         assert_eq!(err.status, StatusCode::BAD_REQUEST);
     }
 }
-

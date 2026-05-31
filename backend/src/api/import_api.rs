@@ -77,9 +77,18 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/import/last-config", get(get_last_import_config))
         .route("/api/import/sessions", post(create_import_session))
-        .route("/api/import/sessions/:session_id/verify", post(verify_import_connection))
-        .route("/api/import/sessions/:session_id/metadata", post(fetch_import_metadata))
-        .route("/api/import/sessions/:session_id/mapping", put(put_import_mapping))
+        .route(
+            "/api/import/sessions/:session_id/verify",
+            post(verify_import_connection),
+        )
+        .route(
+            "/api/import/sessions/:session_id/metadata",
+            post(fetch_import_metadata),
+        )
+        .route(
+            "/api/import/sessions/:session_id/mapping",
+            put(put_import_mapping),
+        )
         .route("/api/import/sessions/:session_id/start", post(start_import))
         .route("/api/import/jobs/:job_id", get(get_import_job_status))
 }
@@ -108,7 +117,8 @@ async fn create_import_session(
     let db = state.db.read().await;
     let provider = ImportProvider::from_str(&req.provider)
         .ok_or_else(|| ApiError::bad_request("unsupported provider"))?;
-    let config_json = serde_json::to_string(&req.connection_config).map_err(|_| ApiError::internal())?;
+    let config_json =
+        serde_json::to_string(&req.connection_config).map_err(|_| ApiError::internal())?;
     let _ = db.set_user_import_config(&user.user_id, provider.as_str(), &config_json);
     let session = db
         .create_import_session(provider.as_str(), &user.user_id, &config_json)
@@ -136,7 +146,10 @@ async fn verify_import_connection(
         .map_err(|_| ApiError::bad_request("invalid connection config"))?;
     let provider = ImportProvider::from_str(&session.provider).unwrap_or(ImportProvider::Jira);
     let engine = get_engine(provider);
-    engine.verify_connection(&config).await.map_err(import_error_to_api)?;
+    engine
+        .verify_connection(&config)
+        .await
+        .map_err(import_error_to_api)?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -210,8 +223,8 @@ async fn start_import(
         .mapping_config_json
         .as_ref()
         .ok_or_else(|| ApiError::bad_request("mapping config not set"))?;
-    let mapping: ImportMappingConfig =
-        serde_json::from_str(mapping_json).map_err(|_| ApiError::bad_request("invalid mapping config"))?;
+    let mapping: ImportMappingConfig = serde_json::from_str(mapping_json)
+        .map_err(|_| ApiError::bad_request("invalid mapping config"))?;
     let config: Value = serde_json::from_str(&session.connection_config_json)
         .map_err(|_| ApiError::bad_request("invalid connection config"))?;
 

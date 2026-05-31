@@ -56,10 +56,7 @@ pub async fn fetch_comments(
             .cloned()
             .unwrap_or_default();
 
-        let total = res
-            .get("total")
-            .and_then(|t| t.as_i64())
-            .unwrap_or(-1);
+        let total = res.get("total").and_then(|t| t.as_i64()).unwrap_or(-1);
 
         let page_len = comments.len() as i64;
         if page_len == 0 {
@@ -89,19 +86,20 @@ pub async fn fetch_comments(
                     .unwrap_or("")
                     .to_string();
                 let email = a.get("emailAddress").and_then(|x| x.as_str());
-                let author_json =
-                    match email.and_then(|e| db.get_user_by_email_case_insensitive(e).ok().flatten()) {
-                        Some(rizm_user) => serde_json::json!({
-                            "id": rizm_user.id,
-                            "name": name
-                        }),
-                        None => {
-                            if name.is_empty() {
-                                None?
-                            }
-                            serde_json::json!({ "name": name })
+                let author_json = match email
+                    .and_then(|e| db.get_user_by_email_case_insensitive(e).ok().flatten())
+                {
+                    Some(rizm_user) => serde_json::json!({
+                        "id": rizm_user.id,
+                        "name": name
+                    }),
+                    None => {
+                        if name.is_empty() {
+                            None?
                         }
-                    };
+                        serde_json::json!({ "name": name })
+                    }
+                };
                 Some(author_json)
             });
 

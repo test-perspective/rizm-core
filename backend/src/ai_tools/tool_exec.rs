@@ -19,9 +19,16 @@ pub(super) fn parse_tool_calls(message: &Value) -> Vec<ToolCall> {
             let id = c.get("id")?.as_str()?.to_string();
             let func = c.get("function")?;
             let name = func.get("name")?.as_str()?.to_string();
-            let args_str = func.get("arguments").and_then(|v| v.as_str()).unwrap_or("{}");
+            let args_str = func
+                .get("arguments")
+                .and_then(|v| v.as_str())
+                .unwrap_or("{}");
             let arguments = serde_json::from_str::<Value>(args_str).unwrap_or_else(|_| json!({}));
-            Some(ToolCall { id, name, arguments })
+            Some(ToolCall {
+                id,
+                name,
+                arguments,
+            })
         })
         .collect()
 }
@@ -46,7 +53,11 @@ pub(super) async fn append_tool_calls(
 }
 
 /// Runs on a blocking thread: all handlers use `db.blocking_read()` or equivalent.
-fn execute_tool_call_sync(state: &AppState, user: &AuthedUser, call: &ToolCall) -> Result<String, ApiError> {
+fn execute_tool_call_sync(
+    state: &AppState,
+    user: &AuthedUser,
+    call: &ToolCall,
+) -> Result<String, ApiError> {
     const ADMIN_TOOLS: &[&str] = &[
         "list_users",
         "get_user",
@@ -76,6 +87,7 @@ fn execute_tool_call_sync(state: &AppState, user: &AuthedUser, call: &ToolCall) 
         "list_tasks" => list_tasks(state, user, &call.arguments),
         "search_tasks" => search_tasks(state, user, &call.arguments),
         "get_task" => get_task(state, user, &call.arguments),
+        "add_comment" => add_comment(state, user, &call.arguments),
         "search_wiki" => search_wiki(state, user, &call.arguments),
         "get_wiki_page" => get_wiki_page(state, user, &call.arguments),
         "create_wiki_page" => create_wiki_page(state, user, &call.arguments),
@@ -83,7 +95,11 @@ fn execute_tool_call_sync(state: &AppState, user: &AuthedUser, call: &ToolCall) 
     }
 }
 
-async fn execute_tool_call(state: &AppState, user: &AuthedUser, call: &ToolCall) -> Result<String, ApiError> {
+async fn execute_tool_call(
+    state: &AppState,
+    user: &AuthedUser,
+    call: &ToolCall,
+) -> Result<String, ApiError> {
     if call.name.as_str() == "fetch_url" {
         return fetch_url(&call.arguments).await;
     }
@@ -138,7 +154,11 @@ pub(super) fn list_projects(state: &AppState, user: &AuthedUser) -> Result<Strin
     Ok(json!({ "projects": projects }).to_string())
 }
 
-pub(super) fn search_projects(state: &AppState, user: &AuthedUser, args: &Value) -> Result<String, ApiError> {
+pub(super) fn search_projects(
+    state: &AppState,
+    user: &AuthedUser,
+    args: &Value,
+) -> Result<String, ApiError> {
     let query = args
         .get("query")
         .and_then(|v| v.as_str())
@@ -171,9 +191,19 @@ pub(super) fn search_projects(state: &AppState, user: &AuthedUser, args: &Value)
     Ok(json!({ "projects": projects }).to_string())
 }
 
-pub(super) fn list_tasks(state: &AppState, user: &AuthedUser, args: &Value) -> Result<String, ApiError> {
-    let pk = args.get("projectKey").and_then(|v| v.as_str()).map(|s| s.trim().to_string());
-    let pid = args.get("projectId").and_then(|v| v.as_str()).map(|s| s.trim().to_string());
+pub(super) fn list_tasks(
+    state: &AppState,
+    user: &AuthedUser,
+    args: &Value,
+) -> Result<String, ApiError> {
+    let pk = args
+        .get("projectKey")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string());
+    let pid = args
+        .get("projectId")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string());
     let limit = args
         .get("limit")
         .and_then(|v| v.as_i64())
@@ -189,14 +219,24 @@ pub(super) fn list_tasks(state: &AppState, user: &AuthedUser, args: &Value) -> R
     .map_err(|e| ApiError::bad_request(format!("{e:#}")))
 }
 
-pub(super) fn search_tasks(state: &AppState, user: &AuthedUser, args: &Value) -> Result<String, ApiError> {
+pub(super) fn search_tasks(
+    state: &AppState,
+    user: &AuthedUser,
+    args: &Value,
+) -> Result<String, ApiError> {
     let query = args
         .get("query")
         .and_then(|v| v.as_str())
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty());
-    let pk = args.get("projectKey").and_then(|v| v.as_str()).map(|s| s.trim().to_string());
-    let pid = args.get("projectId").and_then(|v| v.as_str()).map(|s| s.trim().to_string());
+    let pk = args
+        .get("projectKey")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string());
+    let pid = args
+        .get("projectId")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string());
     let labels = args
         .get("labels")
         .and_then(|v| v.as_array())
@@ -247,7 +287,11 @@ pub(super) fn search_tasks(state: &AppState, user: &AuthedUser, args: &Value) ->
     .map_err(|e| ApiError::bad_request(format!("{e:#}")))
 }
 
-pub(super) fn get_task(state: &AppState, user: &AuthedUser, args: &Value) -> Result<String, ApiError> {
+pub(super) fn get_task(
+    state: &AppState,
+    user: &AuthedUser,
+    args: &Value,
+) -> Result<String, ApiError> {
     let from_task_key = args
         .get("taskKey")
         .and_then(|v| v.as_str())
@@ -283,7 +327,20 @@ pub(super) fn get_task(state: &AppState, user: &AuthedUser, args: &Value) -> Res
     Ok(json!({ "task": props }).to_string())
 }
 
-pub(super) fn get_project_manifest(state: &AppState, user: &AuthedUser, args: &Value) -> Result<String, ApiError> {
+pub(super) fn add_comment(
+    state: &AppState,
+    user: &AuthedUser,
+    args: &Value,
+) -> Result<String, ApiError> {
+    crate::mcp::tools::add_comment_for_target(state, user, args)
+        .map_err(|e| ApiError::bad_request(format!("{e:#}")))
+}
+
+pub(super) fn get_project_manifest(
+    state: &AppState,
+    user: &AuthedUser,
+    args: &Value,
+) -> Result<String, ApiError> {
     let project_id = args
         .get("projectId")
         .and_then(|v| v.as_str())
@@ -317,8 +374,14 @@ fn search_wiki(state: &AppState, user: &AuthedUser, args: &Value) -> Result<Stri
     if query.is_empty() {
         return Ok(json!({ "pages": [] }).to_string());
     }
-    let pk = args.get("projectKey").and_then(|v| v.as_str()).map(|s| s.trim().to_string());
-    let pid = args.get("projectId").and_then(|v| v.as_str()).map(|s| s.trim().to_string());
+    let pk = args
+        .get("projectKey")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string());
+    let pid = args
+        .get("projectId")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string());
     let limit = args
         .get("limit")
         .and_then(|v| v.as_i64())
@@ -356,10 +419,22 @@ fn search_wiki(state: &AppState, user: &AuthedUser, args: &Value) -> Result<Stri
 }
 
 fn get_wiki_page(state: &AppState, user: &AuthedUser, args: &Value) -> Result<String, ApiError> {
-    let pk = args.get("projectKey").and_then(|v| v.as_str()).map(|s| s.trim().to_string());
-    let pid = args.get("projectId").and_then(|v| v.as_str()).map(|s| s.trim().to_string());
-    let page_id = args.get("pageId").and_then(|v| v.as_str()).map(|s| s.trim().to_string());
-    let title = args.get("title").and_then(|v| v.as_str()).map(|s| s.trim().to_string());
+    let pk = args
+        .get("projectKey")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string());
+    let pid = args
+        .get("projectId")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string());
+    let page_id = args
+        .get("pageId")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string());
+    let title = args
+        .get("title")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string());
     let text = crate::mcp::task_wiki::get_wiki_page_for_user(
         state,
         user,
@@ -373,8 +448,14 @@ fn get_wiki_page(state: &AppState, user: &AuthedUser, args: &Value) -> Result<St
 }
 
 fn create_wiki_page(state: &AppState, user: &AuthedUser, args: &Value) -> Result<String, ApiError> {
-    let pk = args.get("projectKey").and_then(|v| v.as_str()).map(|s| s.trim().to_string());
-    let pid = args.get("projectId").and_then(|v| v.as_str()).map(|s| s.trim().to_string());
+    let pk = args
+        .get("projectKey")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string());
+    let pid = args
+        .get("projectId")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string());
     let title = args
         .get("title")
         .and_then(|v| v.as_str())
@@ -382,9 +463,7 @@ fn create_wiki_page(state: &AppState, user: &AuthedUser, args: &Value) -> Result
         .filter(|s| !s.is_empty());
     let from_body = args.get("body").and_then(|v| v.as_str());
     let from_content = args.get("content").and_then(|v| v.as_str());
-    let content = from_content
-        .or(from_body)
-        .map(|s| s.to_string());
+    let content = from_content.or(from_body).map(|s| s.to_string());
     let title = title.ok_or_else(|| ApiError::bad_request("title is required"))?;
     let text = crate::mcp::task_wiki::create_wiki_page_for_user(
         state,

@@ -94,16 +94,20 @@ async fn revert_manifest(
     }
     let msg = format!("revert to {}", req.version_id.trim());
     let db = state.db.read().await;
-    db
-        .revert_manifest_to_version(&project_id, req.version_id.trim(), Some(&actor.user_id), Some(&msg))
-        .map_err(|e| {
-            let s = e.to_string();
-            if s.contains("project not found") || s.contains("version not found") {
-                ApiError::not_found("not found")
-            } else {
-                ApiError::internal()
-            }
-        })?;
+    db.revert_manifest_to_version(
+        &project_id,
+        req.version_id.trim(),
+        Some(&actor.user_id),
+        Some(&msg),
+    )
+    .map_err(|e| {
+        let s = e.to_string();
+        if s.contains("project not found") || s.contains("version not found") {
+            ApiError::not_found("not found")
+        } else {
+            ApiError::internal()
+        }
+    })?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -117,8 +121,7 @@ async fn hide_version(
         return Err(ApiError::bad_request("versionId is required"));
     }
     let db = state.db.read().await;
-    db
-        .hide_manifest_version(&project_id, &version_id.trim(), Some(&actor.user_id))
+    db.hide_manifest_version(&project_id, &version_id.trim(), Some(&actor.user_id))
         .map_err(|e| {
             let s = e.to_string();
             if s.contains("project not found") || s.contains("version not found") {
@@ -137,8 +140,7 @@ async fn clear_versions(
 ) -> Result<StatusCode, ApiError> {
     ensure_editor(&actor)?;
     let db = state.db.read().await;
-    db
-        .clear_manifest_versions(&project_id, Some(&actor.user_id))
+    db.clear_manifest_versions(&project_id, Some(&actor.user_id))
         .map_err(|e| {
             let s = e.to_string();
             if s.contains("project not found") {
@@ -156,4 +158,3 @@ fn ensure_editor(user: &AuthedUser) -> Result<(), ApiError> {
     }
     Ok(())
 }
-

@@ -66,22 +66,21 @@ pub(super) fn parse_args(args: &[String]) -> anyhow::Result<Config> {
                 if i + 1 >= args.len() {
                     anyhow::bail!("--avg-tasks-per-project requires a value");
                 }
-                avg_tasks = Some(
-                    args[i + 1]
-                        .parse()
-                        .with_context(|| format!("Invalid --avg-tasks-per-project value: {}", args[i + 1]))?,
-                );
+                avg_tasks = Some(args[i + 1].parse().with_context(|| {
+                    format!("Invalid --avg-tasks-per-project value: {}", args[i + 1])
+                })?);
                 i += 2;
             }
             "--avg-wiki-pages-per-project" => {
                 if i + 1 >= args.len() {
                     anyhow::bail!("--avg-wiki-pages-per-project requires a value");
                 }
-                avg_wiki = Some(
-                    args[i + 1]
-                        .parse()
-                        .with_context(|| format!("Invalid --avg-wiki-pages-per-project value: {}", args[i + 1]))?,
-                );
+                avg_wiki = Some(args[i + 1].parse().with_context(|| {
+                    format!(
+                        "Invalid --avg-wiki-pages-per-project value: {}",
+                        args[i + 1]
+                    )
+                })?);
                 i += 2;
             }
             "--wipe" => {

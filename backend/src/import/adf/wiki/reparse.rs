@@ -4,11 +4,9 @@ use serde_json::Value;
 
 use super::super::context::AdfImportContext;
 use super::detect::looks_like_markdown;
-use super::inline_text::{
-    flatten_inline_only, flatten_paragraph_block_text, inline_text_eq,
-};
-use super::json_norm::{blocknote_json_semantic_equal, is_blocknote_doc_json_string};
+use super::inline_text::{flatten_inline_only, flatten_paragraph_block_text, inline_text_eq};
 use super::jira_import_string_to_blocknote_doc;
+use super::json_norm::{blocknote_json_semantic_equal, is_blocknote_doc_json_string};
 
 fn flatten_paragraph_only_blocknote(s: &str) -> Option<String> {
     let t = s.trim();

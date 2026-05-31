@@ -118,7 +118,9 @@ fn wiki_push_text_segments(blocks: &mut Vec<Value>, text: &str) {
                 wiki_push_paragraph_block(blocks, &rest);
             }
             continue;
-        } else if let Some((level, title)) = parse_atx_heading_line_wiki_attach_path(lines[0].trim()) {
+        } else if let Some((level, title)) =
+            parse_atx_heading_line_wiki_attach_path(lines[0].trim())
+        {
             let pt = preprocess_jira_wiki_plain_text(&title);
             blocks.push(blocknote_heading_value(level, &pt));
             let rest: String = lines[1..].join("\n");

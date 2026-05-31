@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import { WikiMoveDialog } from './wiki/WikiMoveDialog';
 import { WikiPageListPane } from './wiki/WikiPageListPane';
 import { WikiEditorPane } from './wiki/WikiEditorPane';
@@ -12,6 +13,7 @@ import {
   getPageListWidth,
   setPageListWidth,
 } from '../utils/wikiPageListWidthPrefs';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 export function WikiView({
   projectId,
@@ -148,48 +150,83 @@ export function WikiView({
     [setLastSavedDocById, setCrdtBlobById, handleDocChange]
   );
 
+  const isMobile = useIsMobile();
+  // REQ-286: on mobile, only one pane is visible at a time. `mobileShowList` defaults to
+  // showing the list when no page is selected, and the editor once one is chosen. The back
+  // button flips it without touching the URL — selecting a page in the list flips it back.
+  const [mobileShowList, setMobileShowList] = useState(!selectedPageId);
+  const showListPane = !isMobile || mobileShowList;
+  const showEditorPane = !isMobile || !mobileShowList;
+  const handleMobileSelectPage = useCallback(
+    (id: string) => {
+      setMobileShowList(false);
+      handleSelectPage(id);
+    },
+    [handleSelectPage]
+  );
+  const handleBackToList = useCallback(() => {
+    setMobileShowList(true);
+  }, []);
+
   return (
     <div className="h-full flex overflow-hidden">
-      <WikiPageListPane
-        width={pageListWidth}
-        canEdit={canEditPage}
-        query={query}
-        onQueryChange={setQuery}
-        pages={pages}
-        treeRows={treeRows}
-        sortedPages={sortedPages}
-        selectedPageId={selectedPageId}
-        expandedFolderIds={expandedFolderIds}
-        onToggleFolder={toggleExpandedFolder}
-        titleById={titleById}
-        onSelectPage={handleSelectPage}
-        onCreateTopLevelPage={handleCreateTopLevelPage}
-        onCreateTopLevelFolder={handleCreateTopLevelFolder}
-        onCreateChildPage={handleCreateChildPage}
-        onCreateChildFolder={handleCreateChildFolder}
-        onDeletePage={handleDelete}
-        onRename={handleRename}
-        pageListContainerRef={pageListContainerRef}
-        activeId={activeId}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-        onDragCancel={handleDragCancel}
-        entityById={entityById}
-        onMovePage={
-          collabEnabled && projects.length > 0 ? (id) => setMovePageId(id) : undefined
-        }
-      />
-      <div
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Resize panel"
-        title="Resize panel"
-        data-testid="wiki-page-list-resize-handle"
-        className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-zinc-700/50 transition-colors"
-        onMouseDown={handleResizeStart}
-      />
-      <WikiEditorPane
+      {showListPane && (
+        <WikiPageListPane
+          width={isMobile ? '100%' : pageListWidth}
+          canEdit={canEditPage}
+          query={query}
+          onQueryChange={setQuery}
+          pages={pages}
+          treeRows={treeRows}
+          sortedPages={sortedPages}
+          selectedPageId={selectedPageId}
+          expandedFolderIds={expandedFolderIds}
+          onToggleFolder={toggleExpandedFolder}
+          titleById={titleById}
+          onSelectPage={isMobile ? handleMobileSelectPage : handleSelectPage}
+          onCreateTopLevelPage={handleCreateTopLevelPage}
+          onCreateTopLevelFolder={handleCreateTopLevelFolder}
+          onCreateChildPage={handleCreateChildPage}
+          onCreateChildFolder={handleCreateChildFolder}
+          onDeletePage={handleDelete}
+          onRename={handleRename}
+          pageListContainerRef={pageListContainerRef}
+          activeId={activeId}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
+          entityById={entityById}
+          onMovePage={
+            collabEnabled && projects.length > 0 ? (id) => setMovePageId(id) : undefined
+          }
+        />
+      )}
+      {!isMobile && (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize panel"
+          title="Resize panel"
+          data-testid="wiki-page-list-resize-handle"
+          className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-zinc-700/50 transition-colors"
+          onMouseDown={handleResizeStart}
+        />
+      )}
+      {showEditorPane && (
+        <div className="flex-1 min-w-0 flex flex-col">
+          {isMobile && (
+            <button
+              type="button"
+              data-testid="wiki-mobile-back-to-list"
+              onClick={handleBackToList}
+              className="self-start m-2 px-3 py-2 text-sm rounded-md text-zinc-300 hover:text-white hover:bg-zinc-900 flex items-center gap-1"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>ページ一覧</span>
+            </button>
+          )}
+          <WikiEditorPane
         projectId={projectId}
         canEdit={canEditPage}
         canComment={canComment}
@@ -230,6 +267,8 @@ export function WikiView({
         onServerEntity={onServerEntity}
         pagesCount={pages.length}
       />
+        </div>
+      )}
       {movePageId && onRefreshProject && projects.length > 0 ? (
         <WikiMoveDialog
           open

@@ -12,7 +12,11 @@ use crate::ApiError;
 use super::types::{AuthedUser, Role};
 use super::utils::get_cookie;
 
-pub async fn csrf_middleware(State(state): State<AppState>, req: axum::http::Request<axum::body::Body>, next: Next) -> Response {
+pub async fn csrf_middleware(
+    State(state): State<AppState>,
+    req: axum::http::Request<axum::body::Body>,
+    next: Next,
+) -> Response {
     let method = req.method().clone();
     if method == Method::GET || method == Method::HEAD || method == Method::OPTIONS {
         return next.run(req).await;
@@ -25,7 +29,11 @@ pub async fn csrf_middleware(State(state): State<AppState>, req: axum::http::Req
     ApiError::forbidden("forbidden").into_response()
 }
 
-pub async fn session_middleware(State(state): State<AppState>, mut req: axum::http::Request<axum::body::Body>, next: Next) -> Response {
+pub async fn session_middleware(
+    State(state): State<AppState>,
+    mut req: axum::http::Request<axum::body::Body>,
+    next: Next,
+) -> Response {
     let method = req.method().clone();
     if method == Method::OPTIONS {
         return next.run(req).await;
@@ -89,7 +97,11 @@ pub async fn session_middleware(State(state): State<AppState>, mut req: axum::ht
 
 /// Optional session middleware that allows anonymous users.
 /// If a session exists, it authenticates the user; otherwise, the request continues without authentication.
-pub async fn optional_session_middleware(State(state): State<AppState>, mut req: axum::http::Request<axum::body::Body>, next: Next) -> Response {
+pub async fn optional_session_middleware(
+    State(state): State<AppState>,
+    mut req: axum::http::Request<axum::body::Body>,
+    next: Next,
+) -> Response {
     let method = req.method().clone();
     if method == Method::OPTIONS {
         return next.run(req).await;
@@ -235,4 +247,3 @@ fn referer_matches(host: Option<&str>, referer: &str) -> bool {
         }
     }
 }
-

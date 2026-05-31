@@ -10,11 +10,7 @@ use axum::{
 
 use crate::app_state::AppState;
 
-pub async fn middleware(
-    State(state): State<AppState>,
-    request: Request,
-    next: Next,
-) -> Response {
+pub async fn middleware(State(state): State<AppState>, request: Request, next: Next) -> Response {
     let path = request.uri().path();
     if path == "/health" || path == "/status" {
         return next.run(request).await;

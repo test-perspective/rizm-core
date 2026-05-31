@@ -125,7 +125,8 @@ pub fn run_search(
             .map_err(|_| ApiError::internal())?;
 
         for r in rows {
-            let (pid, kind, entity_pk, title, content, distance) = r.map_err(|_| ApiError::internal())?;
+            let (pid, kind, entity_pk, title, content, distance) =
+                r.map_err(|_| ApiError::internal())?;
             let key = (pid.clone(), entity_pk.clone());
             let existing = candidates.get(&key);
             if existing.map(|e| e.distance <= distance).unwrap_or(false) {

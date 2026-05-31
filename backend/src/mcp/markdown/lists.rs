@@ -3,7 +3,9 @@
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use super::blocks::{default_block_props, make_heading_block, make_paragraph_block};
+use super::blocks::{
+    default_block_props, make_heading_block, make_paragraph_block, make_table_block,
+};
 use super::inline::text_to_block_content;
 
 #[derive(Debug)]
@@ -201,9 +203,19 @@ fn list_item_to_value(item: &ListItem) -> Value {
 pub(super) fn markdown_lines_to_blocks(preprocessed: &str) -> anyhow::Result<Vec<Value>> {
     let mut bullets_buf: Vec<(usize, String)> = Vec::new();
     let mut blocks: Vec<Value> = Vec::new();
+    let lines: Vec<&str> = preprocessed.lines().collect();
+    let mut i = 0usize;
 
-    for line in preprocessed.lines() {
+    while i < lines.len() {
+        let line = lines[i];
         if line.trim().is_empty() {
+            i += 1;
+            continue;
+        }
+        if let Some((headers, rows, next_i)) = parse_markdown_table(&lines, i) {
+            flush_bullet_buffer(&mut bullets_buf, &mut blocks);
+            blocks.push(make_table_block(&headers, &rows));
+            i = next_i;
             continue;
         }
         match parse_markdown_line(line) {
@@ -219,7 +231,64 @@ pub(super) fn markdown_lines_to_blocks(preprocessed: &str) -> anyhow::Result<Vec
                 bullets_buf.push((depth, text));
             }
         }
+        i += 1;
     }
     flush_bullet_buffer(&mut bullets_buf, &mut blocks);
     Ok(blocks)
+}
+
+fn parse_markdown_table(
+    lines: &[&str],
+    start: usize,
+) -> Option<(Vec<String>, Vec<Vec<String>>, usize)> {
+    let header = split_table_row(lines.get(start)?.trim())?;
+    if header.is_empty() {
+        return None;
+    }
+    let divider = lines.get(start + 1)?.trim();
+    if !is_table_divider(divider, header.len()) {
+        return None;
+    }
+
+    let mut rows = Vec::new();
+    let mut i = start + 2;
+    while i < lines.len() {
+        let line = lines[i].trim();
+        if line.is_empty() {
+            break;
+        }
+        let Some(row) = split_table_row(line) else {
+            break;
+        };
+        rows.push(row);
+        i += 1;
+    }
+
+    Some((header, rows, i))
+}
+
+fn split_table_row(line: &str) -> Option<Vec<String>> {
+    if !line.contains('|') {
+        return None;
+    }
+    let trimmed = line.trim().trim_matches('|');
+    let cells: Vec<String> = trimmed.split('|').map(|s| s.trim().to_string()).collect();
+    if cells.len() < 2 {
+        return None;
+    }
+    Some(cells)
+}
+
+fn is_table_divider(line: &str, expected_columns: usize) -> bool {
+    let Some(cells) = split_table_row(line) else {
+        return false;
+    };
+    if cells.len() != expected_columns {
+        return false;
+    }
+    cells.iter().all(|cell| {
+        let t = cell.trim();
+        let core = t.trim_matches(':');
+        core.len() >= 3 && core.chars().all(|c| c == '-')
+    })
 }

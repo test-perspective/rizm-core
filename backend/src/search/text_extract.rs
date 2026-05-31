@@ -21,9 +21,7 @@ pub fn extract_entity_text(entity: &Entity) -> EntityText {
                 .properties
                 .get("Description")
                 .or_else(|| entity.properties.get("description"));
-            let content = desc_value
-                .map(extract_text_from_value)
-                .unwrap_or_default();
+            let content = desc_value.map(extract_text_from_value).unwrap_or_default();
             EntityText { title, content }
         }
         "wikiPage" => {
@@ -34,9 +32,7 @@ pub fn extract_entity_text(entity: &Entity) -> EntityText {
                 .unwrap_or("Untitled")
                 .to_string();
             let doc_value = entity.properties.get("doc");
-            let content = doc_value
-                .map(extract_text_from_value)
-                .unwrap_or_default();
+            let content = doc_value.map(extract_text_from_value).unwrap_or_default();
             EntityText { title, content }
         }
         _ => EntityText {

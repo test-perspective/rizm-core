@@ -1,7 +1,4 @@
-use axum::{
-    routing::get,
-    Extension, Json, Router,
-};
+use axum::{routing::get, Extension, Json, Router};
 use serde::{Deserialize, Serialize};
 
 use crate::app_state::AppState;
@@ -99,11 +96,13 @@ async fn put_dashboard_policy(
     }
 
     // Validate + normalize (store as pretty JSON).
-    let v: serde_json::Value = serde_json::from_str(raw).map_err(|_| ApiError::bad_request("policyJson must be valid JSON"))?;
+    let v: serde_json::Value = serde_json::from_str(raw)
+        .map_err(|_| ApiError::bad_request("policyJson must be valid JSON"))?;
     if !v.is_object() {
         return Err(ApiError::bad_request("policyJson must be a JSON object"));
     }
-    let normalized = serde_json::to_string_pretty(&v).map_err(|_| ApiError::bad_request("policyJson must be serializable JSON"))?;
+    let normalized = serde_json::to_string_pretty(&v)
+        .map_err(|_| ApiError::bad_request("policyJson must be serializable JSON"))?;
 
     let db = state.db.read().await;
     db.set_user_dashboard_policy_json(&user.user_id, &normalized)
@@ -159,4 +158,3 @@ async fn delete_mcp_api_key(
         .map_err(|_| ApiError::internal())?;
     Ok(())
 }
-

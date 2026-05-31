@@ -73,10 +73,7 @@ struct MoveWikiPageResponse {
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route(
-            "/api/projects/:project_id/wiki/pages",
-            get(list_wiki_pages),
-        )
+        .route("/api/projects/:project_id/wiki/pages", get(list_wiki_pages))
         .route(
             "/api/projects/:project_id/wiki/pages/:page_id",
             get(get_wiki_page),
@@ -384,7 +381,10 @@ async fn save_wiki_collab_state(
             Err(e) => {
                 let msg = e.to_string();
                 if msg.contains("database is locked") && attempt < 4 {
-                    tokio::time::sleep(tokio::time::Duration::from_millis(50 * (attempt + 1) as u64)).await;
+                    tokio::time::sleep(tokio::time::Duration::from_millis(
+                        50 * (attempt + 1) as u64,
+                    ))
+                    .await;
                     last_err = Some(e);
                     continue;
                 }
@@ -405,4 +405,3 @@ async fn save_wiki_collab_state(
     tracing::error!(error = ?e, "wiki collab upsert failed");
     Err(ApiError::internal())
 }
-

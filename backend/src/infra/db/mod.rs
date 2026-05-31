@@ -1,6 +1,6 @@
 mod audit;
-mod db_backup_settings;
 mod core;
+mod db_backup_settings;
 mod entities;
 mod groups;
 mod import;
@@ -19,17 +19,9 @@ mod wiki_move;
 
 pub use core::Db;
 pub use types::{
-    AuditLogRecord,
-    EntityWriteError,
-    GroupRecord,
-    ManifestWriteError,
-    ProjectMeta,
-    ProjectScmConfigRecord,
-    ScmOAuthStateRecord,
-    SessionRecord,
+    AuditLogRecord, EntityWriteError, GroupRecord, ManifestWriteError, ProjectMeta,
+    ProjectScmConfigRecord, ScmOAuthStateRecord, SessionRecord, UserMcpApiKeyRecord, UserRecord,
     UserScmCredentialRecord,
-    UserMcpApiKeyRecord,
-    UserRecord,
 };
 
 #[cfg(test)]
@@ -37,4 +29,3 @@ pub(crate) use core::DEFAULT_PROJECT_ID;
 
 #[cfg(test)]
 mod tests;
-

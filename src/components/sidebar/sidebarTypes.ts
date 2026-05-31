@@ -13,4 +13,6 @@ export interface SidebarProps {
   onReorderViews?: (orderedViewIds: string[]) => void;
   /** REQ-288: when true, only NewProjectModal is rendered (sidebar column hidden). */
   notesPaneOccluding?: boolean;
+  /** REQ-286: when supplied (mobile drawer), called after the user picks a project/view to dismiss the drawer. */
+  onAfterNavigate?: () => void;
 }

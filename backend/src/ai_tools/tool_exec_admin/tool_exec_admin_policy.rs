@@ -42,7 +42,11 @@ fn resolve_target_user_id(state: &AppState, args: &Value) -> Result<String, Stri
 
     let db = state.db.blocking_read();
     if let Some(uid) = user_id {
-        if db.get_user_by_id(&uid).map_err(|e| e.to_string())?.is_none() {
+        if db
+            .get_user_by_id(&uid)
+            .map_err(|e| e.to_string())?
+            .is_none()
+        {
             return Err("user not found".to_string());
         }
         return Ok(uid);
@@ -59,9 +63,21 @@ fn resolve_target_user_id(state: &AppState, args: &Value) -> Result<String, Stri
     Err("userId or email is required".to_string())
 }
 
-pub fn get_project_policy(state: &AppState, user: &AuthedUser, args: &Value) -> Result<String, ApiError> {
-    let project_key = args.get("projectKey").and_then(|v| v.as_str()).map(str::trim).filter(|s| !s.is_empty());
-    let project_id = args.get("projectId").and_then(|v| v.as_str()).map(str::trim).filter(|s| !s.is_empty());
+pub fn get_project_policy(
+    state: &AppState,
+    user: &AuthedUser,
+    args: &Value,
+) -> Result<String, ApiError> {
+    let project_key = args
+        .get("projectKey")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    let project_id = args
+        .get("projectId")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
     if project_key.is_none() && project_id.is_none() {
         return Ok(json!({ "error": "projectKey or projectId is required" }).to_string());
     }
@@ -72,7 +88,10 @@ pub fn get_project_policy(state: &AppState, user: &AuthedUser, args: &Value) -> 
     };
 
     let db = state.db.blocking_read();
-    let policy = match db.get_project_policy(&project.id).map_err(|_| ApiError::internal())? {
+    let policy = match db
+        .get_project_policy(&project.id)
+        .map_err(|_| ApiError::internal())?
+    {
         Some(p) => p,
         None => ProjectPolicy {
             project_defaults: PolicyDefaults {
@@ -86,9 +105,21 @@ pub fn get_project_policy(state: &AppState, user: &AuthedUser, args: &Value) -> 
     serde_json::to_string(&policy).map_err(|_| ApiError::internal())
 }
 
-pub fn grant_project_user_access(state: &AppState, user: &AuthedUser, args: &Value) -> Result<String, ApiError> {
-    let project_key = args.get("projectKey").and_then(|v| v.as_str()).map(str::trim).filter(|s| !s.is_empty());
-    let project_id = args.get("projectId").and_then(|v| v.as_str()).map(str::trim).filter(|s| !s.is_empty());
+pub fn grant_project_user_access(
+    state: &AppState,
+    user: &AuthedUser,
+    args: &Value,
+) -> Result<String, ApiError> {
+    let project_key = args
+        .get("projectKey")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    let project_id = args
+        .get("projectId")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
     if project_key.is_none() && project_id.is_none() {
         return Ok(json!({ "error": "projectKey or projectId is required" }).to_string());
     }
@@ -117,7 +148,10 @@ pub fn grant_project_user_access(state: &AppState, user: &AuthedUser, args: &Val
     };
 
     let db = state.db.blocking_read();
-    let mut policy = match db.get_project_policy(&project.id).map_err(|_| ApiError::internal())? {
+    let mut policy = match db
+        .get_project_policy(&project.id)
+        .map_err(|_| ApiError::internal())?
+    {
         Some(p) => p,
         None => ProjectPolicy {
             project_defaults: PolicyDefaults {

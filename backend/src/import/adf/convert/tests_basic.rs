@@ -54,7 +54,9 @@ fn nested_media_single_in_panel_emits_image_block() {
     });
     let s = adf_to_blocknote_doc_with_context(&adf, Some(&ctx)).expect("doc");
     let blocks: Vec<Value> = serde_json::from_str(&s).unwrap();
-    assert!(blocks.iter().any(|b| b.get("type").and_then(|t| t.as_str()) == Some("image")));
+    assert!(blocks
+        .iter()
+        .any(|b| b.get("type").and_then(|t| t.as_str()) == Some("image")));
 }
 
 #[test]
@@ -76,12 +78,25 @@ fn nested_media_single_in_blockquote_emits_image_in_quote_children() {
     });
     let s = adf_to_blocknote_doc_with_context(&adf, Some(&ctx)).expect("doc");
     let blocks: Vec<Value> = serde_json::from_str(&s).unwrap();
-    let quote = blocks.iter().find(|b| b.get("type").and_then(|t| t.as_str()) == Some("quote"));
+    let quote = blocks
+        .iter()
+        .find(|b| b.get("type").and_then(|t| t.as_str()) == Some("quote"));
     let quote = quote.expect("quote block");
-    let content = quote.get("content").and_then(|c| c.as_array()).expect("content");
-    assert!(!content.is_empty(), "quote must have inline content for BlockNote");
-    let children = quote.get("children").and_then(|c| c.as_array()).expect("children");
-    assert!(children.iter().any(|b| b.get("type").and_then(|t| t.as_str()) == Some("image")));
+    let content = quote
+        .get("content")
+        .and_then(|c| c.as_array())
+        .expect("content");
+    assert!(
+        !content.is_empty(),
+        "quote must have inline content for BlockNote"
+    );
+    let children = quote
+        .get("children")
+        .and_then(|c| c.as_array())
+        .expect("children");
+    assert!(children
+        .iter()
+        .any(|b| b.get("type").and_then(|t| t.as_str()) == Some("image")));
 }
 
 #[test]
@@ -112,10 +127,17 @@ fn media_single_inside_list_item_emits_image_child() {
     });
     let s = adf_to_blocknote_doc_with_context(&adf, Some(&ctx)).expect("doc");
     let blocks: Vec<Value> = serde_json::from_str(&s).unwrap();
-    let li = blocks.iter().find(|b| b.get("type").and_then(|t| t.as_str()) == Some("bulletListItem"));
+    let li = blocks
+        .iter()
+        .find(|b| b.get("type").and_then(|t| t.as_str()) == Some("bulletListItem"));
     let li = li.expect("list item");
-    let children = li.get("children").and_then(|c| c.as_array()).expect("children");
-    assert!(children.iter().any(|b| b.get("type").and_then(|t| t.as_str()) == Some("image")));
+    let children = li
+        .get("children")
+        .and_then(|c| c.as_array())
+        .expect("children");
+    assert!(children
+        .iter()
+        .any(|b| b.get("type").and_then(|t| t.as_str()) == Some("image")));
 }
 
 #[test]
@@ -139,7 +161,9 @@ fn media_single_falls_back_to_alt_filename_when_media_id_is_uuid() {
     });
     let s = adf_to_blocknote_doc_with_context(&adf, Some(&ctx)).expect("doc");
     let blocks: Vec<Value> = serde_json::from_str(&s).unwrap();
-    assert!(blocks.iter().any(|b| b.get("type").and_then(|t| t.as_str()) == Some("image")));
+    assert!(blocks
+        .iter()
+        .any(|b| b.get("type").and_then(|t| t.as_str()) == Some("image")));
 }
 
 #[test]
@@ -234,6 +258,10 @@ fn adf_strike_mark_uses_blocknote_strike_style_key() {
         }]
     });
     let s = super::adf_to_blocknote_doc_with_context(&adf, None).expect("doc");
-    assert!(s.contains("\"strike\":true"), "expected BlockNote strike style, got {}", s);
+    assert!(
+        s.contains("\"strike\":true"),
+        "expected BlockNote strike style, got {}",
+        s
+    );
     assert!(!s.contains("strikethrough"), "{}", s);
 }

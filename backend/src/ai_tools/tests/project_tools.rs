@@ -14,7 +14,10 @@ fn list_projects_returns_default() {
     let raw = list_projects(&state, &user).expect("list projects");
     let parsed: JsonValue = serde_json::from_str(&raw).expect("parse json");
     let projects = parsed.get("projects").and_then(|v| v.as_array());
-    assert!(projects.map(|p| !p.is_empty()).unwrap_or(false), "projects should not be empty");
+    assert!(
+        projects.map(|p| !p.is_empty()).unwrap_or(false),
+        "projects should not be empty"
+    );
 }
 
 #[test]
@@ -23,10 +26,14 @@ fn search_projects_matches_name() {
     let state = app_state(db);
     let user = admin_user();
 
-    let raw = search_projects(&state, &user, &json!({ "query": "Default" })).expect("search projects");
+    let raw =
+        search_projects(&state, &user, &json!({ "query": "Default" })).expect("search projects");
     let parsed: JsonValue = serde_json::from_str(&raw).expect("parse json");
     let projects = parsed.get("projects").and_then(|v| v.as_array());
-    assert!(projects.map(|p| !p.is_empty()).unwrap_or(false), "search should match default project");
+    assert!(
+        projects.map(|p| !p.is_empty()).unwrap_or(false),
+        "search should match default project"
+    );
 }
 
 #[test]
@@ -35,7 +42,8 @@ fn get_project_manifest_returns_manifest() {
     let state = app_state(db);
     let user = admin_user();
 
-    let raw = get_project_manifest(&state, &user, &json!({ "projectId": "default" })).expect("get manifest");
+    let raw = get_project_manifest(&state, &user, &json!({ "projectId": "default" }))
+        .expect("get manifest");
     let parsed: JsonValue = serde_json::from_str(&raw).expect("parse json");
     let manifest = parsed.get("manifest");
     assert!(manifest.is_some(), "manifest should exist");

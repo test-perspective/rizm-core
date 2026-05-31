@@ -29,7 +29,11 @@ fn jira_nested_star_bullets_become_children() {
         .get("children")
         .and_then(Value::as_array)
         .expect("children");
-    assert_eq!(ch.len(), 2, "expected two nested items under first top bullet");
+    assert_eq!(
+        ch.len(),
+        2,
+        "expected two nested items under first top bullet"
+    );
     assert_eq!(
         ch[0].get("type").and_then(Value::as_str),
         Some("bulletListItem")
@@ -64,6 +68,37 @@ fn markdown_indented_dash_nests_under_parent() {
         .and_then(Value::as_array)
         .expect("children");
     assert_eq!(ch.len(), 1);
+}
+
+#[test]
+fn markdown_table_becomes_blocknote_table() {
+    let doc = markdown_to_blocknote_doc("| Name | Value |\n| --- | --- |\n| alpha | 1 |")
+        .expect("convert");
+    let arr: Vec<Value> = serde_json::from_str(&doc).expect("parse");
+    assert_eq!(arr.len(), 1);
+    assert_eq!(arr[0].get("type").and_then(Value::as_str), Some("table"));
+    let rows = arr[0]
+        .get("content")
+        .and_then(|c| c.get("rows"))
+        .and_then(Value::as_array)
+        .expect("rows");
+    assert_eq!(rows.len(), 2);
+    assert_eq!(
+        rows[0]["cells"][0]["content"][0]["text"].as_str(),
+        Some("Name")
+    );
+    assert_eq!(
+        rows[0]["cells"][1]["content"][0]["text"].as_str(),
+        Some("Value")
+    );
+    assert_eq!(
+        rows[1]["cells"][0]["content"][0]["text"].as_str(),
+        Some("alpha")
+    );
+    assert_eq!(
+        rows[1]["cells"][1]["content"][0]["text"].as_str(),
+        Some("1")
+    );
 }
 
 #[test]
@@ -102,7 +137,8 @@ fn inline_markdown_bracket_link() {
 
 #[test]
 fn markdown_bracket_link_same_url_not_double_nested() {
-    let doc = markdown_to_blocknote_doc("[https://ex.com/x](https://ex.com/x) tail").expect("convert");
+    let doc =
+        markdown_to_blocknote_doc("[https://ex.com/x](https://ex.com/x) tail").expect("convert");
     let arr: Vec<Value> = serde_json::from_str(&doc).expect("parse");
     let c = arr[0]
         .get("content")
@@ -127,7 +163,8 @@ fn markdown_bracket_link_same_url_not_double_nested() {
 
 #[test]
 fn jira_bracket_alias_pipe_url_becomes_markdown_link() {
-    let doc = markdown_to_blocknote_doc("[https://ex.com/x|https://ex.com/x] after").expect("convert");
+    let doc =
+        markdown_to_blocknote_doc("[https://ex.com/x|https://ex.com/x] after").expect("convert");
     let arr: Vec<Value> = serde_json::from_str(&doc).expect("parse");
     let c = arr[0]
         .get("content")
@@ -170,14 +207,16 @@ fn extract_first_http_url_stops_at_pipe() {
 
 #[test]
 fn preprocess_angle_mailto_link() {
-    let doc = markdown_to_blocknote_doc("Contact <[a@b.com|mailto:a@b.com]> please").expect("convert");
+    let doc =
+        markdown_to_blocknote_doc("Contact <[a@b.com|mailto:a@b.com]> please").expect("convert");
     assert!(doc.contains("mailto:"), "{}", doc);
     assert!(doc.contains("link") || doc.contains("a@b.com"), "{}", doc);
 }
 
 #[test]
 fn preprocess_strips_quote_and_templates() {
-    let doc = markdown_to_blocknote_doc("{quote}Hello{quote} and {{fetchPageName}}").expect("convert");
+    let doc =
+        markdown_to_blocknote_doc("{quote}Hello{quote} and {{fetchPageName}}").expect("convert");
     assert!(!doc.contains("{quote}"), "{}", doc);
     assert!(doc.contains("\"quote\""), "expected quote block: {}", doc);
     assert!(doc.contains("Hello"), "{}", doc);
@@ -191,7 +230,8 @@ fn preprocess_strips_quote_and_templates() {
 
 #[test]
 fn jira_quote_panel_wraps_multiline_content() {
-    let doc = markdown_to_blocknote_doc("{quote}Line one\n\nLine two{quote}\n\nAfter").expect("convert");
+    let doc =
+        markdown_to_blocknote_doc("{quote}Line one\n\nLine two{quote}\n\nAfter").expect("convert");
     let arr: Vec<Value> = serde_json::from_str(&doc).expect("parse");
     let q = arr
         .iter()
@@ -220,7 +260,8 @@ fn preprocess_confluence_colon_brace_template() {
 
 #[test]
 fn preprocess_confluence_double_brace_with_cjk_suffix() {
-    let doc = markdown_to_blocknote_doc("x {{read:attachment:confluenceが必要だったの}} y").expect("convert");
+    let doc = markdown_to_blocknote_doc("x {{read:attachment:confluenceが必要だったの}} y")
+        .expect("convert");
     assert!(!doc.contains("{{"), "{}", doc);
     assert!(doc.contains("read:attachment:confluence"), "{}", doc);
     assert!(doc.contains("が必要だったの"), "{}", doc);
@@ -229,7 +270,8 @@ fn preprocess_confluence_double_brace_with_cjk_suffix() {
 
 #[test]
 fn jira_noformat_becomes_code_block_and_strips_markers() {
-    let doc = markdown_to_blocknote_doc("Intro {noformat}line1\nline2{noformat} outro").expect("convert");
+    let doc =
+        markdown_to_blocknote_doc("Intro {noformat}line1\nline2{noformat} outro").expect("convert");
     assert!(!doc.contains("{noformat}"), "{}", doc);
     assert!(doc.contains("line1"), "{}", doc);
     assert!(doc.contains("line2"), "{}", doc);
@@ -264,7 +306,8 @@ fn jira_wiki_color_bare_hex_gets_hash_prefix() {
 
 #[test]
 fn jira_wiki_nested_color_closes_inner_first() {
-    let doc = markdown_to_blocknote_doc("{color:red}a{color:blue}b{color}c{color}").expect("convert");
+    let doc =
+        markdown_to_blocknote_doc("{color:red}a{color:blue}b{color}c{color}").expect("convert");
     assert!(!doc.contains("{color"), "{}", doc);
     assert!(doc.contains("a"), "{}", doc);
     assert!(doc.contains("b"), "{}", doc);

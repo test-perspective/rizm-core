@@ -34,7 +34,14 @@ impl Db {
                 let lifecycle_status: String = row.get(3)?;
                 let created_at: i64 = row.get(4)?;
                 let updated_at: i64 = row.get(5)?;
-                Ok((id, name, project_key, lifecycle_status, created_at, updated_at))
+                Ok((
+                    id,
+                    name,
+                    project_key,
+                    lifecycle_status,
+                    created_at,
+                    updated_at,
+                ))
             })
             .context("query projects")?;
         let mut out = Vec::new();
@@ -58,7 +65,9 @@ impl Db {
             .context("select manifest by project")?;
         match json {
             None => Ok(None),
-            Some(s) => Ok(Some(serde_json::from_str(&s).context("deserialize manifest")?)),
+            Some(s) => Ok(Some(
+                serde_json::from_str(&s).context("deserialize manifest")?,
+            )),
         }
     }
 
@@ -104,9 +113,13 @@ impl Db {
     pub(crate) fn get_active_project_id_conn(
         conn: &mut rusqlite::Connection,
     ) -> anyhow::Result<Option<String>> {
-        conn.query_row("SELECT value FROM meta WHERE key = 'active_project_id'", [], |row| row.get(0))
-            .optional()
-            .context("select active_project_id")
+        conn.query_row(
+            "SELECT value FROM meta WHERE key = 'active_project_id'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()
+        .context("select active_project_id")
     }
 
     pub(crate) fn get_active_project_id_for_user_conn(
@@ -114,14 +127,20 @@ impl Db {
         user_id: &str,
     ) -> anyhow::Result<Option<String>> {
         let key = format!("active_project_id:{}", user_id);
-        conn.query_row("SELECT value FROM meta WHERE key = ?1", params![key], |row| row.get(0))
-            .optional()
-            .context("select active_project_id for user")
+        conn.query_row(
+            "SELECT value FROM meta WHERE key = ?1",
+            params![key],
+            |row| row.get(0),
+        )
+        .optional()
+        .context("select active_project_id for user")
     }
 
     pub(crate) fn get_version_conn(conn: &mut rusqlite::Connection) -> anyhow::Result<Option<i64>> {
         let s: Option<String> = conn
-            .query_row("SELECT value FROM meta WHERE key = 'version'", [], |row| row.get(0))
+            .query_row("SELECT value FROM meta WHERE key = 'version'", [], |row| {
+                row.get(0)
+            })
             .optional()
             .context("select version")?;
         Ok(s.and_then(|v| v.parse::<i64>().ok()))

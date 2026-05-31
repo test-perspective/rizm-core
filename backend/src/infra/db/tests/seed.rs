@@ -10,7 +10,11 @@ fn new_db_seeds_default_state() {
     assert!(!state.projects.is_empty());
     assert!(state.projects.iter().any(|p| p.id == DEFAULT_PROJECT_ID));
     assert_eq!(state.active_project_id, DEFAULT_PROJECT_ID);
-    let default = state.projects.iter().find(|p| p.id == DEFAULT_PROJECT_ID).unwrap();
+    let default = state
+        .projects
+        .iter()
+        .find(|p| p.id == DEFAULT_PROJECT_ID)
+        .unwrap();
     assert_eq!(default.config.manifest.name, "Task Manager");
     assert!(!default.entities.is_empty());
 
@@ -18,7 +22,12 @@ fn new_db_seeds_default_state() {
         .entities
         .iter()
         .filter(|e| e.entity_id == "task")
-        .filter_map(|e| e.properties.get("taskKey").and_then(|v| v.as_str()).map(|s| s.to_string()))
+        .filter_map(|e| {
+            e.properties
+                .get("taskKey")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        })
         .collect();
     assert!(!task_keys.is_empty());
     task_keys.sort();
@@ -57,8 +66,8 @@ fn new_db_seeds_default_state() {
 
 #[test]
 fn replace_state_round_trips_projects_manifests_entities_and_version() {
-    use crate::models::{Entity, Project, ProjectConfig, StorageData};
     use super::manifest_named;
+    use crate::models::{Entity, Project, ProjectConfig, StorageData};
 
     let (_dir, db_path) = tmp_db_path();
     let db = Db::new(&db_path).expect("create db");
@@ -68,7 +77,10 @@ fn replace_state_round_trips_projects_manifests_entities_and_version() {
         entity_id: "thing".to_string(),
         created_at: 1,
         updated_at: 2,
-        properties: serde_json::json!({"title": "hello"}).as_object().cloned().unwrap_or_default(),
+        properties: serde_json::json!({"title": "hello"})
+            .as_object()
+            .cloned()
+            .unwrap_or_default(),
     }];
 
     let p1 = Project {
@@ -100,7 +112,10 @@ fn replace_state_round_trips_projects_manifests_entities_and_version() {
     assert_eq!(state.projects[0].entities.len(), 1);
     assert_eq!(state.projects[0].entities[0].id, "e1");
     assert_eq!(
-        state.projects[0].entities[0].properties.get("title").and_then(|v| v.as_str()),
+        state.projects[0].entities[0]
+            .properties
+            .get("title")
+            .and_then(|v| v.as_str()),
         Some("hello")
     );
 }

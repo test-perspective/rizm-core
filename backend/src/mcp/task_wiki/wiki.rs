@@ -76,15 +76,13 @@ pub fn get_wiki_page_for_user(
     }
 
     if let Some(t) = title.filter(|s| !s.trim().is_empty()) {
-        let mut matches = wiki_entities
-            .into_iter()
-            .filter(|e| {
-                e.properties
-                    .get("title")
-                    .and_then(Value::as_str)
-                    .map(|s| s == t)
-                    .unwrap_or(false)
-            });
+        let mut matches = wiki_entities.into_iter().filter(|e| {
+            e.properties
+                .get("title")
+                .and_then(Value::as_str)
+                .map(|s| s == t)
+                .unwrap_or(false)
+        });
         let first = matches
             .next()
             .ok_or_else(|| anyhow::anyhow!("wiki page not found for title={t}"))?;
@@ -140,10 +138,12 @@ pub fn create_wiki_page_for_user(
 
     let project = resolve_project(state, user, project_key, project_id)?;
     let db = state.db.blocking_read();
-    let can_ok = can_write(&db, &project.id, Some(user))
-        .context("check write permission")?;
+    let can_ok = can_write(&db, &project.id, Some(user)).context("check write permission")?;
     if !can_ok {
-        anyhow::bail!("insufficient permissions for project {}", project.project_key);
+        anyhow::bail!(
+            "insufficient permissions for project {}",
+            project.project_key
+        );
     }
 
     let doc = match content.and_then(|c| {
@@ -161,14 +161,13 @@ pub fn create_wiki_page_for_user(
     let entities = db
         .list_entities_for_project(&project.id)
         .with_context(|| format!("list entities for project {}", project.id))?;
-    let wiki_pages: Vec<_> = entities.into_iter().filter(|e| e.entity_id == "wikiPage").collect();
+    let wiki_pages: Vec<_> = entities
+        .into_iter()
+        .filter(|e| e.entity_id == "wikiPage")
+        .collect();
     let max_order = wiki_pages
         .iter()
-        .filter_map(|e| {
-            e.properties
-                .get(WIKI_ORDER_KEY)
-                .and_then(Value::as_i64)
-        })
+        .filter_map(|e| e.properties.get(WIKI_ORDER_KEY).and_then(Value::as_i64))
         .max()
         .unwrap_or(-WIKI_ORDER_GAP);
     let new_order = max_order + WIKI_ORDER_GAP;
@@ -176,7 +175,10 @@ pub fn create_wiki_page_for_user(
     let mut properties = serde_json::Map::new();
     properties.insert("title".to_string(), Value::String(title.to_string()));
     properties.insert("doc".to_string(), Value::String(doc));
-    properties.insert(WIKI_ORDER_KEY.to_string(), Value::Number(serde_json::Number::from(new_order)));
+    properties.insert(
+        WIKI_ORDER_KEY.to_string(),
+        Value::Number(serde_json::Number::from(new_order)),
+    );
 
     let entity = db
         .create_entity_for_project(&project.id, None, "wikiPage", properties)

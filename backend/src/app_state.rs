@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use tokio::sync::{Mutex, oneshot};
+use tokio::sync::{oneshot, Mutex};
 
 use crate::db::Db;
 
@@ -66,7 +66,13 @@ impl LoginLimiter {
     }
 
     /// Returns (allowed, backoff_ms).
-    pub async fn can_attempt(&self, key: &str, now_ms: i64, window_ms: i64, max_attempts: usize) -> (bool, i64) {
+    pub async fn can_attempt(
+        &self,
+        key: &str,
+        now_ms: i64,
+        window_ms: i64,
+        max_attempts: usize,
+    ) -> (bool, i64) {
         let mut map = self.failures.lock().await;
         let v = map.entry(key.to_string()).or_default();
         v.retain(|t| now_ms.saturating_sub(*t) <= window_ms);
@@ -84,4 +90,3 @@ impl LoginLimiter {
         (false, backoff)
     }
 }
-

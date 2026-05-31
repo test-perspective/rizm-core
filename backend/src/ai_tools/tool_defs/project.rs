@@ -103,6 +103,26 @@ pub(super) fn project_tools() -> Vec<Value> {
         json!({
             "type": "function",
             "function": {
+                "name": "add_comment",
+                "description": "Add a comment to a task or wiki page. Input text is Markdown/plain text and is stored as a BlockNote document.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "targetType": { "type": "string", "enum": ["task", "wiki"], "description": "Comment target type." },
+                        "taskKey": { "type": "string", "description": "Task key like REQ-299 (required when targetType=task)." },
+                        "projectKey": { "type": "string", "description": "Project key like REQ (required when targetType=wiki)." },
+                        "wikiPageId": { "type": "string", "description": "Wiki page entity id." },
+                        "wikiPageTitle": { "type": "string", "description": "Wiki page title." },
+                        "text": { "type": "string", "description": "Comment body in Markdown/plain text." }
+                    },
+                    "required": ["targetType", "text"],
+                    "additionalProperties": false
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
                 "name": "search_wiki",
                 "description": "Search wiki pages by keyword. Omit projectId to search all projects.",
                 "parameters": {

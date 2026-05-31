@@ -1,7 +1,8 @@
 use uuid::Uuid;
 
 use crate::models::{
-    Entity, EntityDefinition, ProjectManifest, PropertyDefinition, PropertyType, ViewConfig, ViewType,
+    Entity, EntityDefinition, ProjectManifest, PropertyDefinition, PropertyType, ViewConfig,
+    ViewType,
 };
 
 /// Build manifest with custom status options and optional issue type options (e.g. from import).
@@ -36,7 +37,9 @@ pub fn manifest_with_status_options(
     if let Some(ref opts) = issue_type_options {
         if !opts.is_empty() {
             if let Some(task) = m.entities.iter_mut().find(|e| e.id == "task") {
-                if let Some(issue_type_prop) = task.properties.iter_mut().find(|p| p.name == "issueType") {
+                if let Some(issue_type_prop) =
+                    task.properties.iter_mut().find(|p| p.name == "issueType")
+                {
                     issue_type_prop.options = Some(opts.clone());
                 }
             }
@@ -69,7 +72,12 @@ pub fn default_manifest() -> ProjectManifest {
                     PropertyDefinition {
                         name: "status".to_string(),
                         type_: PropertyType::Select,
-                        options: Some(vec!["Backlog".to_string(), "Todo".to_string(), "In Progress".to_string(), "Done".to_string()]),
+                        options: Some(vec![
+                            "Backlog".to_string(),
+                            "Todo".to_string(),
+                            "In Progress".to_string(),
+                            "Done".to_string(),
+                        ]),
                         visible: Some(true),
                     },
                     PropertyDefinition {
@@ -81,7 +89,11 @@ pub fn default_manifest() -> ProjectManifest {
                     PropertyDefinition {
                         name: "priority".to_string(),
                         type_: PropertyType::Select,
-                        options: Some(vec!["Low".to_string(), "Medium".to_string(), "High".to_string()]),
+                        options: Some(vec![
+                            "Low".to_string(),
+                            "Medium".to_string(),
+                            "High".to_string(),
+                        ]),
                         visible: Some(true),
                     },
                     PropertyDefinition {
@@ -160,11 +172,21 @@ pub fn default_manifest() -> ProjectManifest {
                 type_: ViewType::Board,
                 entity_id: "task".to_string(),
                 group_by: Some("status".to_string()),
-                visible_properties: vec!["taskKey".to_string(), "title".to_string(), "priority".to_string(), "assigneeId".to_string(), "labels".to_string()],
+                visible_properties: vec![
+                    "taskKey".to_string(),
+                    "title".to_string(),
+                    "priority".to_string(),
+                    "assigneeId".to_string(),
+                    "labels".to_string(),
+                ],
                 sort_by: None,
                 sort_order: None,
                 column_order: None,
-                hidden_columns: Some(vec!["Todo".to_string(), "In Progress".to_string(), "Done".to_string()]),
+                hidden_columns: Some(vec![
+                    "Todo".to_string(),
+                    "In Progress".to_string(),
+                    "Done".to_string(),
+                ]),
                 board_dividers: None,
             },
             ViewConfig {
@@ -173,7 +195,12 @@ pub fn default_manifest() -> ProjectManifest {
                 type_: ViewType::Board,
                 entity_id: "task".to_string(),
                 group_by: Some("status".to_string()),
-                visible_properties: vec!["title".to_string(), "priority".to_string(), "assigneeId".to_string(), "labels".to_string()],
+                visible_properties: vec![
+                    "title".to_string(),
+                    "priority".to_string(),
+                    "assigneeId".to_string(),
+                    "labels".to_string(),
+                ],
                 sort_by: None,
                 sort_order: None,
                 column_order: None,
@@ -268,46 +295,90 @@ mod tests {
 
         // properties
         assert_eq!(m.entities[0].properties.len(), 9);
-        let names: Vec<_> = m.entities[0].properties.iter().map(|p| p.name.as_str()).collect();
+        let names: Vec<_> = m.entities[0]
+            .properties
+            .iter()
+            .map(|p| p.name.as_str())
+            .collect();
         assert_eq!(
             names,
-            vec!["taskKey", "title", "status", "issueType", "priority", "assigneeId", "Description", "link", "labels"]
+            vec![
+                "taskKey",
+                "title",
+                "status",
+                "issueType",
+                "priority",
+                "assigneeId",
+                "Description",
+                "link",
+                "labels"
+            ]
         );
 
         // views
         assert_eq!(m.views.len(), 4);
-        let table = m.views.iter().find(|v| v.id == "table").expect("table view exists");
+        let table = m
+            .views
+            .iter()
+            .find(|v| v.id == "table")
+            .expect("table view exists");
         assert!(matches!(table.type_, ViewType::Table));
         assert!(table.visible_properties.contains(&"labels".to_string()));
         assert_eq!(table.sort_by.as_deref(), Some("createdAt"));
-        assert!(matches!(table.sort_order, Some(crate::models::SortOrder::Desc)));
+        assert!(matches!(
+            table.sort_order,
+            Some(crate::models::SortOrder::Desc)
+        ));
 
-        let board = m.views.iter().find(|v| v.id == "board").expect("board view exists");
+        let board = m
+            .views
+            .iter()
+            .find(|v| v.id == "board")
+            .expect("board view exists");
         assert!(matches!(board.type_, ViewType::Board));
         assert_eq!(board.group_by.as_deref(), Some("status"));
         assert!(board.visible_properties.contains(&"labels".to_string()));
 
-        let backlog = m.views.iter().find(|v| v.id == "backlog").expect("backlog view exists");
+        let backlog = m
+            .views
+            .iter()
+            .find(|v| v.id == "backlog")
+            .expect("backlog view exists");
         assert!(matches!(backlog.type_, ViewType::Board));
         assert_eq!(backlog.group_by.as_deref(), Some("status"));
         assert!(backlog.visible_properties.contains(&"taskKey".to_string()));
         assert!(backlog.visible_properties.contains(&"labels".to_string()));
 
-        let wiki = m.views.iter().find(|v| v.id == "wiki").expect("wiki view exists");
+        let wiki = m
+            .views
+            .iter()
+            .find(|v| v.id == "wiki")
+            .expect("wiki view exists");
         assert!(matches!(wiki.type_, ViewType::Wiki));
         assert_eq!(wiki.entity_id, "wikiPage");
         assert_eq!(wiki.sort_by.as_deref(), Some("updatedAt"));
-        assert!(matches!(wiki.sort_order, Some(crate::models::SortOrder::Desc)));
+        assert!(matches!(
+            wiki.sort_order,
+            Some(crate::models::SortOrder::Desc)
+        ));
         assert!(wiki.visible_properties.contains(&"title".to_string()));
     }
 
     #[test]
     fn manifest_with_status_options_sets_backlog_hidden_and_issue_types() {
-        let status_opts = vec!["Backlog".to_string(), "To Do".to_string(), "Done".to_string()];
+        let status_opts = vec![
+            "Backlog".to_string(),
+            "To Do".to_string(),
+            "Done".to_string(),
+        ];
         let issue_opts = vec!["Task".to_string(), "Story".to_string(), "Bug".to_string()];
         let m = manifest_with_status_options(status_opts, Some("Backlog"), Some(issue_opts));
         // Backlog view: only Backlog visible (To Do, Done hidden)
-        let backlog = m.views.iter().find(|v| v.id == "backlog").expect("backlog view");
+        let backlog = m
+            .views
+            .iter()
+            .find(|v| v.id == "backlog")
+            .expect("backlog view");
         let hidden: std::collections::HashSet<&str> = backlog
             .hidden_columns
             .as_deref()
@@ -319,9 +390,20 @@ mod tests {
         assert!(hidden.contains("Done"));
         assert!(!hidden.contains("Backlog"));
         // issueType options
-        let task = m.entities.iter().find(|e| e.id == "task").expect("task entity");
-        let issue_type = task.properties.iter().find(|p| p.name == "issueType").expect("issueType prop");
-        let opts = issue_type.options.as_deref().expect("issueType has options");
+        let task = m
+            .entities
+            .iter()
+            .find(|e| e.id == "task")
+            .expect("task entity");
+        let issue_type = task
+            .properties
+            .iter()
+            .find(|p| p.name == "issueType")
+            .expect("issueType prop");
+        let opts = issue_type
+            .options
+            .as_deref()
+            .expect("issueType has options");
         assert_eq!(opts, ["Task", "Story", "Bug"]);
     }
 

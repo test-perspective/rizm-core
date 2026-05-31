@@ -48,7 +48,9 @@ async fn search_users(
     let query = params.q.unwrap_or_default().trim().to_lowercase();
     let limit = params.limit.unwrap_or(20).min(100);
 
-    let all_users = (state.db.read().await).list_users().map_err(|_| ApiError::internal())?;
+    let all_users = (state.db.read().await)
+        .list_users()
+        .map_err(|_| ApiError::internal())?;
 
     let results: Vec<UserSummary> = all_users
         .into_iter()
@@ -75,7 +77,9 @@ async fn resolve_users(
         return Ok(Json(vec![]));
     }
 
-    let all_users = (state.db.read().await).list_users().map_err(|_| ApiError::internal())?;
+    let all_users = (state.db.read().await)
+        .list_users()
+        .map_err(|_| ApiError::internal())?;
 
     let id_set: std::collections::HashSet<&str> = req.ids.iter().map(|s| s.as_str()).collect();
 
@@ -147,7 +151,10 @@ mod tests {
         let result = search_users(
             axum::extract::State(state.clone()),
             axum::Extension(actor.clone()),
-            axum::extract::Query(SearchQuery { q: None, limit: None }),
+            axum::extract::Query(SearchQuery {
+                q: None,
+                limit: None,
+            }),
         )
         .await
         .unwrap();
@@ -229,4 +236,3 @@ mod tests {
         assert_eq!(result.0[0].email, "alice@example.com");
     }
 }
-

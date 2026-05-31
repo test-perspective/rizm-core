@@ -65,7 +65,9 @@ impl Db {
             ) AS j
             WHERE j.value IS NOT NULL
             "#;
-        let total: i64 = conn.query_row(sql, [], |row| row.get(0)).context("query attachment total")?;
+        let total: i64 = conn
+            .query_row(sql, [], |row| row.get(0))
+            .context("query attachment total")?;
         Ok(total)
     }
 
@@ -78,7 +80,9 @@ impl Db {
             Ok(s) => s,
             Err(_) => return Ok((Vec::new(), 0)),
         };
-        let rows = match stmt.query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))) {
+        let rows = match stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+        }) {
             Ok(r) => r,
             Err(_) => return Ok((Vec::new(), 0)),
         };

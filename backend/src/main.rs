@@ -6,18 +6,18 @@ use std::net::SocketAddr;
 use axum::{
     extract::{Path, State},
     http::{header, HeaderValue, Method, StatusCode},
+    middleware,
     response::IntoResponse,
     routing::get,
-    middleware,
     Json, Router,
 };
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
 
+use crate::app_state::{AppState, AuthConfig, LoginLimiter};
 use crate::db::Db;
 use crate::models::{Project, ProjectConfig, StorageData};
-use crate::app_state::{AppState, AuthConfig, LoginLimiter};
 use axum::Extension;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -27,23 +27,29 @@ async fn main() -> anyhow::Result<()> {
     // Default to info logs in dev unless explicitly overridden by RUST_LOG.
     // (If RUST_LOG is unset, EnvFilter::from_default_env can be too quiet and hide AIT progress logs.)
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        .init();
+    tracing_subscriber::fmt().with_env_filter(filter).init();
 
-    let db_path = std::env::var("KEEL_DB_PATH").unwrap_or_else(|_| "./data/keel.sqlite3".to_string());
+    let db_path =
+        std::env::var("KEEL_DB_PATH").unwrap_or_else(|_| "./data/keel.sqlite3".to_string());
     let bind = std::env::var("KEEL_BIND").unwrap_or_else(|_| "127.0.0.1:48888".to_string());
 
     let cookie_secure = std::env::var("KEEL_COOKIE_SECURE")
         .ok()
         .and_then(|v| v.parse::<bool>().ok())
         .unwrap_or(true);
-    let csrf_allowed_origin = std::env::var("KEEL_CSRF_ALLOWED_ORIGIN").ok().filter(|s| !s.trim().is_empty());
+    let csrf_allowed_origin = std::env::var("KEEL_CSRF_ALLOWED_ORIGIN")
+        .ok()
+        .filter(|s| !s.trim().is_empty());
     let dev_admin_login_enabled = std::env::var("KEEL_DEV_ADMIN_LOGIN")
         .ok()
         .and_then(|v| {
             let normalized = v.trim().to_lowercase();
-            Some(normalized == "true" || normalized == "1" || normalized == "yes" || normalized == "on")
+            Some(
+                normalized == "true"
+                    || normalized == "1"
+                    || normalized == "yes"
+                    || normalized == "on",
+            )
         })
         .unwrap_or(false);
 
@@ -106,10 +112,19 @@ async fn main() -> anyhow::Result<()> {
         .merge(crate::api::dashboard_api::router())
         .merge(crate::api::users_api::router())
         .with_state(state.clone())
-        .layer(middleware::from_fn_with_state(state.clone(), crate::auth::csrf_middleware))
-        .layer(middleware::from_fn_with_state(state.clone(), crate::auth::session_middleware));
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::auth::csrf_middleware,
+        ))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::auth::session_middleware,
+        ));
 
-    let mut app = Router::new().merge(public).merge(protected).with_state(state.clone());
+    let mut app = Router::new()
+        .merge(public)
+        .merge(protected)
+        .with_state(state.clone());
 
     // CORS is only needed for dev (different origin). For cookie auth, credentials require a fixed origin.
     // KEEL_CORS_ORIGIN can be a single origin or comma-separated (e.g. "http://localhost:5173,http://127.0.0.1:5173").
@@ -148,7 +163,14 @@ async fn main() -> anyhow::Result<()> {
                 .allow_origin(origins)
                 .allow_credentials(true)
                 // With credentials, headers cannot be wildcard (*).
-                .allow_methods([Method::GET, Method::POST, Method::PUT, Method::PATCH, Method::DELETE, Method::OPTIONS])
+                .allow_methods([
+                    Method::GET,
+                    Method::POST,
+                    Method::PUT,
+                    Method::PATCH,
+                    Method::DELETE,
+                    Method::OPTIONS,
+                ])
                 // If-Match is required for optimistic locking (ETag).
                 .allow_headers([header::CONTENT_TYPE, header::ACCEPT, header::IF_MATCH])
                 // Let the browser read ETag from responses.
@@ -158,14 +180,21 @@ async fn main() -> anyhow::Result<()> {
     }
 
     app = app
-        .layer(middleware::from_fn_with_state(state.clone(), crate::service_gate::middleware))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::service_gate::middleware,
+        ))
         .layer(middleware::from_fn(log_500_errors))
         .layer(TraceLayer::new_for_http());
 
     let addr: SocketAddr = bind.parse()?;
     tracing::info!(%addr, db_path = %db_path, "keel-backend listening");
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?;
     Ok(())
 }
 
@@ -205,7 +234,10 @@ async fn get_state(State(state): State<AppState>) -> Result<Json<StorageData>, A
     Ok(Json(data))
 }
 
-async fn put_state(State(state): State<AppState>, Json(mut data): Json<StorageData>) -> Result<StatusCode, ApiError> {
+async fn put_state(
+    State(state): State<AppState>,
+    Json(mut data): Json<StorageData>,
+) -> Result<StatusCode, ApiError> {
     let db = state.db.read().await;
     if data.version == 0 {
         data.version = crate::time::now_ms();
@@ -220,10 +252,14 @@ async fn put_state(State(state): State<AppState>, Json(mut data): Json<StorageDa
             created_at: now,
             updated_at: now,
             entities: vec![],
-            config: ProjectConfig { manifest: crate::defaults::default_manifest() },
+            config: ProjectConfig {
+                manifest: crate::defaults::default_manifest(),
+            },
         });
     }
-    if data.active_project_id.trim().is_empty() || !data.projects.iter().any(|p| p.id == data.active_project_id) {
+    if data.active_project_id.trim().is_empty()
+        || !data.projects.iter().any(|p| p.id == data.active_project_id)
+    {
         data.active_project_id = data.projects[0].id.clone();
     }
     db.replace_state(data)?;
@@ -245,14 +281,17 @@ async fn get_projection(
         .iter()
         .find(|p| p.id == data.active_project_id)
         .unwrap_or_else(|| &data.projects[0]);
-    
+
     // Check read permission for the view
-    if !crate::permissions::can_read(&db, &project.id, Some(&user)).map_err(|_| ApiError::internal())? {
+    if !crate::permissions::can_read(&db, &project.id, Some(&user))
+        .map_err(|_| ApiError::internal())?
+    {
         return Err(ApiError::forbidden("insufficient permissions"));
     }
-    
-    let projection = crate::projection::project(&project.config.manifest, &project.entities, &view_id)
-        .ok_or_else(|| ApiError::not_found("view not found"))?;
+
+    let projection =
+        crate::projection::project(&project.config.manifest, &project.entities, &view_id)
+            .ok_or_else(|| ApiError::not_found("view not found"))?;
     tracing::info!(view_id = %view_id, "GET /projection/:view_id");
     Ok(Json(projection))
 }
@@ -265,8 +304,12 @@ fn bootstrap_admin_if_needed(db: &Db) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let email = std::env::var("KEEL_BOOTSTRAP_ADMIN_EMAIL").ok().filter(|s| !s.trim().is_empty());
-    let password = std::env::var("KEEL_BOOTSTRAP_ADMIN_PASSWORD").ok().filter(|s| !s.trim().is_empty());
+    let email = std::env::var("KEEL_BOOTSTRAP_ADMIN_EMAIL")
+        .ok()
+        .filter(|s| !s.trim().is_empty());
+    let password = std::env::var("KEEL_BOOTSTRAP_ADMIN_PASSWORD")
+        .ok()
+        .filter(|s| !s.trim().is_empty());
 
     let (email, password) = match (email, password) {
         (Some(e), Some(p)) => (e.trim().to_lowercase(), p),

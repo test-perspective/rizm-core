@@ -15,7 +15,14 @@ impl Db {
         meta_json: Option<&str>,
         created_at: i64,
     ) -> anyhow::Result<()> {
-        self.insert_audit_log_with_activity(actor_user_id, action, target_user_id, meta_json, created_at, false)
+        self.insert_audit_log_with_activity(
+            actor_user_id,
+            action,
+            target_user_id,
+            meta_json,
+            created_at,
+            false,
+        )
     }
 
     pub fn insert_audit_log_with_activity(
@@ -38,7 +45,14 @@ impl Db {
         Ok(())
     }
 
-    pub fn list_audit_logs(&self, limit: i64, offset: i64, since: Option<i64>, until: Option<i64>, is_activity: Option<bool>) -> anyhow::Result<Vec<AuditLogRecord>> {
+    pub fn list_audit_logs(
+        &self,
+        limit: i64,
+        offset: i64,
+        since: Option<i64>,
+        until: Option<i64>,
+        is_activity: Option<bool>,
+    ) -> anyhow::Result<Vec<AuditLogRecord>> {
         let conn = self.pool.get().context("get sqlite conn")?;
 
         let mut out = Vec::new();
@@ -61,21 +75,20 @@ impl Db {
                      LIMIT ?3 OFFSET ?4",
                     activity_filter
                 );
-                let mut stmt = conn
-                    .prepare(&query)
-                    .context("prepare list audit logs")?;
-                let rows = stmt.query_map(params![s_val, u_val, limit, offset], |row| {
-                    Ok(AuditLogRecord {
-                        id: row.get(0)?,
-                        actor_user_id: row.get(1)?,
-                        action: row.get(2)?,
-                        target_user_id: row.get(3)?,
-                        meta_json: row.get(4)?,
-                        created_at: row.get(5)?,
-                        is_activity: row.get::<_, i64>(6)? != 0,
+                let mut stmt = conn.prepare(&query).context("prepare list audit logs")?;
+                let rows = stmt
+                    .query_map(params![s_val, u_val, limit, offset], |row| {
+                        Ok(AuditLogRecord {
+                            id: row.get(0)?,
+                            actor_user_id: row.get(1)?,
+                            action: row.get(2)?,
+                            target_user_id: row.get(3)?,
+                            meta_json: row.get(4)?,
+                            created_at: row.get(5)?,
+                            is_activity: row.get::<_, i64>(6)? != 0,
+                        })
                     })
-                })
-                .context("query list audit logs")?;
+                    .context("query list audit logs")?;
                 for r in rows {
                     out.push(r?);
                 }
@@ -90,21 +103,20 @@ impl Db {
                      LIMIT ?2 OFFSET ?3",
                     activity_filter
                 );
-                let mut stmt = conn
-                    .prepare(&query)
-                    .context("prepare list audit logs")?;
-                let rows = stmt.query_map(params![s_val, limit, offset], |row| {
-                    Ok(AuditLogRecord {
-                        id: row.get(0)?,
-                        actor_user_id: row.get(1)?,
-                        action: row.get(2)?,
-                        target_user_id: row.get(3)?,
-                        meta_json: row.get(4)?,
-                        created_at: row.get(5)?,
-                        is_activity: row.get::<_, i64>(6)? != 0,
+                let mut stmt = conn.prepare(&query).context("prepare list audit logs")?;
+                let rows = stmt
+                    .query_map(params![s_val, limit, offset], |row| {
+                        Ok(AuditLogRecord {
+                            id: row.get(0)?,
+                            actor_user_id: row.get(1)?,
+                            action: row.get(2)?,
+                            target_user_id: row.get(3)?,
+                            meta_json: row.get(4)?,
+                            created_at: row.get(5)?,
+                            is_activity: row.get::<_, i64>(6)? != 0,
+                        })
                     })
-                })
-                .context("query list audit logs")?;
+                    .context("query list audit logs")?;
                 for r in rows {
                     out.push(r?);
                 }
@@ -119,21 +131,20 @@ impl Db {
                      LIMIT ?2 OFFSET ?3",
                     activity_filter
                 );
-                let mut stmt = conn
-                    .prepare(&query)
-                    .context("prepare list audit logs")?;
-                let rows = stmt.query_map(params![u_val, limit, offset], |row| {
-                    Ok(AuditLogRecord {
-                        id: row.get(0)?,
-                        actor_user_id: row.get(1)?,
-                        action: row.get(2)?,
-                        target_user_id: row.get(3)?,
-                        meta_json: row.get(4)?,
-                        created_at: row.get(5)?,
-                        is_activity: row.get::<_, i64>(6)? != 0,
+                let mut stmt = conn.prepare(&query).context("prepare list audit logs")?;
+                let rows = stmt
+                    .query_map(params![u_val, limit, offset], |row| {
+                        Ok(AuditLogRecord {
+                            id: row.get(0)?,
+                            actor_user_id: row.get(1)?,
+                            action: row.get(2)?,
+                            target_user_id: row.get(3)?,
+                            meta_json: row.get(4)?,
+                            created_at: row.get(5)?,
+                            is_activity: row.get::<_, i64>(6)? != 0,
+                        })
                     })
-                })
-                .context("query list audit logs")?;
+                    .context("query list audit logs")?;
                 for r in rows {
                     out.push(r?);
                 }
@@ -154,21 +165,20 @@ impl Db {
                         activity_filter.trim_start_matches(" AND ")
                     )
                 };
-                let mut stmt = conn
-                    .prepare(&query)
-                    .context("prepare list audit logs")?;
-                let rows = stmt.query_map(params![limit, offset], |row| {
-                    Ok(AuditLogRecord {
-                        id: row.get(0)?,
-                        actor_user_id: row.get(1)?,
-                        action: row.get(2)?,
-                        target_user_id: row.get(3)?,
-                        meta_json: row.get(4)?,
-                        created_at: row.get(5)?,
-                        is_activity: row.get::<_, i64>(6)? != 0,
+                let mut stmt = conn.prepare(&query).context("prepare list audit logs")?;
+                let rows = stmt
+                    .query_map(params![limit, offset], |row| {
+                        Ok(AuditLogRecord {
+                            id: row.get(0)?,
+                            actor_user_id: row.get(1)?,
+                            action: row.get(2)?,
+                            target_user_id: row.get(3)?,
+                            meta_json: row.get(4)?,
+                            created_at: row.get(5)?,
+                            is_activity: row.get::<_, i64>(6)? != 0,
+                        })
                     })
-                })
-                .context("query list audit logs")?;
+                    .context("query list audit logs")?;
                 for r in rows {
                     out.push(r?);
                 }
@@ -182,12 +192,12 @@ impl Db {
         let conn = self.pool.get().context("get sqlite conn")?;
         // 2 weeks = 14 days = 1,209,600,000 milliseconds
         let two_weeks_ago = crate::time::now_ms() - 1_209_600_000;
-        let deleted = conn.execute(
-            "DELETE FROM audit_logs WHERE is_activity = 1 AND created_at < ?1",
-            params![two_weeks_ago],
-        )
-        .context("delete old activity logs")?;
+        let deleted = conn
+            .execute(
+                "DELETE FROM audit_logs WHERE is_activity = 1 AND created_at < ?1",
+                params![two_weeks_ago],
+            )
+            .context("delete old activity logs")?;
         Ok(deleted)
     }
 }
-

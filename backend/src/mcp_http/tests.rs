@@ -57,6 +57,16 @@ fn mk_user(role: Role) -> crate::auth::AuthedUser {
     }
 }
 
+fn tool_content_text(result: &Value) -> &str {
+    result
+        .get("content")
+        .and_then(|c| c.as_array())
+        .and_then(|a| a.first())
+        .and_then(|c| c.get("text"))
+        .and_then(|t| t.as_str())
+        .expect("content text")
+}
+
 #[test]
 fn markdown_to_blocknote_doc_converts_basic_blocks() {
     let doc = crate::mcp::markdown::markdown_to_blocknote_doc("# H1\n## H2\n- item\nplain")
@@ -72,8 +82,14 @@ fn markdown_to_blocknote_doc_converts_basic_blocks() {
             .and_then(Value::as_i64),
         Some(1)
     );
-    assert_eq!(arr[2].get("type").and_then(Value::as_str), Some("bulletListItem"));
-    assert_eq!(arr[3].get("type").and_then(Value::as_str), Some("paragraph"));
+    assert_eq!(
+        arr[2].get("type").and_then(Value::as_str),
+        Some("bulletListItem")
+    );
+    assert_eq!(
+        arr[3].get("type").and_then(Value::as_str),
+        Some("paragraph")
+    );
 }
 
 #[test]
@@ -86,20 +102,42 @@ fn markdown_to_blocknote_doc_converts_inline_bold_and_italic() {
     let arr = blocks.as_array().expect("array");
     assert_eq!(arr.len(), 2);
 
-    let content0 = arr[0].get("content").and_then(Value::as_array).expect("content");
+    let content0 = arr[0]
+        .get("content")
+        .and_then(Value::as_array)
+        .expect("content");
     assert!(content0.len() >= 3);
     let bold_segments: Vec<_> = content0
         .iter()
-        .filter(|c| c.get("styles").and_then(|s| s.get("bold")).and_then(Value::as_bool) == Some(true))
+        .filter(|c| {
+            c.get("styles")
+                .and_then(|s| s.get("bold"))
+                .and_then(Value::as_bool)
+                == Some(true)
+        })
         .collect();
     assert_eq!(bold_segments.len(), 2);
-    assert_eq!(bold_segments[0].get("text").and_then(Value::as_str), Some("REQ"));
-    assert_eq!(bold_segments[1].get("text").and_then(Value::as_str), Some("28"));
+    assert_eq!(
+        bold_segments[0].get("text").and_then(Value::as_str),
+        Some("REQ")
+    );
+    assert_eq!(
+        bold_segments[1].get("text").and_then(Value::as_str),
+        Some("28")
+    );
 
-    let content1 = arr[1].get("content").and_then(Value::as_array).expect("content");
+    let content1 = arr[1]
+        .get("content")
+        .and_then(Value::as_array)
+        .expect("content");
     let italic_segments: Vec<_> = content1
         .iter()
-        .filter(|c| c.get("styles").and_then(|s| s.get("italic")).and_then(Value::as_bool) == Some(true))
+        .filter(|c| {
+            c.get("styles")
+                .and_then(|s| s.get("italic"))
+                .and_then(Value::as_bool)
+                == Some(true)
+        })
         .collect();
     assert_eq!(italic_segments.len(), 1);
     assert_eq!(
@@ -117,14 +155,28 @@ fn markdown_to_blocknote_doc_converts_bullet_with_bold() {
     let blocks: Value = serde_json::from_str(&doc).expect("parse doc json");
     let arr = blocks.as_array().expect("array");
     assert_eq!(arr.len(), 1);
-    assert_eq!(arr[0].get("type").and_then(Value::as_str), Some("bulletListItem"));
-    let content = arr[0].get("content").and_then(Value::as_array).expect("content");
+    assert_eq!(
+        arr[0].get("type").and_then(Value::as_str),
+        Some("bulletListItem")
+    );
+    let content = arr[0]
+        .get("content")
+        .and_then(Value::as_array)
+        .expect("content");
     let bold_segments: Vec<_> = content
         .iter()
-        .filter(|c| c.get("styles").and_then(|s| s.get("bold")).and_then(Value::as_bool) == Some(true))
+        .filter(|c| {
+            c.get("styles")
+                .and_then(|s| s.get("bold"))
+                .and_then(Value::as_bool)
+                == Some(true)
+        })
         .collect();
     assert_eq!(bold_segments.len(), 1);
-    assert_eq!(bold_segments[0].get("text").and_then(Value::as_str), Some("create_wiki_page"));
+    assert_eq!(
+        bold_segments[0].get("text").and_then(Value::as_str),
+        Some("create_wiki_page")
+    );
 }
 
 #[test]
@@ -150,7 +202,8 @@ fn add_comment_for_task_requires_write_permission() {
         "taskKey": "P1A-1",
         "text": "hello"
     });
-    let err = crate::mcp::tools::add_comment_for_target(&state, &viewer, &args).expect_err("should fail");
+    let err =
+        crate::mcp::tools::add_comment_for_target(&state, &viewer, &args).expect_err("should fail");
     assert!(format!("{err:#}").contains("insufficient permissions"));
 }
 
@@ -177,11 +230,12 @@ fn add_comment_for_task_appends_comment() {
         "taskKey": "P1A-1",
         "text": "## Plan\n- step1"
     });
-    let msg = crate::mcp::tools::add_comment_for_target(&state, &admin, &args).expect("add comment");
+    let msg =
+        crate::mcp::tools::add_comment_for_target(&state, &admin, &args).expect("add comment");
     assert!(msg.contains("comment added"));
 
-    let props =
-        crate::mcp::tools::read_entity_by_task_key_for_user(&state, &admin, "P1A-1").expect("read entity");
+    let props = crate::mcp::tools::read_entity_by_task_key_for_user(&state, &admin, "P1A-1")
+        .expect("read entity");
     let comments = props
         .get("comments")
         .and_then(Value::as_array)
@@ -212,17 +266,273 @@ fn list_tasks_returns_tasks() {
         )
         .expect("create task");
     let admin = mk_user(Role::Admin);
-    let result = crate::mcp::task_wiki::list_tasks_for_user(
-        &state,
-        &admin,
-        Some("P1A"),
-        None,
-        10,
-    )
-    .expect("list_tasks");
+    let result = crate::mcp::task_wiki::list_tasks_for_user(&state, &admin, Some("P1A"), None, 10)
+        .expect("list_tasks");
     let v: Value = serde_json::from_str(&result).expect("parse");
     let tasks = v.get("tasks").and_then(|t| t.as_array()).expect("tasks");
     assert!(!tasks.is_empty());
+}
+
+#[tokio::test]
+async fn create_task_tool_creates_task() {
+    let (_dir, state) = mk_state_with_project("p1", "P1A");
+    let admin = mk_user(Role::Admin);
+    let params = serde_json::json!({
+        "name": "create_task",
+        "arguments": {
+            "projectKey": "P1A",
+            "title": "New MCP Task",
+            "status": "Todo",
+            "priority": "High",
+            "labels": ["mcp", "REQ-299"],
+            "description": "## Details\n- created from MCP"
+        }
+    });
+
+    let result = crate::mcp::tools::tools_call(&state, &admin, params)
+        .await
+        .expect("tools_call");
+    let v: Value = serde_json::from_str(tool_content_text(&result)).expect("parse");
+    assert_eq!(v.get("taskKey").and_then(Value::as_str), Some("P1A-1"));
+
+    let entities = state
+        .db
+        .read()
+        .await
+        .list_entities_for_project("p1")
+        .expect("list entities");
+    let props = &entities
+        .iter()
+        .find(|e| e.properties.get("taskKey").and_then(Value::as_str) == Some("P1A-1"))
+        .expect("task")
+        .properties;
+    assert_eq!(
+        props.get("title").and_then(Value::as_str),
+        Some("New MCP Task")
+    );
+    assert_eq!(props.get("createdBy").and_then(Value::as_str), Some("u1"));
+    assert!(props.get("Description").and_then(Value::as_str).is_some());
+}
+
+#[tokio::test]
+async fn create_task_tool_requires_write_permission() {
+    let (_dir, state) = mk_state_with_project("p1", "P1A");
+    let viewer = mk_user(Role::Viewer);
+    let params = serde_json::json!({
+        "name": "create_task",
+        "arguments": {
+            "projectKey": "P1A",
+            "title": "Denied Task"
+        }
+    });
+
+    let err = crate::mcp::tools::tools_call(&state, &viewer, params)
+        .await
+        .expect_err("viewer should fail");
+    assert!(format!("{err:#}").contains("insufficient permissions"));
+}
+
+#[tokio::test]
+async fn update_task_tool_updates_fields_and_ignores_actor_patch() {
+    let (_dir, state) = mk_state_with_project("p1", "P1A");
+    state
+        .db
+        .read()
+        .await
+        .create_entity_for_project(
+            "p1",
+            Some("t1"),
+            "task",
+            serde_json::json!({"title": "Task 1", "status": "Todo", "createdBy": "owner"})
+                .as_object()
+                .cloned()
+                .unwrap_or_default(),
+        )
+        .expect("create task");
+    let admin = mk_user(Role::Admin);
+    let params = serde_json::json!({
+        "name": "update_task",
+        "arguments": {
+            "taskKey": "P1A-1",
+            "status": "In Progress",
+            "labels": ["mcp"],
+            "patch": {
+                "createdBy": "attacker",
+                "updatedBy": "attacker",
+                "priority": "High"
+            }
+        }
+    });
+
+    let result = crate::mcp::tools::tools_call(&state, &admin, params)
+        .await
+        .expect("tools_call");
+    let v: Value = serde_json::from_str(tool_content_text(&result)).expect("parse");
+    let changed = v
+        .get("changedFields")
+        .and_then(Value::as_array)
+        .expect("changed fields");
+    assert!(changed.iter().any(|f| f.as_str() == Some("status")));
+    assert!(changed.iter().any(|f| f.as_str() == Some("labels")));
+
+    let entities = state
+        .db
+        .read()
+        .await
+        .list_entities_for_project("p1")
+        .expect("list entities");
+    let props = &entities
+        .iter()
+        .find(|e| e.properties.get("taskKey").and_then(Value::as_str) == Some("P1A-1"))
+        .expect("task")
+        .properties;
+    assert_eq!(
+        props.get("status").and_then(Value::as_str),
+        Some("In Progress")
+    );
+    assert_eq!(props.get("priority").and_then(Value::as_str), Some("High"));
+    assert_eq!(
+        props.get("createdBy").and_then(Value::as_str),
+        Some("owner")
+    );
+    assert_eq!(props.get("updatedBy").and_then(Value::as_str), Some("u1"));
+    let labels = props
+        .get("labels")
+        .and_then(Value::as_array)
+        .expect("labels");
+    assert_eq!(labels.first().and_then(Value::as_str), Some("mcp"));
+}
+
+#[tokio::test]
+async fn project_manifest_tools_list_dry_run_and_apply() {
+    let (_dir, state) = mk_state_with_project("p1", "P1A");
+    let admin = mk_user(Role::Admin);
+
+    let list = crate::mcp::tools::tools_call(
+        &state,
+        &admin,
+        serde_json::json!({ "name": "list_projects", "arguments": {} }),
+    )
+    .await
+    .expect("list projects");
+    let list_v: Value = serde_json::from_str(tool_content_text(&list)).expect("parse list");
+    let projects = list_v
+        .get("projects")
+        .and_then(Value::as_array)
+        .expect("projects");
+    assert!(projects
+        .iter()
+        .any(|p| { p.get("projectKey").and_then(Value::as_str) == Some("P1A") }));
+
+    let manifest = crate::mcp::tools::tools_call(
+        &state,
+        &admin,
+        serde_json::json!({
+            "name": "get_project_manifest",
+            "arguments": { "projectKey": "P1A" }
+        }),
+    )
+    .await
+    .expect("get manifest");
+    let manifest_v: Value =
+        serde_json::from_str(tool_content_text(&manifest)).expect("parse manifest");
+    let etag = manifest_v
+        .get("etag")
+        .and_then(Value::as_str)
+        .expect("etag")
+        .to_string();
+    let mut next_manifest = default_manifest();
+    next_manifest.name = "MCP Applied".to_string();
+
+    let dry_run = crate::mcp::tools::tools_call(
+        &state,
+        &admin,
+        serde_json::json!({
+            "name": "apply_manifest",
+            "arguments": {
+                "projectKey": "P1A",
+                "manifest": next_manifest,
+                "dryRun": true
+            }
+        }),
+    )
+    .await
+    .expect("dry run");
+    let dry_v: Value = serde_json::from_str(tool_content_text(&dry_run)).expect("parse dry run");
+    assert_eq!(dry_v.get("dryRun").and_then(Value::as_bool), Some(true));
+    let next_manifest = dry_v.get("manifest").cloned().expect("normalized manifest");
+
+    let applied = crate::mcp::tools::tools_call(
+        &state,
+        &admin,
+        serde_json::json!({
+            "name": "apply_manifest",
+            "arguments": {
+                "projectKey": "P1A",
+                "manifest": next_manifest,
+                "dryRun": false,
+                "ifMatch": etag,
+                "message": "Apply from MCP test"
+            }
+        }),
+    )
+    .await
+    .expect("apply manifest");
+    let applied_v: Value =
+        serde_json::from_str(tool_content_text(&applied)).expect("parse applied");
+    assert_eq!(
+        applied_v.get("dryRun").and_then(Value::as_bool),
+        Some(false)
+    );
+
+    let (stored, _) = state
+        .db
+        .read()
+        .await
+        .get_manifest_with_etag("p1")
+        .expect("get stored manifest")
+        .expect("manifest exists");
+    assert_eq!(stored.name, "MCP Applied");
+}
+
+#[tokio::test]
+async fn apply_manifest_requires_write_permission() {
+    let (_dir, state) = mk_state_with_project("p1", "P1A");
+    let viewer = mk_user(Role::Viewer);
+    let params = serde_json::json!({
+        "name": "apply_manifest",
+        "arguments": {
+            "projectKey": "P1A",
+            "manifest": default_manifest(),
+            "dryRun": true
+        }
+    });
+
+    let err = crate::mcp::tools::tools_call(&state, &viewer, params)
+        .await
+        .expect_err("viewer should fail");
+    assert!(format!("{err:#}").contains("insufficient permissions"));
+}
+
+#[tokio::test]
+async fn apply_manifest_rejects_stale_if_match() {
+    let (_dir, state) = mk_state_with_project("p1", "P1A");
+    let admin = mk_user(Role::Admin);
+    let params = serde_json::json!({
+        "name": "apply_manifest",
+        "arguments": {
+            "projectKey": "P1A",
+            "manifest": default_manifest(),
+            "dryRun": false,
+            "ifMatch": "stale-etag"
+        }
+    });
+
+    let err = crate::mcp::tools::tools_call(&state, &admin, params)
+        .await
+        .expect_err("stale etag should fail");
+    let msg = format!("{err:#}");
+    assert!(msg.contains("conflict") || msg.contains("etag"));
 }
 
 #[tokio::test]
@@ -237,13 +547,9 @@ async fn create_wiki_page_tool_creates_page() {
             "content": "# Results\n\n- Item 1"
         }
     });
-    let result = crate::mcp::tools::tools_call(
-        &state,
-        &admin,
-        params,
-    )
-    .await
-    .expect("tools_call");
+    let result = crate::mcp::tools::tools_call(&state, &admin, params)
+        .await
+        .expect("tools_call");
     let content = result
         .get("content")
         .and_then(|c| c.as_array())
@@ -252,7 +558,10 @@ async fn create_wiki_page_tool_creates_page() {
         .and_then(|t| t.as_str())
         .expect("content text");
     let v: Value = serde_json::from_str(content).expect("parse");
-    assert_eq!(v.get("title").and_then(|t| t.as_str()), Some("AI Investigation"));
+    assert_eq!(
+        v.get("title").and_then(|t| t.as_str()),
+        Some("AI Investigation")
+    );
     assert!(v.get("pageId").and_then(|i| i.as_str()).is_some());
 
     let entities = state
@@ -261,7 +570,10 @@ async fn create_wiki_page_tool_creates_page() {
         .await
         .list_entities_for_project("p1")
         .expect("list");
-    let wiki: Vec<_> = entities.into_iter().filter(|e| e.entity_id == "wikiPage").collect();
+    let wiki: Vec<_> = entities
+        .into_iter()
+        .filter(|e| e.entity_id == "wikiPage")
+        .collect();
     assert_eq!(wiki.len(), 1);
 }
 
@@ -283,7 +595,9 @@ async fn post_mcp_initialize_authenticates_without_blocking_read_panic() {
     let mut headers = HeaderMap::new();
     headers.insert(
         header::AUTHORIZATION,
-        format!("Bearer {token}").parse().expect("authorization header"),
+        format!("Bearer {token}")
+            .parse()
+            .expect("authorization header"),
     );
 
     let response = super::post_mcp(

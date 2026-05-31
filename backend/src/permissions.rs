@@ -1,7 +1,7 @@
-use anyhow::Context;
 use crate::auth::{AuthedUser, Role};
 use crate::db::Db;
 use crate::models::Permission;
+use anyhow::Context;
 
 pub fn check_permission(
     db: &Db,
@@ -29,7 +29,8 @@ pub fn check_permission(
     // Get user info
     let user_id = user.map(|u| u.user_id.as_str());
     let user_groups = if let Some(user) = user {
-        db.get_user_groups(&user.user_id).context("get user groups")?
+        db.get_user_groups(&user.user_id)
+            .context("get user groups")?
     } else {
         vec![]
     };
@@ -84,20 +85,12 @@ pub fn check_permission(
     Ok(Permission::None)
 }
 
-pub fn can_read(
-    db: &Db,
-    project_id: &str,
-    user: Option<&AuthedUser>,
-) -> anyhow::Result<bool> {
+pub fn can_read(db: &Db, project_id: &str, user: Option<&AuthedUser>) -> anyhow::Result<bool> {
     let perm = check_permission(db, project_id, user, Action::Read)?;
     Ok(perm != Permission::None)
 }
 
-pub fn can_write(
-    db: &Db,
-    project_id: &str,
-    user: Option<&AuthedUser>,
-) -> anyhow::Result<bool> {
+pub fn can_write(db: &Db, project_id: &str, user: Option<&AuthedUser>) -> anyhow::Result<bool> {
     let perm = check_permission(db, project_id, user, Action::Write)?;
     Ok(perm == Permission::Write)
 }
@@ -136,8 +129,8 @@ mod tests {
     use super::*;
     use crate::auth::{AuthedUser, Role};
     use crate::db::Db;
-    use crate::models::{PolicyDefaults, Project, ProjectConfig, ProjectPolicy};
     use crate::defaults::default_manifest;
+    use crate::models::{PolicyDefaults, Project, ProjectConfig, ProjectPolicy};
     use std::collections::HashMap;
 
     fn tmp_db() -> (tempfile::TempDir, Db) {
@@ -160,7 +153,10 @@ mod tests {
     #[test]
     fn test_resolve_group_permissions() {
         assert_eq!(resolve_group_permissions(&[]), None);
-        assert_eq!(resolve_group_permissions(&[Permission::Read]), Some(Permission::Read));
+        assert_eq!(
+            resolve_group_permissions(&[Permission::Read]),
+            Some(Permission::Read)
+        );
         assert_eq!(
             resolve_group_permissions(&[Permission::Read, Permission::Write]),
             Some(Permission::Write)
@@ -175,7 +171,7 @@ mod tests {
     fn test_admin_bypasses_policy_when_no_policy_exists() {
         let (_dir, db) = tmp_db();
         let project_id = "test-project";
-        
+
         // Create admin user
         let admin_user = AuthedUser {
             user_id: "admin-1".to_string(),
@@ -188,8 +184,9 @@ mod tests {
         // Admin should have write permission even when no policy exists
         let perm_read = check_permission(&db, project_id, Some(&admin_user), Action::Read).unwrap();
         assert_eq!(perm_read, Permission::Write);
-        
-        let perm_write = check_permission(&db, project_id, Some(&admin_user), Action::Write).unwrap();
+
+        let perm_write =
+            check_permission(&db, project_id, Some(&admin_user), Action::Write).unwrap();
         assert_eq!(perm_write, Permission::Write);
 
         // can_read and can_write should both return true
@@ -201,7 +198,7 @@ mod tests {
     fn test_admin_bypasses_explicit_deny() {
         let (_dir, db) = tmp_db();
         let project_id = "test-project";
-        
+
         // Create project first (required for foreign key constraint)
         let project = Project {
             id: project_id.to_string(),
@@ -216,7 +213,7 @@ mod tests {
             },
         };
         db.replace_project_state(project).unwrap();
-        
+
         // Create admin user
         let admin_user = AuthedUser {
             user_id: "admin-1".to_string(),
@@ -241,8 +238,9 @@ mod tests {
         // Admin should still have write permission despite explicit deny
         let perm_read = check_permission(&db, project_id, Some(&admin_user), Action::Read).unwrap();
         assert_eq!(perm_read, Permission::Write);
-        
-        let perm_write = check_permission(&db, project_id, Some(&admin_user), Action::Write).unwrap();
+
+        let perm_write =
+            check_permission(&db, project_id, Some(&admin_user), Action::Write).unwrap();
         assert_eq!(perm_write, Permission::Write);
 
         // can_read and can_write should both return true

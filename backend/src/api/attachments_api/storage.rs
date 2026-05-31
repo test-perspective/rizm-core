@@ -15,11 +15,17 @@ pub(crate) fn attachments_root_from_db_path(db_path: &str) -> PathBuf {
 }
 
 pub(super) fn shard_dir(attachment_id: &str) -> String {
-    attachment_id.chars().take(2).collect::<String>().to_lowercase()
+    attachment_id
+        .chars()
+        .take(2)
+        .collect::<String>()
+        .to_lowercase()
 }
 
 pub(crate) fn attachment_path(root: &FsPath, project_id: &str, attachment_id: &str) -> PathBuf {
-    root.join(project_id).join(shard_dir(attachment_id)).join(attachment_id)
+    root.join(project_id)
+        .join(shard_dir(attachment_id))
+        .join(attachment_id)
 }
 
 /// Remove all attachment files for a project from disk. Best-effort; returns Ok if dir does not exist.

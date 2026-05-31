@@ -2,11 +2,15 @@ use anyhow::Context;
 use rusqlite::{params, OptionalExtension, TransactionBehavior};
 use uuid::Uuid;
 
-use crate::models::Entity;
 use super::{Db, EntityWriteError};
+use crate::models::Entity;
 
 impl Db {
-    pub fn get_entity_for_project(&self, project_id: &str, entity_pk: &str) -> anyhow::Result<Option<Entity>> {
+    pub fn get_entity_for_project(
+        &self,
+        project_id: &str,
+        entity_pk: &str,
+    ) -> anyhow::Result<Option<Entity>> {
         let conn = self.pool.get().context("get sqlite conn")?;
         let row: Option<(String, String, i64, i64, String)> = conn
             .query_row(
@@ -89,15 +93,19 @@ impl Db {
                 )
                 .context("select next_task_seq")?;
 
-            let (task_key, bump_to) = if let Some(serde_json::Value::String(ref provided)) = properties.get("taskKey") {
-                let provided = provided.trim();
-                if provided.is_empty() {
-                    (format!("{key}-{next_seq}"), next_seq + 1)
-                } else if let Some((prefix, num_str)) = provided.rsplit_once('-') {
-                    if prefix.to_uppercase() == key.to_uppercase() {
-                        if let Ok(n) = num_str.parse::<i64>() {
-                            let bump_to = (next_seq).max(n + 1);
-                            (provided.to_string(), bump_to)
+            let (task_key, bump_to) =
+                if let Some(serde_json::Value::String(ref provided)) = properties.get("taskKey") {
+                    let provided = provided.trim();
+                    if provided.is_empty() {
+                        (format!("{key}-{next_seq}"), next_seq + 1)
+                    } else if let Some((prefix, num_str)) = provided.rsplit_once('-') {
+                        if prefix.to_uppercase() == key.to_uppercase() {
+                            if let Ok(n) = num_str.parse::<i64>() {
+                                let bump_to = (next_seq).max(n + 1);
+                                (provided.to_string(), bump_to)
+                            } else {
+                                (format!("{key}-{next_seq}"), next_seq + 1)
+                            }
                         } else {
                             (format!("{key}-{next_seq}"), next_seq + 1)
                         }
@@ -106,10 +114,7 @@ impl Db {
                     }
                 } else {
                     (format!("{key}-{next_seq}"), next_seq + 1)
-                }
-            } else {
-                (format!("{key}-{next_seq}"), next_seq + 1)
-            };
+                };
 
             tx.execute(
                 "UPDATE project_counters SET next_task_seq = ?2 WHERE project_id = ?1",
@@ -185,9 +190,7 @@ impl Db {
         };
 
         if current_updated_at != expected_updated_at {
-            return Err(EntityWriteError::Conflict {
-                current_updated_at,
-            });
+            return Err(EntityWriteError::Conflict { current_updated_at });
         }
 
         // Prevent clients from changing server-managed keys.
@@ -370,9 +373,7 @@ impl Db {
             return Err(EntityWriteError::NotFound);
         };
         if current_updated_at != expected_updated_at {
-            return Err(EntityWriteError::Conflict {
-                current_updated_at,
-            });
+            return Err(EntityWriteError::Conflict { current_updated_at });
         }
 
         tx.execute(
@@ -418,4 +419,3 @@ fn sqlite_err_to_entity_write_error(e: rusqlite::Error) -> EntityWriteError {
         _ => EntityWriteError::ServiceUnavailable,
     }
 }
-

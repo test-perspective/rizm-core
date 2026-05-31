@@ -3,8 +3,22 @@ use uuid::Uuid;
 
 pub(super) fn generate_task_title<R: rand::Rng>(rng: &mut R) -> String {
     let verbs = vec![
-        "Implement", "Design", "Refactor", "Fix", "Optimize", "Review", "Test", "Document", "Deploy", "Configure",
-        "Update", "Create", "Add", "Remove", "Improve", "Analyze",
+        "Implement",
+        "Design",
+        "Refactor",
+        "Fix",
+        "Optimize",
+        "Review",
+        "Test",
+        "Document",
+        "Deploy",
+        "Configure",
+        "Update",
+        "Create",
+        "Add",
+        "Remove",
+        "Improve",
+        "Analyze",
     ];
     let nouns = vec![
         "user authentication",
@@ -48,7 +62,11 @@ pub(super) fn generate_task_title<R: rand::Rng>(rng: &mut R) -> String {
     format!("{} {}{}", verb, noun, context)
 }
 
-pub(super) fn generate_task_description<R: rand::Rng>(rng: &mut R, project_key: &str, task_num: usize) -> String {
+pub(super) fn generate_task_description<R: rand::Rng>(
+    rng: &mut R,
+    project_key: &str,
+    task_num: usize,
+) -> String {
     let task_key = format!("{}-{}", project_key, task_num);
     let paragraphs = vec![
         "This task involves implementing the requested feature.".to_string(),
@@ -75,7 +93,11 @@ pub(super) fn generate_task_description<R: rand::Rng>(rng: &mut R, project_key: 
     }
 
     if rng.gen_bool(0.7) {
-        let items = vec!["Check existing implementation", "Write unit tests", "Update documentation"];
+        let items = vec![
+            "Check existing implementation",
+            "Write unit tests",
+            "Update documentation",
+        ];
         for item in items.iter().take(rng.gen_range(2..=3)) {
             blocks.push(json!({
                 "id": Uuid::new_v4().to_string(),
@@ -120,7 +142,11 @@ pub(super) fn generate_wiki_title<R: rand::Rng>(rng: &mut R) -> String {
     format!("{}: {}", prefix, topic)
 }
 
-pub(super) fn generate_wiki_doc<R: rand::Rng>(rng: &mut R, project_key: &str, max_task_seq: usize) -> String {
+pub(super) fn generate_wiki_doc<R: rand::Rng>(
+    rng: &mut R,
+    project_key: &str,
+    max_task_seq: usize,
+) -> String {
     let mut blocks = Vec::new();
     blocks.push(json!({
         "id": Uuid::new_v4().to_string(),
@@ -192,7 +218,11 @@ pub(super) fn generate_wiki_doc<R: rand::Rng>(rng: &mut R, project_key: &str, ma
             "content": [{"type": "text", "text": "Next Steps"}],
             "children": []
         }));
-        let steps = vec!["Validate with QA", "Prepare rollout checklist", "Update project wiki"];
+        let steps = vec![
+            "Validate with QA",
+            "Prepare rollout checklist",
+            "Update project wiki",
+        ];
         for step in steps.iter().take(rng.gen_range(1..=2)) {
             blocks.push(json!({
                 "id": Uuid::new_v4().to_string(),

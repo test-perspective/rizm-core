@@ -1,10 +1,12 @@
 //! Shared task and wiki tools for MCP and AI Tools.
 
 mod project;
+mod task_write;
 mod tasks;
 mod wiki;
 
 pub use project::resolve_project;
+pub use task_write::{create_task_for_user, update_task_for_user};
 pub use tasks::{list_tasks_for_user, search_tasks_for_user};
 pub use wiki::{create_wiki_page_for_user, get_wiki_page_for_user, search_wiki_for_user};
 
@@ -77,9 +79,15 @@ mod tests {
 
         let out = list_tasks_for_user(&state, &user, Some("P1A"), None, 10).expect("list_tasks");
         let v: serde_json::Value = serde_json::from_str(&out).expect("parse");
-        let total_count = v.get("totalCount").and_then(|c| c.as_i64()).expect("totalCount");
+        let total_count = v
+            .get("totalCount")
+            .and_then(|c| c.as_i64())
+            .expect("totalCount");
         assert_eq!(total_count, 1);
-        let tasks = v.get("tasks").and_then(|t| t.as_array()).expect("tasks array");
+        let tasks = v
+            .get("tasks")
+            .and_then(|t| t.as_array())
+            .expect("tasks array");
         assert_eq!(tasks.len(), 1);
         assert_eq!(
             tasks[0].get("taskKey").and_then(|k| k.as_str()),
@@ -108,9 +116,15 @@ mod tests {
         let user = admin_user();
         let out = list_tasks_for_user(&state, &user, Some("P1A"), None, 2).expect("list_tasks");
         let v: serde_json::Value = serde_json::from_str(&out).expect("parse");
-        let total_count = v.get("totalCount").and_then(|c| c.as_i64()).expect("totalCount");
+        let total_count = v
+            .get("totalCount")
+            .and_then(|c| c.as_i64())
+            .expect("totalCount");
         assert_eq!(total_count, 5);
-        let tasks = v.get("tasks").and_then(|t| t.as_array()).expect("tasks array");
+        let tasks = v
+            .get("tasks")
+            .and_then(|t| t.as_array())
+            .expect("tasks array");
         assert_eq!(tasks.len(), 2);
     }
 
@@ -193,7 +207,10 @@ mod tests {
         )
         .expect("search");
         let v: serde_json::Value = serde_json::from_str(&out).expect("parse");
-        let results = v.get("results").and_then(|r| r.as_array()).expect("results");
+        let results = v
+            .get("results")
+            .and_then(|r| r.as_array())
+            .expect("results");
         assert_eq!(results.len(), 1);
         assert_eq!(
             results[0].get("title").and_then(|t| t.as_str()),
@@ -219,15 +236,8 @@ mod tests {
             .expect("create wiki");
         let user = admin_user();
 
-        let out = get_wiki_page_for_user(
-            &state,
-            &user,
-            Some("P1A"),
-            None,
-            Some("w1"),
-            None,
-        )
-        .expect("get_wiki_page");
+        let out = get_wiki_page_for_user(&state, &user, Some("P1A"), None, Some("w1"), None)
+            .expect("get_wiki_page");
         let v: serde_json::Value = serde_json::from_str(&out).expect("parse");
         let page = v.get("page").expect("page");
         assert_eq!(page.get("title").and_then(|t| t.as_str()), Some("My Wiki"));
@@ -249,7 +259,7 @@ mod tests {
                     Some("P1A"),
                     None,
                     "Investigation Results",
-                    Some("# Summary\n\n- Finding 1\n- Finding 2"),
+                    Some("# Summary\n\n- Finding 1\n- Finding 2\n\n| Name | Value |\n| --- | --- |\n| alpha | 1 |"),
                 )
             }
         })
@@ -258,7 +268,10 @@ mod tests {
         .expect("create_wiki_page");
         let v: serde_json::Value = serde_json::from_str(&out).expect("parse");
         assert!(v.get("pageId").and_then(|i| i.as_str()).is_some());
-        assert_eq!(v.get("title").and_then(|t| t.as_str()), Some("Investigation Results"));
+        assert_eq!(
+            v.get("title").and_then(|t| t.as_str()),
+            Some("Investigation Results")
+        );
 
         let entities = state
             .db
@@ -266,16 +279,32 @@ mod tests {
             .await
             .list_entities_for_project("p1")
             .expect("list");
-        let wiki: Vec<_> = entities.into_iter().filter(|e| e.entity_id == "wikiPage").collect();
+        let wiki: Vec<_> = entities
+            .into_iter()
+            .filter(|e| e.entity_id == "wikiPage")
+            .collect();
         assert_eq!(wiki.len(), 1);
         assert_eq!(
             wiki[0].properties.get("title").and_then(|v| v.as_str()),
             Some("Investigation Results")
         );
-        let doc = wiki[0].properties.get("doc").and_then(|v| v.as_str()).expect("doc");
+        let doc = wiki[0]
+            .properties
+            .get("doc")
+            .and_then(|v| v.as_str())
+            .expect("doc");
         let blocks: Vec<serde_json::Value> = serde_json::from_str(doc).expect("doc json");
         assert!(!blocks.is_empty());
-        assert_eq!(blocks[0].get("type").and_then(|v| v.as_str()), Some("heading"));
+        assert_eq!(
+            blocks[0].get("type").and_then(|v| v.as_str()),
+            Some("heading")
+        );
+        assert!(
+            blocks
+                .iter()
+                .any(|b| b.get("type").and_then(|v| v.as_str()) == Some("table")),
+            "MCP-created wiki markdown table should be stored as BlockNote table: {doc}"
+        );
     }
 
     #[tokio::test]
@@ -301,9 +330,72 @@ mod tests {
             .await
             .list_entities_for_project("p1")
             .expect("list");
-        let wiki: Vec<_> = entities.into_iter().filter(|e| e.entity_id == "wikiPage").collect();
+        let wiki: Vec<_> = entities
+            .into_iter()
+            .filter(|e| e.entity_id == "wikiPage")
+            .collect();
         assert_eq!(wiki.len(), 1);
-        assert_eq!(wiki[0].properties.get("doc").and_then(|v| v.as_str()), Some("[]"));
+        assert_eq!(
+            wiki[0].properties.get("doc").and_then(|v| v.as_str()),
+            Some("[]")
+        );
+    }
+
+    #[test]
+    fn add_comment_converts_markdown_table_for_task_comments() {
+        let (_dir, state) = tmp_state("p1", "P1A");
+        state
+            .db
+            .blocking_read()
+            .create_entity_for_project(
+                "p1",
+                Some("t1"),
+                "task",
+                serde_json::json!({
+                    "taskKey": "P1A-1",
+                    "title": "Task 1"
+                })
+                .as_object()
+                .cloned()
+                .unwrap_or_default(),
+            )
+            .expect("create task");
+        let user = admin_user();
+
+        crate::mcp::tools::add_comment_for_target(
+            &state,
+            &user,
+            &serde_json::json!({
+                "taskKey": "P1A-1",
+                "text": "| Name | Value |\n| --- | --- |\n| alpha | 1 |"
+            }),
+        )
+        .expect("add_comment");
+
+        let entities = state
+            .db
+            .blocking_read()
+            .list_entities_for_project("p1")
+            .expect("list");
+        let task = entities.into_iter().find(|e| e.id == "t1").expect("task");
+        let comments = task
+            .properties
+            .get("comments")
+            .and_then(|v| v.as_array())
+            .expect("comments");
+        let doc = comments[0]
+            .get("doc")
+            .and_then(|v| v.as_str())
+            .expect("doc");
+        let blocks: Vec<serde_json::Value> = serde_json::from_str(doc).expect("doc json");
+        assert_eq!(
+            blocks[0].get("type").and_then(|v| v.as_str()),
+            Some("table")
+        );
+        assert_eq!(
+            blocks[0]["content"]["rows"][1]["cells"][0]["content"][0]["text"].as_str(),
+            Some("alpha")
+        );
     }
 
     #[test]
@@ -320,7 +412,8 @@ mod tests {
         let (_dir, state) = tmp_state("p1", "P1A");
         let user = admin_user();
 
-        let err = create_wiki_page_for_user(&state, &user, Some("P1A"), None, "", None).unwrap_err();
+        let err =
+            create_wiki_page_for_user(&state, &user, Some("P1A"), None, "", None).unwrap_err();
         assert!(format!("{err}").contains("title"));
     }
 }

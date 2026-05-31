@@ -14,7 +14,10 @@ mod tests {
     fn import_provider_from_str() {
         assert_eq!(ImportProvider::from_str("jira"), Some(ImportProvider::Jira));
         assert_eq!(ImportProvider::from_str("JIRA"), Some(ImportProvider::Jira));
-        assert_eq!(ImportProvider::from_str("backlog"), Some(ImportProvider::Backlog));
+        assert_eq!(
+            ImportProvider::from_str("backlog"),
+            Some(ImportProvider::Backlog)
+        );
         assert_eq!(ImportProvider::from_str("unknown"), None);
     }
 

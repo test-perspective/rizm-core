@@ -60,7 +60,8 @@ async fn create_entity_sets_creator_fields_and_ignores_client_tampering() {
             anonymous: crate::models::Permission::None,
         },
     };
-    db.set_project_policy("p1", policy).expect("set project policy");
+    db.set_project_policy("p1", policy)
+        .expect("set project policy");
 
     let state = AppState {
         db: Arc::new(RwLock::new(db.clone())),
@@ -84,7 +85,13 @@ async fn create_entity_sets_creator_fields_and_ignores_client_tampering() {
         .clone(),
     };
 
-    let result = create_entity(State(state), Path("p1".to_string()), Extension(user), Json(req)).await;
+    let result = create_entity(
+        State(state),
+        Path("p1".to_string()),
+        Extension(user),
+        Json(req),
+    )
+    .await;
 
     assert!(result.is_ok(), "create_entity should succeed");
     let (_, _, Json(entity)) = result.unwrap();
@@ -142,7 +149,8 @@ async fn patch_entity_updates_updated_by_and_preserves_created_by() {
             anonymous: crate::models::Permission::None,
         },
     };
-    db.set_project_policy("p1", policy).expect("set project policy");
+    db.set_project_policy("p1", policy)
+        .expect("set project policy");
 
     let mut props = serde_json::Map::new();
     props.insert("createdBy".to_string(), json!("user1"));
@@ -204,7 +212,10 @@ async fn patch_entity_updates_updated_by_and_preserves_created_by() {
         Some("user2")
     );
     assert_eq!(
-        updated_entity.properties.get("title").and_then(|v| v.as_str()),
+        updated_entity
+            .properties
+            .get("title")
+            .and_then(|v| v.as_str()),
         Some("Updated Title")
     );
 }

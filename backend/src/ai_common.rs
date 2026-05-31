@@ -32,7 +32,8 @@ pub fn extract_json_value(s: &str) -> Result<serde_json::Value, &'static str> {
         return Err("no json object found");
     }
     let sub = &t[start..=end];
-    serde_json::from_str::<serde_json::Value>(sub).map_err(|_| "failed to parse json from model output")
+    serde_json::from_str::<serde_json::Value>(sub)
+        .map_err(|_| "failed to parse json from model output")
 }
 
 pub fn extract_non_json_text(s: &str) -> Option<String> {
@@ -120,8 +121,10 @@ pub fn validate_manifest(m: &ProjectManifest) -> Result<(), String> {
 
     // entities + properties
     let mut entity_ids = std::collections::HashSet::<String>::new();
-    let mut entity_prop_names: std::collections::HashMap<String, std::collections::HashSet<String>> =
-        std::collections::HashMap::new();
+    let mut entity_prop_names: std::collections::HashMap<
+        String,
+        std::collections::HashSet<String>,
+    > = std::collections::HashMap::new();
 
     for e in &m.entities {
         if e.id.trim().is_empty() {
@@ -143,24 +146,36 @@ pub fn validate_manifest(m: &ProjectManifest) -> Result<(), String> {
                 return Err(format!("entity '{}' property.name must not be empty", e.id));
             }
             if !prop_names.insert(p.name.clone()) {
-                return Err(format!("entity '{}' has duplicate property name: {}", e.id, p.name));
+                return Err(format!(
+                    "entity '{}' has duplicate property name: {}",
+                    e.id, p.name
+                ));
             }
             if matches!(p.type_, PropertyType::Select) {
-                let opts = p
-                    .options
+                if p.options
                     .as_ref()
-                    .ok_or_else(|| format!("select property '{}' requires options", p.name))?;
-                if opts.is_empty() {
-                    return Err(format!("select property '{}' requires non-empty options", p.name));
+                    .map(|opts| opts.is_empty())
+                    .unwrap_or(false)
+                {
+                    return Err(format!(
+                        "select property '{}' requires non-empty options",
+                        p.name
+                    ));
                 }
             }
             if matches!(p.type_, PropertyType::Labels) {
                 if let Some(opts) = p.options.as_ref() {
                     if opts.is_empty() {
-                        return Err(format!("labels property '{}' requires non-empty options when provided", p.name));
+                        return Err(format!(
+                            "labels property '{}' requires non-empty options when provided",
+                            p.name
+                        ));
                     }
                     if opts.iter().any(|opt| opt.trim().is_empty()) {
-                        return Err(format!("labels property '{}' options must be non-empty strings", p.name));
+                        return Err(format!(
+                            "labels property '{}' options must be non-empty strings",
+                            p.name
+                        ));
                     }
                 }
             }
@@ -180,13 +195,19 @@ pub fn validate_manifest(m: &ProjectManifest) -> Result<(), String> {
         if v.entity_id.trim().is_empty() {
             return Err(format!("view '{}' entityId must not be empty", v.id));
         }
-        let props = entity_prop_names
-            .get(&v.entity_id)
-            .ok_or_else(|| format!("view '{}' references unknown entityId '{}'", v.id, v.entity_id))?;
+        let props = entity_prop_names.get(&v.entity_id).ok_or_else(|| {
+            format!(
+                "view '{}' references unknown entityId '{}'",
+                v.id, v.entity_id
+            )
+        })?;
 
         for vp in &v.visible_properties {
             if !props.contains(vp) {
-                return Err(format!("view '{}' references unknown property '{}'", v.id, vp));
+                return Err(format!(
+                    "view '{}' references unknown property '{}'",
+                    v.id, vp
+                ));
             }
         }
 
@@ -251,7 +272,11 @@ pub fn normalize_manifest(mut m: ProjectManifest) -> ProjectManifest {
             if !matches!(prop.type_, PropertyType::Select) {
                 continue;
             }
-            let has_non_empty_options = prop.options.as_ref().map(|opts| !opts.is_empty()).unwrap_or(false);
+            let has_non_empty_options = prop
+                .options
+                .as_ref()
+                .map(|opts| !opts.is_empty())
+                .unwrap_or(false);
             if has_non_empty_options {
                 continue;
             }
@@ -303,7 +328,11 @@ pub fn normalize_manifest(mut m: ProjectManifest) -> ProjectManifest {
                     p.type_ = PropertyType::Select;
                 }
                 if p.options.as_ref().map(|o| o.is_empty()).unwrap_or(true) {
-                    p.options = Some(vec!["Todo".to_string(), "In Progress".to_string(), "Done".to_string()]);
+                    p.options = Some(vec![
+                        "Todo".to_string(),
+                        "In Progress".to_string(),
+                        "Done".to_string(),
+                    ]);
                 }
                 if p.visible.is_none() {
                     p.visible = Some(true);
@@ -313,7 +342,11 @@ pub fn normalize_manifest(mut m: ProjectManifest) -> ProjectManifest {
                 entity.properties.push(PropertyDefinition {
                     name: status_name.clone(),
                     type_: PropertyType::Select,
-                    options: Some(vec!["Todo".to_string(), "In Progress".to_string(), "Done".to_string()]),
+                    options: Some(vec![
+                        "Todo".to_string(),
+                        "In Progress".to_string(),
+                        "Done".to_string(),
+                    ]),
                     visible: Some(true),
                 });
             }
@@ -392,7 +425,10 @@ mod tests {
     #[test]
     fn extract_non_json_text_keeps_plain_text() {
         let out = extract_non_json_text("Need to check schema before final JSON");
-        assert_eq!(out, Some("Need to check schema before final JSON".to_string()));
+        assert_eq!(
+            out,
+            Some("Need to check schema before final JSON".to_string())
+        );
     }
 
     #[test]

@@ -6,8 +6,8 @@ use serde_json::Value;
 
 use crate::api::attachments_api::{write_import_attachment_bytes, AttachmentMeta};
 
-use super::client;
 use super::super::ImportEngineError;
+use super::client;
 
 fn jira_attachment_id_str(v: &Value) -> Option<String> {
     match v {
@@ -71,14 +71,9 @@ pub async fn download_issue_attachments(
             }
         };
 
-        let mut meta = write_import_attachment_bytes(
-            db_path,
-            project_id,
-            &filename,
-            mime_type,
-            &bytes,
-        )
-        .map_err(|e: std::io::Error| ImportEngineError::Internal(e.to_string()))?;
+        let mut meta =
+            write_import_attachment_bytes(db_path, project_id, &filename, mime_type, &bytes)
+                .map_err(|e: std::io::Error| ImportEngineError::Internal(e.to_string()))?;
 
         if let Some(ms) = created_ms {
             meta.created_at = ms;

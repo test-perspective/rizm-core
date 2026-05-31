@@ -53,10 +53,13 @@ impl Db {
 
         // --- Manifest version history ---
         // Keep manifest_versions across saves, but clean up versions for projects removed by replace.
-        let incoming_ids: std::collections::HashSet<String> = data.projects.iter().map(|p| p.id.clone()).collect();
+        let incoming_ids: std::collections::HashSet<String> =
+            data.projects.iter().map(|p| p.id.clone()).collect();
         let mut existing_project_ids: Vec<String> = Vec::new();
         {
-            let mut stmt = tx.prepare("SELECT id FROM projects").context("prepare select projects ids")?;
+            let mut stmt = tx
+                .prepare("SELECT id FROM projects")
+                .context("prepare select projects ids")?;
             let rows = stmt
                 .query_map([], |row| row.get::<_, String>(0))
                 .context("query select projects ids")?;
@@ -75,13 +78,16 @@ impl Db {
         }
 
         // Snapshot current manifests to detect changes.
-        let mut old_manifest_json: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+        let mut old_manifest_json: std::collections::HashMap<String, String> =
+            std::collections::HashMap::new();
         {
             let mut stmt = tx
                 .prepare("SELECT project_id, json FROM manifests")
                 .context("prepare select manifests")?;
             let rows = stmt
-                .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+                .query_map([], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                })
                 .context("query select manifests")?;
             for r in rows {
                 let (pid, json) = r?;
@@ -91,8 +97,12 @@ impl Db {
 
         let now_ms = crate::time::now_ms();
         for p in &data.projects {
-            let new_json = serde_json::to_string(&p.config.manifest).context("serialize incoming manifest for history")?;
-            let unchanged = old_manifest_json.get(&p.id).map(|s| s == &new_json).unwrap_or(false);
+            let new_json = serde_json::to_string(&p.config.manifest)
+                .context("serialize incoming manifest for history")?;
+            let unchanged = old_manifest_json
+                .get(&p.id)
+                .map(|s| s == &new_json)
+                .unwrap_or(false);
             if unchanged {
                 continue;
             }
@@ -125,9 +135,12 @@ impl Db {
         }
 
         // Replace semantics (simple prototype)
-        tx.execute("DELETE FROM entities", []).context("delete entities")?;
-        tx.execute("DELETE FROM manifests", []).context("delete manifests")?;
-        tx.execute("DELETE FROM projects", []).context("delete projects")?;
+        tx.execute("DELETE FROM entities", [])
+            .context("delete entities")?;
+        tx.execute("DELETE FROM manifests", [])
+            .context("delete manifests")?;
+        tx.execute("DELETE FROM projects", [])
+            .context("delete projects")?;
 
         // Projects + manifests + entities
         {
@@ -150,18 +163,34 @@ impl Db {
             for p in &data.projects {
                 let lifecycle = p.lifecycle_status.as_deref().unwrap_or("ready");
                 insert_project
-                    .execute(params![p.id, p.name, p.project_key, lifecycle, p.created_at, p.updated_at])
+                    .execute(params![
+                        p.id,
+                        p.name,
+                        p.project_key,
+                        lifecycle,
+                        p.created_at,
+                        p.updated_at
+                    ])
                     .with_context(|| format!("insert project {}", p.id))?;
 
-                let manifest_json = serde_json::to_string(&p.config.manifest).context("serialize manifest")?;
+                let manifest_json =
+                    serde_json::to_string(&p.config.manifest).context("serialize manifest")?;
                 upsert_manifest
                     .execute(params![p.id, manifest_json])
                     .with_context(|| format!("upsert manifest {}", p.id))?;
 
                 for e in &p.entities {
-                    let props_json = serde_json::to_string(&e.properties).context("serialize entity props")?;
+                    let props_json =
+                        serde_json::to_string(&e.properties).context("serialize entity props")?;
                     insert_entity
-                        .execute(params![e.id, p.id, e.entity_id, e.created_at, e.updated_at, props_json])
+                        .execute(params![
+                            e.id,
+                            p.id,
+                            e.entity_id,
+                            e.created_at,
+                            e.updated_at,
+                            props_json
+                        ])
                         .with_context(|| format!("insert entity {}", e.id))?;
                 }
             }
@@ -188,4 +217,3 @@ impl Db {
         Ok(())
     }
 }
-

@@ -175,15 +175,14 @@ pub(super) async fn process_issue(
         *board_order += 1;
     }
 
-    let entity = match ctx.db.create_entity_for_project(
-        ctx.target_project_id,
-        None,
-        "task",
-        properties,
-    ) {
-        Ok(entity) => entity,
-        Err(_) => return Ok(IssueOutcome::Errored),
-    };
+    let entity =
+        match ctx
+            .db
+            .create_entity_for_project(ctx.target_project_id, None, "task", properties)
+        {
+            Ok(entity) => entity,
+            Err(_) => return Ok(IssueOutcome::Errored),
+        };
 
     if ctx
         .db
@@ -240,12 +239,7 @@ pub(super) async fn process_issue(
     if !patch.is_empty() {
         if ctx
             .db
-            .patch_entity_for_project(
-                ctx.target_project_id,
-                &entity.id,
-                entity.updated_at,
-                patch,
-            )
+            .patch_entity_for_project(ctx.target_project_id, &entity.id, entity.updated_at, patch)
             .is_err()
         {
             return Ok(IssueOutcome::Errored);

@@ -142,7 +142,9 @@ pub(crate) fn seed_if_empty(conn: &mut rusqlite::Connection) -> anyhow::Result<(
     }
 
     let version_exists: Option<String> = conn
-        .query_row("SELECT value FROM meta WHERE key = 'version'", [], |row| row.get(0))
+        .query_row("SELECT value FROM meta WHERE key = 'version'", [], |row| {
+            row.get(0)
+        })
         .optional()
         .context("check version exists")?;
     if version_exists.is_none() {
@@ -154,7 +156,11 @@ pub(crate) fn seed_if_empty(conn: &mut rusqlite::Connection) -> anyhow::Result<(
     }
 
     let active_exists: Option<String> = conn
-        .query_row("SELECT value FROM meta WHERE key = 'active_project_id'", [], |row| row.get(0))
+        .query_row(
+            "SELECT value FROM meta WHERE key = 'active_project_id'",
+            [],
+            |row| row.get(0),
+        )
         .optional()
         .context("check active project id exists")?;
     if active_exists.is_none() {

@@ -85,14 +85,20 @@ mod tests {
     async fn fetch_url_empty_returns_error_json() {
         let out = fetch_url("").await.unwrap();
         let v: Value = serde_json::from_str(&out).unwrap();
-        assert_eq!(v.get("error").and_then(Value::as_str), Some("url is required"));
+        assert_eq!(
+            v.get("error").and_then(Value::as_str),
+            Some("url is required")
+        );
     }
 
     #[tokio::test]
     async fn fetch_url_whitespace_only_returns_error_json() {
         let out = fetch_url("   ").await.unwrap();
         let v: Value = serde_json::from_str(&out).unwrap();
-        assert_eq!(v.get("error").and_then(Value::as_str), Some("url is required"));
+        assert_eq!(
+            v.get("error").and_then(Value::as_str),
+            Some("url is required")
+        );
     }
 
     #[tokio::test]

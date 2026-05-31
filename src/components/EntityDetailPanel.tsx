@@ -8,6 +8,7 @@ import { PropertyInput } from './entityDetail/inputs/PropertyInput';
 import type { EntityDetailPanelProps } from './entityDetail/entityDetailPanelTypes';
 import { useEntityDetailPanelModel } from './entityDetail/useEntityDetailPanelModel';
 import { shouldSuppressAdjacentEntityNavigation } from '../utils/entityDetailKeyboardGuards';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 const DEFAULT_WIDTH = 672;
 const MIN_WIDTH = 360;
@@ -80,11 +81,13 @@ export const EntityDetailPanel = ({
     onDelete,
   });
 
+  const isMobile = useIsMobile();
   const [panelWidth, setPanelWidth] = useState(() =>
     Math.min(DEFAULT_WIDTH, typeof window !== 'undefined' ? window.innerWidth : DEFAULT_WIDTH)
   );
   const panelWidthRef = useRef(panelWidth);
   panelWidthRef.current = panelWidth;
+  const effectivePanelStyle = isMobile ? { width: '100vw' } : { width: panelWidth };
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -205,19 +208,21 @@ export const EntityDetailPanel = ({
         className="min-w-0 flex-1 bg-black/60 backdrop-blur-sm"
         onClick={handleClose}
       />
-      <div
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Resize panel"
-        title="Resize panel"
-        data-testid="entity-detail-resize-handle"
-        className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-zinc-700/50 transition-colors"
-        onMouseDown={handleResizeStart}
-      />
+      {!isMobile && (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize panel"
+          title="Resize panel"
+          data-testid="entity-detail-resize-handle"
+          className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-zinc-700/50 transition-colors"
+          onMouseDown={handleResizeStart}
+        />
+      )}
       <div
         data-testid="entity-detail-panel"
         className="shrink-0 bg-zinc-950 border-l border-zinc-800 flex flex-col"
-        style={{ width: panelWidth }}
+        style={effectivePanelStyle}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
           <h2 className="text-lg font-semibold text-white font-mono">{panelTitle}</h2>

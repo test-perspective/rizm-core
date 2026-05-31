@@ -6,12 +6,14 @@ use serde_json::Value;
 
 use crate::db::Db;
 
-
 /// Resolve Jira assignee to Rizm user id by email. Returns None if no match.
 pub fn resolve_assignee_by_email(db: &Db, raw: Option<&Value>) -> Option<Value> {
     let obj = raw?.as_object()?;
     let email = obj.get("emailAddress").and_then(|v| v.as_str())?;
-    let user = db.get_user_by_email_case_insensitive(email).ok().flatten()?;
+    let user = db
+        .get_user_by_email_case_insensitive(email)
+        .ok()
+        .flatten()?;
     Some(Value::String(user.id))
 }
 
@@ -94,7 +96,11 @@ pub fn extract_field_value(
                     return Some(s.to_string());
                 }
                 x.as_object()
-                    .and_then(|o| o.get("name").or_else(|| o.get("value")).and_then(|n| n.as_str()))
+                    .and_then(|o| {
+                        o.get("name")
+                            .or_else(|| o.get("value"))
+                            .and_then(|n| n.as_str())
+                    })
                     .map(|s| s.to_string())
             })
             .collect();

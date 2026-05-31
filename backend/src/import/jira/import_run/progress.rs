@@ -57,7 +57,9 @@ mod tests {
 
     #[test]
     fn flush_when_reached_total() {
-        assert!(jira_import_progress_should_flush(1000, 990, 1000, 25, false));
+        assert!(jira_import_progress_should_flush(
+            1000, 990, 1000, 25, false
+        ));
     }
 
     #[test]

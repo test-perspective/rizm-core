@@ -104,8 +104,12 @@ pub fn apply_bitbucket_scm_from_conversation_text(
     combined_text: &str,
     llm_scm: Option<ScmConfigResult>,
 ) -> Option<ScmConfigResult> {
-    let from_text = parse_bitbucket_workspace_repo(combined_text)
-        .map(|(workspace, repo_slug)| ScmConfigResult { workspace, repo_slug });
+    let from_text = parse_bitbucket_workspace_repo(combined_text).map(|(workspace, repo_slug)| {
+        ScmConfigResult {
+            workspace,
+            repo_slug,
+        }
+    });
     let llm_had = llm_scm.is_some();
     let text_had = from_text.is_some();
     if text_had || llm_had {
@@ -117,7 +121,9 @@ pub fn apply_bitbucket_scm_from_conversation_text(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{EntityDefinition, ProjectManifest, PropertyDefinition, PropertyType, ViewConfig, ViewType};
+    use crate::models::{
+        EntityDefinition, ProjectManifest, PropertyDefinition, PropertyType, ViewConfig, ViewType,
+    };
 
     #[test]
     fn parse_bitbucket_https_url() {

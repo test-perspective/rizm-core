@@ -3,10 +3,7 @@ use serde_json::Value;
 
 pub fn parse_jsonrpc_request(v: &Value) -> anyhow::Result<(Option<Value>, String, Value)> {
     let obj = v.as_object().context("request must be a json object")?;
-    let jsonrpc = obj
-        .get("jsonrpc")
-        .and_then(Value::as_str)
-        .unwrap_or("2.0");
+    let jsonrpc = obj.get("jsonrpc").and_then(Value::as_str).unwrap_or("2.0");
     if jsonrpc != "2.0" {
         anyhow::bail!("unsupported jsonrpc version");
     }

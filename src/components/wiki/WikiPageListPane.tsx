@@ -22,7 +22,8 @@ import { WikiPageRow } from './WikiPageRow';
 import { buildAfterDropId, buildBeforeDropId } from './wikiDndTarget';
 
 type WikiPageListPaneProps = {
-  width: number;
+  /** Pixel width on desktop; `'100%'` on mobile (REQ-286 single-pane). */
+  width: number | string;
   canEdit: boolean;
   query: string;
   onQueryChange: (next: string) => void;

@@ -65,15 +65,20 @@ impl AdfImportContext {
     /// ADF `media` fallback: Jira sometimes uses UUID media ids while issue attachments are numeric ids.
     /// In those cases `attrs.alt` often carries the original filename, so match by filename.
     pub fn block_for_media_attrs(&self, attrs: &Value) -> Option<Value> {
-        if let Some(jira_id) = attrs
-            .get("id")
-            .and_then(|v| v.as_str().map(str::to_string).or_else(|| v.as_i64().map(|n| n.to_string())))
-        {
+        if let Some(jira_id) = attrs.get("id").and_then(|v| {
+            v.as_str()
+                .map(str::to_string)
+                .or_else(|| v.as_i64().map(|n| n.to_string()))
+        }) {
             if let Some(block) = self.block_for_jira_file_id(&jira_id) {
                 return Some(block);
             }
         }
-        let alt = attrs.get("alt").and_then(|v| v.as_str()).unwrap_or("").trim();
+        let alt = attrs
+            .get("alt")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim();
         if alt.is_empty() {
             return None;
         }

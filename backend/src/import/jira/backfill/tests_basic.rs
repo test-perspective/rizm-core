@@ -9,7 +9,10 @@ fn backfill_converts_markdown_description() {
         json!("# Title\n\n- **bold** item"),
     );
     let patch = compute_jira_markdown_backfill_patch(&props).expect("patch");
-    let desc = patch.get("Description").and_then(|v| v.as_str()).expect("desc");
+    let desc = patch
+        .get("Description")
+        .and_then(|v| v.as_str())
+        .expect("desc");
     assert!(desc.starts_with('['), "expected BlockNote JSON array");
     assert!(desc.contains("heading"), "{}", desc);
     assert!(desc.contains("bulletListItem"), "{}", desc);
@@ -23,7 +26,10 @@ fn backfill_converts_description_with_jira_noformat() {
         json!("a {noformat}b **c** d{noformat} e"),
     );
     let patch = compute_jira_markdown_backfill_patch(&props).expect("patch");
-    let desc = patch.get("Description").and_then(|v| v.as_str()).expect("desc");
+    let desc = patch
+        .get("Description")
+        .and_then(|v| v.as_str())
+        .expect("desc");
     assert!(!desc.contains("{noformat}"), "{}", desc);
     assert!(desc.contains("**c**"), "{}", desc);
     assert!(desc.contains("\"codeBlock\""), "{}", desc);
@@ -39,7 +45,10 @@ fn backfill_converts_description_with_jira_color_markup() {
         json!("{color:#FF5630}[ 確認 ]{color}"),
     );
     let patch = compute_jira_markdown_backfill_patch(&props).expect("patch");
-    let desc = patch.get("Description").and_then(|v| v.as_str()).expect("desc");
+    let desc = patch
+        .get("Description")
+        .and_then(|v| v.as_str())
+        .expect("desc");
     assert!(!desc.contains("{color"), "{}", desc);
     assert!(desc.contains("確認"), "{}", desc);
     assert!(desc.contains("textColor"), "{}", desc);
@@ -66,7 +75,10 @@ fn backfill_expands_jira_emoticons_in_blocknote_text() {
     let mut props = serde_json::Map::new();
     props.insert("Description".to_string(), Value::String(doc));
     let patch = compute_jira_markdown_backfill_patch(&props).expect("patch");
-    let desc = patch.get("Description").and_then(|v| v.as_str()).expect("desc");
+    let desc = patch
+        .get("Description")
+        .and_then(|v| v.as_str())
+        .expect("desc");
     assert!(desc.contains('✅'), "{}", desc);
     assert!(desc.contains('❌'), "{}", desc);
 }

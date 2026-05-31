@@ -78,13 +78,14 @@ pub async fn run_import(
     };
     let field_ids_merged = merge_field_ids_with_attachment(&field_ids_for_fetch);
     let fields_json = serde_json::to_value(&field_ids_merged).unwrap_or(serde_json::json!([]));
-    let field_ids_vec: Vec<String> = serde_json::from_value(fields_json.clone()).unwrap_or_else(|_| {
-        vec![
-            "summary".to_string(),
-            "description".to_string(),
-            "status".to_string(),
-        ]
-    });
+    let field_ids_vec: Vec<String> =
+        serde_json::from_value(fields_json.clone()).unwrap_or_else(|_| {
+            vec![
+                "summary".to_string(),
+                "description".to_string(),
+                "status".to_string(),
+            ]
+        });
 
     let mut cursor = PageCursor::new();
     let mut imported = 0u64;

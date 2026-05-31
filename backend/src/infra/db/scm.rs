@@ -8,7 +8,11 @@ use super::Db;
 impl Db {
     // --- Project SCM Configs ---
 
-    pub fn get_project_scm_config(&self, project_id: &str, provider: &str) -> anyhow::Result<Option<ProjectScmConfigRecord>> {
+    pub fn get_project_scm_config(
+        &self,
+        project_id: &str,
+        provider: &str,
+    ) -> anyhow::Result<Option<ProjectScmConfigRecord>> {
         let conn = self.pool.get().context("get sqlite conn")?;
         let row: Option<(String, String, String, i64)> = conn
             .query_row(
@@ -20,15 +24,22 @@ impl Db {
             )
             .optional()
             .context("select project_scm_config")?;
-        Ok(row.map(|(project_id, provider, config_json, updated_at)| ProjectScmConfigRecord {
-            project_id,
-            provider,
-            config_json,
-            updated_at,
-        }))
+        Ok(row.map(
+            |(project_id, provider, config_json, updated_at)| ProjectScmConfigRecord {
+                project_id,
+                provider,
+                config_json,
+                updated_at,
+            },
+        ))
     }
 
-    pub fn set_project_scm_config(&self, project_id: &str, provider: &str, config_json: &str) -> anyhow::Result<()> {
+    pub fn set_project_scm_config(
+        &self,
+        project_id: &str,
+        provider: &str,
+        config_json: &str,
+    ) -> anyhow::Result<()> {
         let conn = self.pool.get().context("get sqlite conn")?;
         let now_ms = crate::time::now_ms();
         conn.execute(
@@ -43,7 +54,11 @@ impl Db {
 
     // --- User SCM Credentials ---
 
-    pub fn get_user_scm_credential(&self, user_id: &str, provider: &str) -> anyhow::Result<Option<UserScmCredentialRecord>> {
+    pub fn get_user_scm_credential(
+        &self,
+        user_id: &str,
+        provider: &str,
+    ) -> anyhow::Result<Option<UserScmCredentialRecord>> {
         let conn = self.pool.get().context("get sqlite conn")?;
         let row: Option<(String, String, String, String, i64)> = conn
             .query_row(
@@ -55,16 +70,23 @@ impl Db {
             )
             .optional()
             .context("select user_scm_credential")?;
-        Ok(row.map(|(id, user_id, provider, token_json, updated_at)| UserScmCredentialRecord {
-            id,
-            user_id,
-            provider,
-            token_json,
-            updated_at,
-        }))
+        Ok(row.map(
+            |(id, user_id, provider, token_json, updated_at)| UserScmCredentialRecord {
+                id,
+                user_id,
+                provider,
+                token_json,
+                updated_at,
+            },
+        ))
     }
 
-    pub fn set_user_scm_credential(&self, user_id: &str, provider: &str, token_json: &str) -> anyhow::Result<()> {
+    pub fn set_user_scm_credential(
+        &self,
+        user_id: &str,
+        provider: &str,
+        token_json: &str,
+    ) -> anyhow::Result<()> {
         let conn = self.pool.get().context("get sqlite conn")?;
         let now_ms = crate::time::now_ms();
         let id = Uuid::new_v4().to_string();
@@ -100,7 +122,12 @@ impl Db {
         Ok(id)
     }
 
-    pub fn consume_oauth_state(&self, provider: &str, state: &str, now_ms: i64) -> anyhow::Result<Option<ScmOAuthStateRecord>> {
+    pub fn consume_oauth_state(
+        &self,
+        provider: &str,
+        state: &str,
+        now_ms: i64,
+    ) -> anyhow::Result<Option<ScmOAuthStateRecord>> {
         let conn = self.pool.get().context("get sqlite conn")?;
         let row: Option<(String, String, String, String, String, String, i64)> = conn
             .query_row(
@@ -108,7 +135,17 @@ impl Db {
                  FROM oauth_states
                  WHERE provider = ?1 AND state = ?2",
                 params![provider, state],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?)),
+                |r| {
+                    Ok((
+                        r.get(0)?,
+                        r.get(1)?,
+                        r.get(2)?,
+                        r.get(3)?,
+                        r.get(4)?,
+                        r.get(5)?,
+                        r.get(6)?,
+                    ))
+                },
             )
             .optional()
             .context("select oauth_state")?;

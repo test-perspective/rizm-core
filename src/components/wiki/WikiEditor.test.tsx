@@ -36,6 +36,33 @@ describe('WikiEditor', () => {
     rafSpy.mockRestore();
   });
 
+  it('passes wiki-rich-text-editor class to RichTextEditor', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    act(() => {
+      root.render(
+        <WikiEditor
+          projectId="project-1"
+          page={page}
+          docJson="[]"
+          editable={false}
+          mode="read"
+          onUpdateDoc={() => {}}
+        />
+      );
+    });
+
+    const editor = container.querySelector('[data-testid="rich-text-editor"]');
+    expect(editor?.className).toContain('wiki-rich-text-editor');
+
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
   it('includes scroll container classes for internal scrolling', () => {
     const container = document.createElement('div');
     document.body.appendChild(container);

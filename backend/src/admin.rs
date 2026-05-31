@@ -9,12 +9,12 @@ use serde::{Deserialize, Serialize};
 use std::io::Write;
 
 use crate::app_state::AppState;
-use crate::auth::{Role, AuthedUser};
+use crate::auth::{AuthedUser, Role};
 use crate::ApiError;
 
-mod system_info;
 pub mod db_snapshot;
 mod support;
+mod system_info;
 pub(crate) use support::{ensure_admin, generate_temp_password, hash_password, normalize_email};
 
 #[derive(Debug, Serialize)]
@@ -98,7 +98,10 @@ struct AuditLogRow {
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/admin/users", get(list_users).post(create_user))
-        .route("/api/admin/users/:id", patch(patch_user).delete(delete_user))
+        .route(
+            "/api/admin/users/:id",
+            patch(patch_user).delete(delete_user),
+        )
         .route("/api/admin/users/:id/reset-password", post(reset_password))
         .route("/api/admin/audit-logs", get(list_audit_logs))
         .route("/api/admin/export-db", get(export_database))
@@ -106,7 +109,10 @@ pub fn router() -> Router<AppState> {
         .merge(db_snapshot::router())
 }
 
-async fn list_users(State(state): State<AppState>, Extension(actor): Extension<AuthedUser>) -> Result<Json<Vec<UserPublic>>, ApiError> {
+async fn list_users(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthedUser>,
+) -> Result<Json<Vec<UserPublic>>, ApiError> {
     ensure_admin(&actor)?;
     let db = state.db.read().await;
     let users = db.list_users().map_err(|_| ApiError::internal())?;
@@ -136,11 +142,14 @@ async fn create_user(
     ensure_admin(&actor)?;
     let db = state.db.read().await;
 
-    let email = normalize_email(&req.email).ok_or_else(|| ApiError::bad_request("invalid email"))?;
+    let email =
+        normalize_email(&req.email).ok_or_else(|| ApiError::bad_request("invalid email"))?;
     let (password, temp_password) = match req.initial_password {
         Some(p) => {
             if p.trim().len() < 12 {
-                return Err(ApiError::bad_request("password must be at least 12 characters"));
+                return Err(ApiError::bad_request(
+                    "password must be at least 12 characters",
+                ));
             }
             (p, None)
         }
@@ -159,10 +168,16 @@ async fn create_user(
     // Try to find the appropriate group (created by migration script) by name
     let (group_name, _) = match req.role {
         Role::Admin => ("Admin (Migrated)", "Auto-created from existing admin users"),
-        Role::Editor => ("Editor (Migrated)", "Auto-created from existing editor users"),
-        Role::Viewer => ("Viewer (Migrated)", "Auto-created from existing viewer users"),
+        Role::Editor => (
+            "Editor (Migrated)",
+            "Auto-created from existing editor users",
+        ),
+        Role::Viewer => (
+            "Viewer (Migrated)",
+            "Auto-created from existing viewer users",
+        ),
     };
-    
+
     // Find group by name, or create it if it doesn't exist
     let groups = db.list_user_groups().map_err(|_| ApiError::internal())?;
     let group_id = groups
@@ -173,21 +188,34 @@ async fn create_user(
             // Create new group if not found
             let (name, desc) = match req.role {
                 Role::Admin => ("Admin (Migrated)", "Auto-created from existing admin users"),
-                Role::Editor => ("Editor (Migrated)", "Auto-created from existing editor users"),
-                Role::Viewer => ("Viewer (Migrated)", "Auto-created from existing viewer users"),
+                Role::Editor => (
+                    "Editor (Migrated)",
+                    "Auto-created from existing editor users",
+                ),
+                Role::Viewer => (
+                    "Viewer (Migrated)",
+                    "Auto-created from existing viewer users",
+                ),
             };
             // This will create a new group with a new UUID, which is fine
             // The migration script creates groups with fixed IDs, but new ones can have random IDs
-            db.create_user_group(name, Some(desc)).map_err(|_| {
-                tracing::warn!("Failed to create group {}", name);
-            }).unwrap_or_else(|_| String::new())
+            db.create_user_group(name, Some(desc))
+                .map_err(|_| {
+                    tracing::warn!("Failed to create group {}", name);
+                })
+                .unwrap_or_else(|_| String::new())
         });
-    
+
     // Add user to the group (ignore errors if already in group)
     if !group_id.is_empty() {
         let _ = db.add_user_to_group(&user.id, &group_id).map_err(|e| {
             // Ignore errors if user is already in the group
-            tracing::debug!("Note: user {} may already be in group {}: {:?}", user.id, group_id, e);
+            tracing::debug!(
+                "Note: user {} may already be in group {}: {:?}",
+                user.id,
+                group_id,
+                e
+            );
         });
     }
 
@@ -223,11 +251,11 @@ async fn patch_user(
     ensure_admin(&actor)?;
     let db = state.db.read().await;
     db.update_user_role_disabled(
-            &user_id,
-            req.role.as_ref().map(|r| r.as_str()),
-            req.is_disabled,
-        )
-        .map_err(|_| ApiError::internal())?;
+        &user_id,
+        req.role.as_ref().map(|r| r.as_str()),
+        req.is_disabled,
+    )
+    .map_err(|_| ApiError::internal())?;
 
     let now = crate::time::now_ms();
     let _ = db.insert_audit_log(
@@ -256,16 +284,13 @@ async fn delete_user(
 
     // Keep at least one enabled admin account.
     if user.role == "admin" && !user.is_disabled {
-        let admin_count = db
-            .count_admin_users()
-            .map_err(|_| ApiError::internal())?;
+        let admin_count = db.count_admin_users().map_err(|_| ApiError::internal())?;
         if admin_count <= 1 {
             return Err(ApiError::bad_request("cannot delete the last admin user"));
         }
     }
 
-    db
-        .delete_user_and_clear_assignee_references(&user_id)
+    db.delete_user_and_clear_assignee_references(&user_id)
         .map_err(|_| ApiError::internal())?;
 
     let now = crate::time::now_ms();
@@ -294,16 +319,19 @@ async fn reset_password(
         (t.clone(), Some(t))
     } else if let Some(p) = req.new_password {
         if p.trim().len() < 12 {
-            return Err(ApiError::bad_request("password must be at least 12 characters"));
+            return Err(ApiError::bad_request(
+                "password must be at least 12 characters",
+            ));
         }
         (p, None)
     } else {
-        return Err(ApiError::bad_request("newPassword or generateTemp required"));
+        return Err(ApiError::bad_request(
+            "newPassword or generateTemp required",
+        ));
     };
 
     let new_hash = hash_password(&new_pw);
-    db
-        .set_user_password_hash(&user_id, &new_hash)
+    db.set_user_password_hash(&user_id, &new_hash)
         .map_err(|_| ApiError::internal())?;
 
     let now = crate::time::now_ms();
@@ -311,11 +339,15 @@ async fn reset_password(
         Some(&actor.user_id),
         "PASSWORD_RESET",
         Some(&user_id),
-        Some(&serde_json::json!({ "generateTemp": req.generate_temp.unwrap_or(false) }).to_string()),
+        Some(
+            &serde_json::json!({ "generateTemp": req.generate_temp.unwrap_or(false) }).to_string(),
+        ),
         now,
     );
 
-    Ok(Json(ResetPasswordResponse { temp_password: temp_pw }))
+    Ok(Json(ResetPasswordResponse {
+        temp_password: temp_pw,
+    }))
 }
 
 async fn list_audit_logs(
@@ -347,10 +379,16 @@ async fn list_audit_logs(
             .map(|r| AuditLogRow {
                 id: r.id,
                 actor_user_id: r.actor_user_id.clone(),
-                actor_user_email: r.actor_user_id.as_ref().and_then(|id| email_by_id.get(id).cloned()),
+                actor_user_email: r
+                    .actor_user_id
+                    .as_ref()
+                    .and_then(|id| email_by_id.get(id).cloned()),
                 action: r.action,
                 target_user_id: r.target_user_id.clone(),
-                target_user_email: r.target_user_id.as_ref().and_then(|id| email_by_id.get(id).cloned()),
+                target_user_email: r
+                    .target_user_id
+                    .as_ref()
+                    .and_then(|id| email_by_id.get(id).cloned()),
                 meta_json: r.meta_json,
                 created_at: r.created_at,
                 is_activity: r.is_activity,
@@ -366,12 +404,10 @@ async fn export_database(
     ensure_admin(&actor)?;
 
     // SQLite DBファイルを読み込む
-    let db_bytes = tokio::fs::read(&state.db_path)
-        .await
-        .map_err(|e| {
-            tracing::error!(error = %e, path = %state.db_path, "failed to read database file");
-            ApiError::internal()
-        })?;
+    let db_bytes = tokio::fs::read(&state.db_path).await.map_err(|e| {
+        tracing::error!(error = %e, path = %state.db_path, "failed to read database file");
+        ApiError::internal()
+    })?;
 
     // ZIPファイルを作成
     let mut zip_buffer = Vec::new();
@@ -386,11 +422,10 @@ async fn export_database(
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("keel.sqlite3");
-        zip.start_file(db_filename, options)
-            .map_err(|e| {
-                tracing::error!(error = %e, "failed to start zip file");
-                ApiError::internal()
-            })?;
+        zip.start_file(db_filename, options).map_err(|e| {
+            tracing::error!(error = %e, "failed to start zip file");
+            ApiError::internal()
+        })?;
         zip.write_all(&db_bytes).map_err(|e| {
             tracing::error!(error = %e, "failed to write to zip");
             ApiError::internal()

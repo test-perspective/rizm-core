@@ -68,6 +68,106 @@ pub fn tools_list_result() -> Value {
                 }
             },
             {
+                "name": "create_task",
+                "description": "Create a task in a project. The taskKey is generated from the project key unless taskKey is explicitly provided.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "projectKey": { "type": "string", "description": "Project key like REQ" },
+                        "projectId": { "type": "string", "description": "Project id" },
+                        "title": { "type": "string", "description": "Task title" },
+                        "description": { "type": "string", "description": "Optional Markdown/plain text task description" },
+                        "status": { "type": "string", "description": "Task status (e.g. Todo, In Progress)" },
+                        "priority": { "type": "string", "description": "Task priority (e.g. Low, Medium, High)" },
+                        "labels": { "type": "array", "items": { "type": "string" }, "description": "Task labels" },
+                        "taskKey": { "type": "string", "description": "Optional explicit task key like REQ-299" }
+                    },
+                    "required": ["title"],
+                    "additionalProperties": false
+                }
+            },
+            {
+                "name": "update_task",
+                "description": "Update a task by taskKey. Supports common fields and an optional patch object for additional task properties.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "taskKey": { "type": "string", "description": "Task key like REQ-299" },
+                        "title": { "type": "string", "description": "Task title" },
+                        "description": { "type": "string", "description": "Markdown/plain text task description" },
+                        "status": { "type": "string", "description": "Task status" },
+                        "priority": { "type": "string", "description": "Task priority" },
+                        "labels": { "type": "array", "items": { "type": "string" }, "description": "Task labels" },
+                        "patch": { "type": "object", "description": "Additional task properties to patch. createdBy and updatedBy are ignored." }
+                    },
+                    "required": ["taskKey"],
+                    "additionalProperties": false
+                }
+            },
+            {
+                "name": "list_projects",
+                "description": "List projects the current user can read.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                    "required": [],
+                    "additionalProperties": false
+                }
+            },
+            {
+                "name": "search_projects",
+                "description": "Search readable projects by name or projectKey.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "query": { "type": "string", "description": "Search keywords for project name or projectKey" }
+                    },
+                    "required": ["query"],
+                    "additionalProperties": false
+                }
+            },
+            {
+                "name": "get_project_manifest",
+                "description": "Get a project's manifest by projectKey or projectId.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "projectKey": { "type": "string", "description": "Project key like REQ" },
+                        "projectId": { "type": "string", "description": "Project id" }
+                    },
+                    "required": [],
+                    "additionalProperties": false
+                }
+            },
+            {
+                "name": "get_current_datetime",
+                "description": "Get the current server local date and time.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                    "required": [],
+                    "additionalProperties": false
+                }
+            },
+            {
+                "name": "apply_manifest",
+                "description": "Validate and optionally apply a ProjectManifest. Use dryRun=true before saving; dryRun=false requires ifMatch.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "projectKey": { "type": "string", "description": "Project key like REQ" },
+                        "projectId": { "type": "string", "description": "Project id" },
+                        "manifest": { "type": "object", "description": "ProjectManifest JSON" },
+                        "ifMatch": { "type": "string", "description": "Current manifest ETag returned by get_project_manifest" },
+                        "dryRun": { "type": "boolean", "description": "When true, validate and return a summary without saving" },
+                        "message": { "type": "string", "description": "Optional history message when saving" },
+                        "source": { "type": "string", "description": "Optional history source; defaults to mcp_apply_manifest" }
+                    },
+                    "required": ["manifest"],
+                    "additionalProperties": false
+                }
+            },
+            {
                 "name": "list_tasks",
                 "description": "List tasks in a project.",
                 "inputSchema": {

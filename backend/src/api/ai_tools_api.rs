@@ -1,3 +1,4 @@
+use axum::Extension;
 use axum::{
     extract::State,
     routing::{get, post},
@@ -5,11 +6,12 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use axum::Extension;
 use std::time::Instant;
 
 use crate::ai_common::{extract_json_value, normalize_manifest, validate_manifest};
-use crate::ai_tools::{chat_with_tools as llm_chat_with_tools, LlmConfig, resolve_deepseek_api_key};
+use crate::ai_tools::{
+    chat_with_tools as llm_chat_with_tools, resolve_deepseek_api_key, LlmConfig,
+};
 use crate::app_state::AppState;
 use crate::auth::AuthedUser;
 use crate::models::ProjectManifest;
@@ -18,8 +20,8 @@ use crate::ApiError;
 use chat_stream::chat_with_tools_stream;
 use stream::transform_manifest_with_tools_stream;
 use support::{
-    build_ai_audit_meta_json, build_chat_system_prompt, build_history_messages, build_transform_system_prompt,
-    build_transform_user_prompt,
+    build_ai_audit_meta_json, build_chat_system_prompt, build_history_messages,
+    build_transform_system_prompt, build_transform_user_prompt,
 };
 use transform_conversation_stream::transform_conversation_stream;
 
@@ -47,7 +49,9 @@ async fn openrouter_models() -> Result<Json<serde_json::Value>, ApiError> {
         .await
         .map_err(|_| ApiError::bad_request("failed to fetch Open Router models"))?;
     if !res.status().is_success() {
-        return Err(ApiError::bad_request("Open Router models API returned non-200"));
+        return Err(ApiError::bad_request(
+            "Open Router models API returned non-200",
+        ));
     }
     let data: serde_json::Value = res
         .json()
@@ -139,8 +143,14 @@ struct ChatResponse {
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/ai/openrouter-models", get(openrouter_models))
-        .route("/api/ai/transform-tools", post(transform_manifest_with_tools))
-        .route("/api/ai/transform-tools-stream", post(transform_manifest_with_tools_stream))
+        .route(
+            "/api/ai/transform-tools",
+            post(transform_manifest_with_tools),
+        )
+        .route(
+            "/api/ai/transform-tools-stream",
+            post(transform_manifest_with_tools_stream),
+        )
         .route(
             "/api/ai/transform-conversation-stream",
             post(transform_conversation_stream),
@@ -201,9 +211,8 @@ async fn transform_manifest_with_tools(
         .get("manifest")
         .cloned()
         .unwrap_or_else(|| parsed.clone());
-    let mut manifest: ProjectManifest = serde_json::from_value(manifest_value).map_err(|_| {
-        ApiError::bad_request("model output does not match ProjectManifest shape")
-    })?;
+    let mut manifest: ProjectManifest = serde_json::from_value(manifest_value)
+        .map_err(|_| ApiError::bad_request("model output does not match ProjectManifest shape"))?;
 
     let llm_scm = parsed
         .get("scmConfig")
@@ -223,7 +232,8 @@ async fn transform_manifest_with_tools(
         });
 
     let history_refs: Vec<&str> = req.history.iter().map(|m| m.content.as_str()).collect();
-    let combined = crate::ai_scm_from_text::combine_transform_text_for_scm(req.input.trim(), &history_refs);
+    let combined =
+        crate::ai_scm_from_text::combine_transform_text_for_scm(req.input.trim(), &history_refs);
     let _scm_config = crate::ai_scm_from_text::apply_bitbucket_scm_from_conversation_text(
         &mut manifest,
         &combined,
@@ -278,7 +288,9 @@ pub(super) fn resolve_llm_config_chat(req: &ChatRequest) -> Result<LlmConfig, Ap
     )
 }
 
-pub(super) fn resolve_llm_config_conversation(req: &TransformConversationRequest) -> Result<LlmConfig, ApiError> {
+pub(super) fn resolve_llm_config_conversation(
+    req: &TransformConversationRequest,
+) -> Result<LlmConfig, ApiError> {
     resolve_llm_config_from(
         req.provider.as_deref(),
         req.model.as_deref(),
@@ -304,7 +316,9 @@ fn resolve_llm_config_from(
             let api_key = openrouter_api_key
                 .map(str::trim)
                 .filter(|s| !s.is_empty())
-                .ok_or_else(|| ApiError::bad_request("Open Router API key is required (set in LLM settings)"))?;
+                .ok_or_else(|| {
+                    ApiError::bad_request("Open Router API key is required (set in LLM settings)")
+                })?;
             LlmConfig::for_openrouter(model, api_key.to_string())
         }
         "ollama" => Ok(LlmConfig::for_ollama(model.map(String::from))),
@@ -333,7 +347,11 @@ async fn chat_with_tools(
         .as_ref()
         .filter(|s| !s.trim().is_empty())
         .cloned()
-        .or_else(|| db.get_active_project_id_for_user(&user.user_id).ok().flatten());
+        .or_else(|| {
+            db.get_active_project_id_for_user(&user.user_id)
+                .ok()
+                .flatten()
+        });
     let project_key: Option<String> = effective_project_id
         .as_ref()
         .and_then(|pid| db.get_project_key_by_id(pid).ok().flatten());
@@ -398,4 +416,3 @@ async fn chat_with_tools(
 
     Ok(Json(ChatResponse { message: content }))
 }
-

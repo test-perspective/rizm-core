@@ -201,9 +201,10 @@ pub(super) fn build_ai_audit_meta_json(
     });
     if let Some(project_id) = project_id {
         if !project_id.trim().is_empty() {
-            ai.as_object_mut()
-                .unwrap()
-                .insert("projectId".to_string(), Value::String(project_id.trim().to_string()));
+            ai.as_object_mut().unwrap().insert(
+                "projectId".to_string(),
+                Value::String(project_id.trim().to_string()),
+            );
         }
     }
     json!({ "ai": ai }).to_string()
@@ -217,7 +218,10 @@ mod tests {
     use crate::auth::{AuthedUser, Role};
     use crate::models::ProjectManifest;
 
-    use super::{build_ai_audit_meta_json, build_chat_system_prompt, build_history_messages, build_transform_conversation_system_prompt};
+    use super::{
+        build_ai_audit_meta_json, build_chat_system_prompt, build_history_messages,
+        build_transform_conversation_system_prompt,
+    };
 
     #[test]
     fn build_ai_audit_meta_json_includes_expected_fields() {
@@ -245,9 +249,18 @@ mod tests {
         let parsed: Value = serde_json::from_str(&meta_json).expect("parse meta json");
         let ai = parsed.get("ai").expect("ai field");
         assert_eq!(ai.get("kind").and_then(|v| v.as_str()), Some("chat-tools"));
-        assert_eq!(ai.get("model").and_then(|v| v.as_str()), Some("deepseek-chat"));
-        assert_eq!(ai.get("prompt").and_then(|v| v.as_str()), Some("user prompt"));
-        assert_eq!(ai.get("projectId").and_then(|v| v.as_str()), Some("project-1"));
+        assert_eq!(
+            ai.get("model").and_then(|v| v.as_str()),
+            Some("deepseek-chat")
+        );
+        assert_eq!(
+            ai.get("prompt").and_then(|v| v.as_str()),
+            Some("user prompt")
+        );
+        assert_eq!(
+            ai.get("projectId").and_then(|v| v.as_str()),
+            Some("project-1")
+        );
         assert_eq!(ai.get("elapsedMs").and_then(|v| v.as_u64()), Some(1234));
         let tool_calls_value = ai.get("toolCalls").and_then(|v| v.as_array());
         assert_eq!(tool_calls_value.map(|v| v.len()), Some(2));
@@ -277,9 +290,18 @@ mod tests {
         let out = build_history_messages(&history);
         assert_eq!(out.len(), 2);
         assert_eq!(out[0].get("role").and_then(|v| v.as_str()), Some("user"));
-        assert_eq!(out[0].get("content").and_then(|v| v.as_str()), Some("Hello"));
-        assert_eq!(out[1].get("role").and_then(|v| v.as_str()), Some("assistant"));
-        assert_eq!(out[1].get("content").and_then(|v| v.as_str()), Some("World"));
+        assert_eq!(
+            out[0].get("content").and_then(|v| v.as_str()),
+            Some("Hello")
+        );
+        assert_eq!(
+            out[1].get("role").and_then(|v| v.as_str()),
+            Some("assistant")
+        );
+        assert_eq!(
+            out[1].get("content").and_then(|v| v.as_str()),
+            Some("World")
+        );
     }
 
     #[test]

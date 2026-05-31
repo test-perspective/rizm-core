@@ -10,10 +10,7 @@ use std::sync::OnceLock;
 use anyhow::Context;
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
-use rusqlite::{
-    auto_extension::register_auto_extension,
-    auto_extension::RawAutoExtension,
-};
+use rusqlite::{auto_extension::register_auto_extension, auto_extension::RawAutoExtension};
 use sqlite_vec::sqlite3_vec_init;
 
 pub(crate) const DEFAULT_PROJECT_ID: &str = "default";

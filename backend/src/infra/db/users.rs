@@ -11,13 +11,20 @@ impl Db {
     pub fn count_admin_users(&self) -> anyhow::Result<i64> {
         let conn = self.pool.get().context("get sqlite conn")?;
         let n: i64 = conn
-            .query_row("SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_disabled = 0", [], |row| row.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_disabled = 0",
+                [],
+                |row| row.get(0),
+            )
             .context("count admin users")?;
         Ok(n)
     }
 
     /// Look up user by email (case-insensitive). Use for import matching (Jira assignee/author).
-    pub fn get_user_by_email_case_insensitive(&self, email: &str) -> anyhow::Result<Option<UserRecord>> {
+    pub fn get_user_by_email_case_insensitive(
+        &self,
+        email: &str,
+    ) -> anyhow::Result<Option<UserRecord>> {
         let email = email.trim();
         if email.is_empty() {
             return Ok(None);
@@ -92,7 +99,10 @@ impl Db {
     }
 
     /// Returns id -> email for the given user IDs. IDs not found are omitted.
-    pub fn get_emails_by_user_ids(&self, ids: &[String]) -> anyhow::Result<HashMap<String, String>> {
+    pub fn get_emails_by_user_ids(
+        &self,
+        ids: &[String],
+    ) -> anyhow::Result<HashMap<String, String>> {
         if ids.is_empty() {
             return Ok(HashMap::new());
         }
@@ -148,7 +158,12 @@ impl Db {
         Ok(out)
     }
 
-    pub fn create_local_user(&self, email: &str, role: &str, password_hash: &str) -> anyhow::Result<UserRecord> {
+    pub fn create_local_user(
+        &self,
+        email: &str,
+        role: &str,
+        password_hash: &str,
+    ) -> anyhow::Result<UserRecord> {
         let mut conn = self.pool.get().context("get sqlite conn")?;
         let tx = conn.transaction().context("begin tx")?;
 
@@ -183,7 +198,12 @@ impl Db {
         })
     }
 
-    pub fn update_user_role_disabled(&self, user_id: &str, role: Option<&str>, is_disabled: Option<bool>) -> anyhow::Result<()> {
+    pub fn update_user_role_disabled(
+        &self,
+        user_id: &str,
+        role: Option<&str>,
+        is_disabled: Option<bool>,
+    ) -> anyhow::Result<()> {
         let conn = self.pool.get().context("get sqlite conn")?;
         let now = crate::time::now_ms();
         if role.is_none() && is_disabled.is_none() {
@@ -275,4 +295,3 @@ impl Db {
         Ok(())
     }
 }
-

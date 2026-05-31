@@ -1,10 +1,4 @@
-use axum::{
-    body::Body,
-    extract::State,
-    http::header,
-    response::Response,
-    Extension, Json,
-};
+use axum::{body::Body, extract::State, http::header, response::Response, Extension, Json};
 use bytes::Bytes;
 use std::convert::Infallible;
 use std::time::Instant;
@@ -19,10 +13,10 @@ use crate::auth::AuthedUser;
 use crate::time;
 use crate::ApiError;
 
+use super::resolve_llm_config_conversation;
 use super::support::{
     build_ai_audit_meta_json, build_history_messages, build_transform_conversation_system_prompt,
 };
-use super::resolve_llm_config_conversation;
 use super::TransformConversationRequest;
 
 pub(super) async fn transform_conversation_stream(
@@ -133,9 +127,7 @@ pub(super) async fn transform_conversation_stream(
         );
 
         let _ = progress
-            .send(AiProgressEvent::ChatResult {
-                message: content,
-            })
+            .send(AiProgressEvent::ChatResult { message: content })
             .await;
     });
 
@@ -143,8 +135,14 @@ pub(super) async fn transform_conversation_stream(
     let body = Body::from_stream(stream);
     let mut response = Response::new(body);
     let headers = response.headers_mut();
-    headers.insert(header::CONTENT_TYPE, header::HeaderValue::from_static("application/x-ndjson"));
-    headers.insert(header::CACHE_CONTROL, header::HeaderValue::from_static("no-cache"));
+    headers.insert(
+        header::CONTENT_TYPE,
+        header::HeaderValue::from_static("application/x-ndjson"),
+    );
+    headers.insert(
+        header::CACHE_CONTROL,
+        header::HeaderValue::from_static("no-cache"),
+    );
     headers.insert(
         header::HeaderName::from_static("x-accel-buffering"),
         header::HeaderValue::from_static("no"),

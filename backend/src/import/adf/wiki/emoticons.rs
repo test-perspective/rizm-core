@@ -3,7 +3,9 @@
 use serde_json::Value;
 
 use super::json_norm::is_blocknote_doc_json_string;
-use crate::mcp::markdown::{blocknote_inline_from_jira_plain_text, preprocess_jira_wiki_plain_text};
+use crate::mcp::markdown::{
+    blocknote_inline_from_jira_plain_text, preprocess_jira_wiki_plain_text,
+};
 
 fn content_array_is_plain_text_only(items: &[Value]) -> bool {
     !items.is_empty()
@@ -70,7 +72,12 @@ fn expand_jira_emoticons_in_block(v: &mut Value) -> bool {
         let typ = obj.get("type").and_then(|t| t.as_str()).unwrap_or("");
         if matches!(
             typ,
-            "paragraph" | "heading" | "bulletListItem" | "numberedListItem" | "toggleListItem" | "checkListItem"
+            "paragraph"
+                | "heading"
+                | "bulletListItem"
+                | "numberedListItem"
+                | "toggleListItem"
+                | "checkListItem"
         ) {
             if let Some(Value::Array(content)) = obj.get_mut("content") {
                 if try_rehydrate_plain_text_content_array(content) {

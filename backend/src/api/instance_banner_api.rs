@@ -42,7 +42,8 @@ pub(crate) fn validate_background_color(input: &str) -> Result<String, ApiError>
         return Err(ApiError::bad_request("backgroundColor is required"));
     }
     if let Some(hex) = s.strip_prefix('#') {
-        let ok_len = matches!(hex.len(), 3 | 4 | 6 | 8) && hex.chars().all(|c| c.is_ascii_hexdigit());
+        let ok_len =
+            matches!(hex.len(), 3 | 4 | 6 | 8) && hex.chars().all(|c| c.is_ascii_hexdigit());
         if ok_len {
             return Ok(format!("#{}", hex.to_ascii_lowercase()));
         }
@@ -52,7 +53,11 @@ pub(crate) fn validate_background_color(input: &str) -> Result<String, ApiError>
         .strip_prefix("rgb(")
         .and_then(|x| x.strip_suffix(')'))
         .ok_or_else(|| ApiError::bad_request("invalid backgroundColor"))?;
-    let parts: Vec<&str> = inner.split(',').map(|p| p.trim()).filter(|p| !p.is_empty()).collect();
+    let parts: Vec<&str> = inner
+        .split(',')
+        .map(|p| p.trim())
+        .filter(|p| !p.is_empty())
+        .collect();
     if parts.len() != 3 {
         return Err(ApiError::bad_request("invalid backgroundColor"));
     }
@@ -232,9 +237,12 @@ mod tests {
         .unwrap();
 
         let state2 = test_state(db2);
-        let got = get_instance_banner(axum::extract::State(state2), Extension(authed(Role::Viewer)))
-            .await
-            .unwrap();
+        let got = get_instance_banner(
+            axum::extract::State(state2),
+            Extension(authed(Role::Viewer)),
+        )
+        .await
+        .unwrap();
         assert_eq!(got.0.message, "Hello");
         assert_eq!(got.0.background_color, "rgb(10, 20, 30)");
     }

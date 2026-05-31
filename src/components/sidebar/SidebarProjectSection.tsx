@@ -1,5 +1,6 @@
 import type { ProjectMeta } from '../../types';
 import { ProjectOverflowMenu } from './ProjectOverflowMenu';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 interface SidebarProjectSectionProps {
   projects: ProjectMeta[];
@@ -16,6 +17,7 @@ export function SidebarProjectSection({
   onOpenProjectDetail,
   onAddProject,
 }: SidebarProjectSectionProps) {
+  const isMobile = useIsMobile();
   return (
     <div className="p-4 border-b border-zinc-800">
       <div className="flex items-center gap-2">
@@ -40,11 +42,14 @@ export function SidebarProjectSection({
               </option>
             ))}
           </select>
-          <ProjectOverflowMenu
-            onOpenProjectDetail={onOpenProjectDetail}
-            onAddProject={onAddProject}
-            menuButtonTestId="sidebar-project-overflow-menu"
-          />
+          {/* REQ-286: Project Details / Add Project are desktop-only — mobile keeps just the picker. */}
+          {!isMobile && (
+            <ProjectOverflowMenu
+              onOpenProjectDetail={onOpenProjectDetail}
+              onAddProject={onAddProject}
+              menuButtonTestId="sidebar-project-overflow-menu"
+            />
+          )}
         </div>
       </div>
     </div>

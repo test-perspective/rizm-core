@@ -1,11 +1,14 @@
 import { useCallback } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 
-import { getInitialGroupByValueForNewEntity } from '../utils/boardColumns';
-import { computeOrderForNewEntityAtTopInLane, ORDER_KEY } from '../components/board/boardOrder';
+import { buildDefaultPropertiesForNewEntity } from './buildCreateEntityDefaults';
 import type { Entity, PropertyDefinition, ViewConfig } from '../types';
 
 type BuildPathFn = (params: { projectId: string; viewId: string; entityId?: string | null }) => string;
+
+export type CreateEntityOptions = {
+  groupByValue?: string;
+};
 
 type UseCreateEntityHandlerArgs = {
   currentView: ViewConfig | null;
@@ -28,51 +31,37 @@ export function useCreateEntityHandler({
   navigate,
   addEntity,
 }: UseCreateEntityHandlerArgs) {
-  const handleCreateEntity = useCallback(() => {
-    if (!currentView || !currentEntity || !activeProjectId) return;
-    if (currentView.type === 'wiki') return;
+  const handleCreateEntity = useCallback(
+    (options?: CreateEntityOptions) => {
+      if (!currentView || !currentEntity || !activeProjectId) return;
+      if (currentView.type === 'wiki') return;
 
-    const initialGroupByValue =
-      currentView.type === 'board'
-        ? getInitialGroupByValueForNewEntity(currentView, currentEntity.properties)
-        : undefined;
+      const defaultProps = buildDefaultPropertiesForNewEntity({
+        currentView,
+        properties: currentEntity.properties,
+        currentEntities,
+        groupByValue: options?.groupByValue,
+      });
 
-    const defaultProps: Record<string, unknown> = {};
-    currentEntity.properties.forEach((prop) => {
-      if (prop.type === 'text') {
-        if (prop.name === 'taskKey') return;
-        defaultProps[prop.name] = '';
-      } else if (prop.type === 'select' && prop.options && prop.options.length > 0) {
-        if (initialGroupByValue && prop.name === currentView.groupBy) {
-          defaultProps[prop.name] = initialGroupByValue;
-        } else {
-          defaultProps[prop.name] = prop.options[0];
-        }
+      const newEntity = addEntity(currentView.entityId, defaultProps);
+      if (effectiveViewId) {
+        navigate(
+          buildPath({ projectId: activeProjectId, viewId: effectiveViewId, entityId: newEntity.id }),
+          { replace: false }
+        );
       }
-    });
-
-    if (currentView.type === 'board' && initialGroupByValue && currentView.groupBy) {
-      const laneEntities = currentEntities.filter(
-        (e) => e.properties[currentView.groupBy!] === initialGroupByValue
-      );
-      const order = computeOrderForNewEntityAtTopInLane(laneEntities);
-      defaultProps[ORDER_KEY] = order;
-    }
-
-    const newEntity = addEntity(currentView.entityId, defaultProps);
-    if (effectiveViewId) {
-      navigate(buildPath({ projectId: activeProjectId, viewId: effectiveViewId, entityId: newEntity.id }), { replace: false });
-    }
-  }, [
-    currentView,
-    currentEntity,
-    currentEntities,
-    addEntity,
-    effectiveViewId,
-    activeProjectId,
-    navigate,
-    buildPath,
-  ]);
+    },
+    [
+      currentView,
+      currentEntity,
+      currentEntities,
+      addEntity,
+      effectiveViewId,
+      activeProjectId,
+      navigate,
+      buildPath,
+    ]
+  );
 
   return { handleCreateEntity };
 }

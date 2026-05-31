@@ -87,7 +87,10 @@ fn main() -> anyhow::Result<()> {
     }
 
     let Some(pk) = project_key.filter(|s| !s.trim().is_empty()) else {
-        eprintln!("Missing --project-key <KEY> (or use --list-projects). DB: {}", db_path);
+        eprintln!(
+            "Missing --project-key <KEY> (or use --list-projects). DB: {}",
+            db_path
+        );
         std::process::exit(1);
     };
 

@@ -34,13 +34,16 @@ pub(super) fn parse_hh_mm(s: &str) -> Result<NaiveTime, ApiError> {
     let m: u32 = parts[1]
         .parse()
         .map_err(|_| ApiError::bad_request("scheduledTime must be HH:MM"))?;
-    NaiveTime::from_hms_opt(h, m, 0).ok_or_else(|| ApiError::bad_request("scheduledTime must be HH:MM"))
+    NaiveTime::from_hms_opt(h, m, 0)
+        .ok_or_else(|| ApiError::bad_request("scheduledTime must be HH:MM"))
 }
 
 fn validate_settings(s: &DbBackupSettingsDto) -> Result<DbBackupSettingsDto, ApiError> {
     let scheduled_time = parse_hh_mm(&s.scheduled_time)?;
     if s.retention_days < 1 || s.retention_days > 3650 {
-        return Err(ApiError::bad_request("retentionDays must be between 1 and 3650"));
+        return Err(ApiError::bad_request(
+            "retentionDays must be between 1 and 3650",
+        ));
     }
     Ok(DbBackupSettingsDto {
         enabled: s.enabled,

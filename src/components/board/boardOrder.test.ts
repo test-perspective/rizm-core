@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Entity } from '../../types';
-import { computeOrderForMove, ORDER_KEY, getOrder, sortEntitiesForBoard, computeOrderForNewEntityAtTopInLane } from './boardOrder';
+import { computeOrderForMove, ORDER_KEY, getOrder, sortEntitiesForBoard, computeOrderForNewEntityAtTopInLane, computeOrderForNewEntityAtBottomInLane } from './boardOrder';
 
 describe('boardOrder', () => {
   const createEntity = (id: string, order: number | null, createdAt: number = 1000): Entity => ({
@@ -218,6 +218,38 @@ describe('boardOrder', () => {
       const order = computeOrderForNewEntityAtTopInLane(laneEntities);
       // Minimum order is 5000, so new order should be 5000 - 1000 = 4000
       expect(order).toBe(4000);
+    });
+  });
+
+  describe('computeOrderForNewEntityAtBottomInLane', () => {
+    it('should return 0 when lane is empty', () => {
+      expect(computeOrderForNewEntityAtBottomInLane([])).toBe(0);
+    });
+
+    it('should return maxOrder + ORDER_GAP when lane has entities with orders', () => {
+      const laneEntities: Entity[] = [
+        createEntity('1', 1000),
+        createEntity('2', 3000),
+        createEntity('3', 2000),
+      ];
+      expect(computeOrderForNewEntityAtBottomInLane(laneEntities)).toBe(4000);
+    });
+
+    it('should return null when lane has only entities without orders', () => {
+      const laneEntities: Entity[] = [
+        createEntity('1', null),
+        createEntity('2', null),
+      ];
+      expect(computeOrderForNewEntityAtBottomInLane(laneEntities)).toBeNull();
+    });
+
+    it('should ignore entities without orders when computing max order', () => {
+      const laneEntities: Entity[] = [
+        createEntity('1', null),
+        createEntity('2', 2000),
+        createEntity('3', 5000),
+      ];
+      expect(computeOrderForNewEntityAtBottomInLane(laneEntities)).toBe(6000);
     });
   });
 });

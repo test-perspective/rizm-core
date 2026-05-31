@@ -102,10 +102,10 @@ impl IntoResponse for ApiError {
             let secs = ((ms + 999) / 1000).max(1);
             res.headers_mut().insert(
                 axum::http::header::RETRY_AFTER,
-                HeaderValue::from_str(&secs.to_string()).unwrap_or_else(|_| HeaderValue::from_static("1")),
+                HeaderValue::from_str(&secs.to_string())
+                    .unwrap_or_else(|_| HeaderValue::from_static("1")),
             );
         }
         res
     }
 }
-

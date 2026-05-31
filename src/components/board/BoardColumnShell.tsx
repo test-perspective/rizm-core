@@ -29,7 +29,7 @@ export function BoardColumnShell({
 }: BoardColumnShellProps) {
   const rootClass = isSingleColumn
     ? 'w-full bg-zinc-950 border border-zinc-800 rounded-lg'
-    : 'w-80 flex-shrink-0 bg-zinc-950 border border-zinc-800 rounded-lg';
+    : 'w-72 sm:w-80 flex-shrink-0 snap-start bg-zinc-950 border border-zinc-800 rounded-lg';
 
   return (
     <div className={rootClass}>

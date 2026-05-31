@@ -75,4 +75,3 @@ pub(crate) fn client_ip(headers: &HeaderMap) -> Option<String> {
 pub(crate) fn json_meta(email: &str, ip: &str) -> String {
     serde_json::json!({ "email": email, "ip": ip }).to_string()
 }
-

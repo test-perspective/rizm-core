@@ -20,14 +20,19 @@ impl Db {
             .context("select project policy")?;
 
         if let Some(json) = policy_json {
-            let policy: ProjectPolicy = serde_json::from_str(&json).context("deserialize project policy")?;
+            let policy: ProjectPolicy =
+                serde_json::from_str(&json).context("deserialize project policy")?;
             Ok(Some(policy))
         } else {
             Ok(None)
         }
     }
 
-    pub fn set_project_policy(&self, project_id: &str, policy: ProjectPolicy) -> anyhow::Result<()> {
+    pub fn set_project_policy(
+        &self,
+        project_id: &str,
+        policy: ProjectPolicy,
+    ) -> anyhow::Result<()> {
         let conn = self.pool.get().context("get sqlite conn")?;
         let policy_json = serde_json::to_string(&policy).context("serialize project policy")?;
         let now_ms = crate::time::now_ms();
@@ -57,7 +62,11 @@ impl Db {
         Ok(policy_json)
     }
 
-    pub fn set_user_dashboard_policy_json(&self, user_id: &str, policy_json: &str) -> anyhow::Result<()> {
+    pub fn set_user_dashboard_policy_json(
+        &self,
+        user_id: &str,
+        policy_json: &str,
+    ) -> anyhow::Result<()> {
         let conn = self.pool.get().context("get sqlite conn")?;
         let now_ms = crate::time::now_ms();
         conn.execute(
@@ -69,4 +78,3 @@ impl Db {
         Ok(())
     }
 }
-

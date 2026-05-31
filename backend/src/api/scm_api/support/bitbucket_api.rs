@@ -159,7 +159,11 @@ pub async fn bitbucket_create_branch(
         return Err(ApiError::bad_request(text));
     }
     let json: Value = res.json().await.map_err(|_| ApiError::internal())?;
-    let branch_name = json.get("name").and_then(|v| v.as_str()).unwrap_or(name).to_string();
+    let branch_name = json
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or(name)
+        .to_string();
     let html = json
         .get("links")
         .and_then(|l| l.get("html"))
@@ -212,14 +216,26 @@ pub async fn bitbucket_create_pull_request(
         return Err(ApiError::bad_request(text));
     }
     let json: Value = res.json().await.map_err(|_| ApiError::internal())?;
-    let id = json.get("id").map(|v| v.to_string()).unwrap_or_else(|| "unknown".to_string());
-    let title = json.get("title").and_then(|v| v.as_str()).unwrap_or(&req.title).to_string();
+    let id = json
+        .get("id")
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+    let title = json
+        .get("title")
+        .and_then(|v| v.as_str())
+        .unwrap_or(&req.title)
+        .to_string();
     let html = json
         .get("links")
         .and_then(|l| l.get("html"))
         .and_then(|h| h.get("href"))
         .and_then(|h| h.as_str())
         .map(|s| s.to_string())
-        .unwrap_or_else(|| format!("https://bitbucket.org/{}/{}/pull-requests", cfg.workspace, cfg.repo_slug));
+        .unwrap_or_else(|| {
+            format!(
+                "https://bitbucket.org/{}/{}/pull-requests",
+                cfg.workspace, cfg.repo_slug
+            )
+        });
     Ok((id, title, html))
 }

@@ -59,8 +59,10 @@ impl Db {
             .into_iter()
             .filter(|e| e.entity_id == WIKI_ENTITY)
             .collect();
-        let wiki_by_id_source: HashMap<String, Entity> =
-            wiki_source.iter().map(|e| (e.id.clone(), e.clone())).collect();
+        let wiki_by_id_source: HashMap<String, Entity> = wiki_source
+            .iter()
+            .map(|e| (e.id.clone(), e.clone()))
+            .collect();
 
         let dest_entities = if dest_project_id == source_project_id {
             vec![]
@@ -73,8 +75,10 @@ impl Db {
             .filter(|e| e.entity_id == WIKI_ENTITY)
             .collect();
 
-        let wiki_by_id_dest: HashMap<String, Entity> =
-            wiki_dest.iter().map(|e| (e.id.clone(), e.clone())).collect();
+        let wiki_by_id_dest: HashMap<String, Entity> = wiki_dest
+            .iter()
+            .map(|e| (e.id.clone(), e.clone()))
+            .collect();
 
         let subtree_ids = collect_subtree_ids(page_id, &wiki_by_id_source)?;
         let subtree_set: HashSet<String> = subtree_ids.iter().cloned().collect();
@@ -172,8 +176,10 @@ impl Db {
                 .collect()
         };
         dest_sibling_candidates.sort_by(|a, b| wiki_sort_key(a).cmp(&wiki_sort_key(b)));
-        let mut dest_order_ids: Vec<String> =
-            dest_sibling_candidates.iter().map(|e| e.id.clone()).collect();
+        let mut dest_order_ids: Vec<String> = dest_sibling_candidates
+            .iter()
+            .map(|e| e.id.clone())
+            .collect();
         dest_order_ids = insert_root_into_sibling_order(dest_order_ids, page_id, before_page_id);
 
         let tx = conn
@@ -191,7 +197,8 @@ impl Db {
                 now,
             )?;
         } else {
-            let _ = reindex_siblings_under_parent(&tx, source_project_id, None, &source_exclude, now)?;
+            let _ =
+                reindex_siblings_under_parent(&tx, source_project_id, None, &source_exclude, now)?;
         }
 
         // 2) Cross-project: move subtree rows + collab to destination (with URL rewrites).
@@ -212,7 +219,8 @@ impl Db {
                 let mut props: Map<String, serde_json::Value> =
                     serde_json::from_str(&props_json).context("deserialize")?;
                 if let Some(serde_json::Value::String(doc)) = props.get_mut("doc") {
-                    *doc = rewrite_project_in_attachment_urls(doc, source_project_id, dest_project_id);
+                    *doc =
+                        rewrite_project_in_attachment_urls(doc, source_project_id, dest_project_id);
                 }
                 props.insert(
                     "updatedBy".to_string(),
@@ -255,13 +263,7 @@ impl Db {
         }
 
         // 3) Order siblings under destination parent (root is now in dest project when cross-project).
-        apply_sibling_order(
-            &tx,
-            dest_project_id,
-            &dest_order_ids,
-            now,
-            updated_by,
-        )?;
+        apply_sibling_order(&tx, dest_project_id, &dest_order_ids, now, updated_by)?;
 
         // 4) Set parentId on the moved root.
         {
@@ -321,14 +323,22 @@ impl Db {
         tx.commit().context("commit move tx")?;
 
         if cross_project {
-            delete_attachment_files_for_project(db_path, source_project_id, &wiki_by_id_source, &subtree_ids);
+            delete_attachment_files_for_project(
+                db_path,
+                source_project_id,
+                &wiki_by_id_source,
+                &subtree_ids,
+            );
         }
 
         // Reload all touched entities for indexer + response.
         let mut index_upserts: Vec<(String, Entity)> = vec![];
         let mut seen_up: HashSet<(String, String)> = HashSet::new();
 
-        let push_upsert = |pid: &str, eid: &str, upserts: &mut Vec<(String, Entity)>, seen: &mut HashSet<(String, String)>| {
+        let push_upsert = |pid: &str,
+                           eid: &str,
+                           upserts: &mut Vec<(String, Entity)>,
+                           seen: &mut HashSet<(String, String)>| {
             if let Ok(Some(e)) = self.get_entity_for_project(pid, eid) {
                 let key = (pid.to_string(), eid.to_string());
                 if seen.insert(key.clone()) {

@@ -7,14 +7,16 @@ use axum::{
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+use super::attachments_api::{
+    attachment_path, attachments_root_from_db_path, read_attachments_from_entity,
+};
 use crate::app_state::AppState;
 use crate::auth::AuthedUser;
 use crate::models::Entity;
-use super::attachments_api::{attachments_root_from_db_path, attachment_path, read_attachments_from_entity};
 use crate::permissions::{can_read, can_write};
 use crate::search::indexer::{enqueue_entity_delete, enqueue_entity_upsert};
-use crate::ApiError;
 use crate::time;
+use crate::ApiError;
 use axum::Extension;
 use rand::Rng;
 
@@ -55,7 +57,9 @@ fn parse_if_match_updated_at(headers: &HeaderMap) -> Result<i64, ApiError> {
         .unwrap_or_default();
 
     if raw.is_empty() {
-        return Err(ApiError::precondition_required("If-Match header is required"));
+        return Err(ApiError::precondition_required(
+            "If-Match header is required",
+        ));
     }
 
     // Accept W/"123" or "123" or 123
@@ -67,19 +71,22 @@ fn parse_if_match_updated_at(headers: &HeaderMap) -> Result<i64, ApiError> {
 
 fn get_entity_title(entity: &Entity) -> String {
     if entity.entity_id == "task" || entity.entity_id == "item" {
-        entity.properties
+        entity
+            .properties
             .get("taskKey")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string())
             .or_else(|| {
-                entity.properties
+                entity
+                    .properties
                     .get("title")
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string())
             })
             .unwrap_or_else(|| "Untitled Task".to_string())
     } else if entity.entity_id == "wikiPage" {
-        entity.properties
+        entity
+            .properties
             .get("title")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string())
@@ -103,17 +110,16 @@ fn build_activity_meta_json(
         "project_id": project_id,
     });
     if let Some(changes) = changes {
-        meta.as_object_mut().unwrap().insert("changes".to_string(), json!(changes));
+        meta.as_object_mut()
+            .unwrap()
+            .insert("changes".to_string(), json!(changes));
     }
     serde_json::to_string(&meta).unwrap_or_default()
 }
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route(
-            "/api/projects/:project_id/entities",
-            post(create_entity),
-        )
+        .route("/api/projects/:project_id/entities", post(create_entity))
         .route(
             "/api/projects/:project_id/entities/:entity_pk",
             get(get_entity).patch(patch_entity).delete(delete_entity),
@@ -161,9 +167,14 @@ async fn create_entity(
     // Set server-controlled creator fields
     properties.insert("createdBy".to_string(), Value::String(user.user_id.clone()));
     properties.insert("updatedBy".to_string(), Value::String(user.user_id.clone()));
-    
+
     let e = db
-        .create_entity_for_project(&project_id, req.id.as_deref(), req.entity_id.trim(), properties)
+        .create_entity_for_project(
+            &project_id,
+            req.id.as_deref(),
+            req.entity_id.trim(),
+            properties,
+        )
         .map_err(|e| {
             let s = e.to_string();
             if s.contains("project not found") {
@@ -227,7 +238,7 @@ async fn patch_entity(
     let mut sanitized_patch = req.patch.clone();
     sanitized_patch.remove("createdBy");
     sanitized_patch.remove("updatedBy");
-    
+
     // Build changes diff from sanitized patch (before adding server-controlled updatedBy)
     let mut changes = serde_json::Map::new();
     for (key, new_value) in &sanitized_patch {
@@ -249,7 +260,9 @@ async fn patch_entity(
         .map_err(|e| match e {
             crate::db::EntityWriteError::NotFound => ApiError::not_found("not found"),
             crate::db::EntityWriteError::Conflict { current_updated_at } => {
-                ApiError::precondition_failed(format!("conflict (current updatedAt = {current_updated_at})"))
+                ApiError::precondition_failed(format!(
+                    "conflict (current updatedAt = {current_updated_at})"
+                ))
             }
             crate::db::EntityWriteError::ServiceUnavailable => {
                 ApiError::service_unavailable("database temporarily unavailable")
@@ -259,15 +272,27 @@ async fn patch_entity(
     // Log activity for task or wiki updates
     if res.entity_id == "task" || res.entity_id == "item" || res.entity_id == "wikiPage" {
         let entity_title = get_entity_title(&res);
-        let action = if res.entity_id == "task" || res.entity_id == "item" { "TASK_UPDATED" } else { "WIKI_UPDATED" };
-        let entity_type = if res.entity_id == "task" || res.entity_id == "item" { "TASK" } else { "WIKI" };
+        let action = if res.entity_id == "task" || res.entity_id == "item" {
+            "TASK_UPDATED"
+        } else {
+            "WIKI_UPDATED"
+        };
+        let entity_type = if res.entity_id == "task" || res.entity_id == "item" {
+            "TASK"
+        } else {
+            "WIKI"
+        };
 
         let meta_json = build_activity_meta_json(
             entity_type,
             &res.id,
             &entity_title,
             &project_id,
-            if changes.is_empty() { None } else { Some(changes) },
+            if changes.is_empty() {
+                None
+            } else {
+                Some(changes)
+            },
         );
         let db_clone = db.clone();
         let _ = db.insert_audit_log_with_activity(
@@ -313,12 +338,13 @@ async fn delete_entity(
         .map_err(|_| ApiError::internal())?
         .ok_or_else(|| ApiError::not_found("not found"))?;
 
-    db
-        .delete_entity_for_project(&project_id, &entity_pk, expected)
+    db.delete_entity_for_project(&project_id, &entity_pk, expected)
         .map_err(|e| match e {
             crate::db::EntityWriteError::NotFound => ApiError::not_found("not found"),
             crate::db::EntityWriteError::Conflict { current_updated_at } => {
-                ApiError::precondition_failed(format!("conflict (current updatedAt = {current_updated_at})"))
+                ApiError::precondition_failed(format!(
+                    "conflict (current updatedAt = {current_updated_at})"
+                ))
             }
             crate::db::EntityWriteError::ServiceUnavailable => {
                 ApiError::service_unavailable("database temporarily unavailable")
@@ -338,7 +364,13 @@ async fn delete_entity(
     // Log activity for task deletion
     if entity_to_delete.entity_id == "task" || entity_to_delete.entity_id == "item" {
         let entity_title = get_entity_title(&entity_to_delete);
-        let meta_json = build_activity_meta_json("TASK", &entity_to_delete.id, &entity_title, &project_id, None);
+        let meta_json = build_activity_meta_json(
+            "TASK",
+            &entity_to_delete.id,
+            &entity_title,
+            &project_id,
+            None,
+        );
         let now = time::now_ms();
         let db_clone = db.clone();
         let _ = db.insert_audit_log_with_activity(
@@ -364,4 +396,3 @@ async fn delete_entity(
 
 #[cfg(test)]
 mod tests;
-

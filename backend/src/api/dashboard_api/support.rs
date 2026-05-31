@@ -7,7 +7,10 @@ use crate::ApiError;
 
 use super::{DashboardParentNode, SectionFilter};
 
-pub(super) fn filter_self_updates(user_id: &str, mut parents: Vec<DashboardParentNode>) -> Vec<DashboardParentNode> {
+pub(super) fn filter_self_updates(
+    user_id: &str,
+    mut parents: Vec<DashboardParentNode>,
+) -> Vec<DashboardParentNode> {
     for parent in parents.iter_mut() {
         parent
             .children

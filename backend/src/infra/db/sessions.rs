@@ -49,8 +49,11 @@ impl Db {
 
     pub fn touch_session(&self, session_id: &str, now_ms: i64) -> anyhow::Result<()> {
         let conn = self.pool.get().context("get sqlite conn")?;
-        conn.execute("UPDATE sessions SET last_seen_at = ?2 WHERE id = ?1", params![session_id, now_ms])
-            .context("touch session")?;
+        conn.execute(
+            "UPDATE sessions SET last_seen_at = ?2 WHERE id = ?1",
+            params![session_id, now_ms],
+        )
+        .context("touch session")?;
         Ok(())
     }
 
@@ -64,9 +67,11 @@ impl Db {
     pub fn delete_expired_sessions(&self, now_ms: i64) -> anyhow::Result<i64> {
         let conn = self.pool.get().context("get sqlite conn")?;
         let n = conn
-            .execute("DELETE FROM sessions WHERE expires_at <= ?1", params![now_ms])
+            .execute(
+                "DELETE FROM sessions WHERE expires_at <= ?1",
+                params![now_ms],
+            )
             .context("delete expired sessions")?;
         Ok(n as i64)
     }
 }
-

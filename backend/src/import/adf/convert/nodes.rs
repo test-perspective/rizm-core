@@ -7,7 +7,10 @@ use super::super::context::AdfImportContext;
 use super::inline::adf_inline_to_blocknote_content;
 use super::media::adf_media_single_blocks;
 
-pub(in crate::import::adf) fn adf_blocks_from_node(node: &Value, ctx: Option<&AdfImportContext>) -> Vec<Value> {
+pub(in crate::import::adf) fn adf_blocks_from_node(
+    node: &Value,
+    ctx: Option<&AdfImportContext>,
+) -> Vec<Value> {
     let obj = match node.as_object() {
         Some(o) => o,
         None => return vec![],
@@ -16,7 +19,11 @@ pub(in crate::import::adf) fn adf_blocks_from_node(node: &Value, ctx: Option<&Ad
         Some(x) => x,
         None => return vec![],
     };
-    let content: &[Value] = obj.get("content").and_then(|c| c.as_array()).map(|v| v.as_slice()).unwrap_or(&[]);
+    let content: &[Value] = obj
+        .get("content")
+        .and_then(|c| c.as_array())
+        .map(|v| v.as_slice())
+        .unwrap_or(&[]);
 
     if t == "mediaSingle" {
         return adf_media_single_blocks(node, ctx);
@@ -55,10 +62,17 @@ pub(in crate::import::adf) fn adf_blocks_from_node(node: &Value, ctx: Option<&Ad
     vec![]
 }
 
-pub(in crate::import::adf) fn adf_block_to_blocknote(node: &Value, ctx: Option<&AdfImportContext>) -> Option<Value> {
+pub(in crate::import::adf) fn adf_block_to_blocknote(
+    node: &Value,
+    ctx: Option<&AdfImportContext>,
+) -> Option<Value> {
     let obj = node.as_object()?;
     let t = obj.get("type")?.as_str()?;
-    let content: &[Value] = obj.get("content").and_then(|c| c.as_array()).map(|v| v.as_slice()).unwrap_or(&[]);
+    let content: &[Value] = obj
+        .get("content")
+        .and_then(|c| c.as_array())
+        .map(|v| v.as_slice())
+        .unwrap_or(&[]);
 
     let id = uuid::Uuid::new_v4().to_string();
 
@@ -79,8 +93,14 @@ pub(in crate::import::adf) fn adf_block_to_blocknote(node: &Value, ctx: Option<&
                 .and_then(|a| a.get("level"))
                 .and_then(|l| l.as_i64())
                 .unwrap_or(1);
-            let mut props = blocks::block_props().as_object().cloned().unwrap_or_default();
-            props.insert("level".to_string(), Value::Number(serde_json::Number::from(level)));
+            let mut props = blocks::block_props()
+                .as_object()
+                .cloned()
+                .unwrap_or_default();
+            props.insert(
+                "level".to_string(),
+                Value::Number(serde_json::Number::from(level)),
+            );
             let segs = adf_inline_to_blocknote_content(content);
             Some(json!({
                 "id": id,
@@ -187,7 +207,11 @@ pub(in crate::import::adf) fn adf_list_item_to_blocknote(
     ctx: Option<&AdfImportContext>,
 ) -> Option<Value> {
     let obj = node.as_object()?;
-    let content: &[Value] = obj.get("content").and_then(|c| c.as_array()).map(|v| v.as_slice()).unwrap_or(&[]);
+    let content: &[Value] = obj
+        .get("content")
+        .and_then(|c| c.as_array())
+        .map(|v| v.as_slice())
+        .unwrap_or(&[]);
 
     let id = uuid::Uuid::new_v4().to_string();
 
@@ -198,12 +222,21 @@ pub(in crate::import::adf) fn adf_list_item_to_blocknote(
         if let Some(o) = c.as_object() {
             let t = o.get("type").and_then(|v| v.as_str()).unwrap_or("");
             if t == "paragraph" {
-                let p_content: &[Value] = o.get("content").and_then(|x| x.as_array()).map(|v| v.as_slice()).unwrap_or(&[]);
+                let p_content: &[Value] = o
+                    .get("content")
+                    .and_then(|x| x.as_array())
+                    .map(|v| v.as_slice())
+                    .unwrap_or(&[]);
                 inline_segs.extend(adf_inline_to_blocknote_content(p_content));
             } else if t == "mediaSingle" {
                 child_blocks.extend(adf_media_single_blocks(c, ctx));
             } else if t == "bulletList" || t == "orderedList" {
-                for item in o.get("content").and_then(|x| x.as_array()).map(|v| v.as_slice()).unwrap_or(&[]) {
+                for item in o
+                    .get("content")
+                    .and_then(|x| x.as_array())
+                    .map(|v| v.as_slice())
+                    .unwrap_or(&[])
+                {
                     if let Some(block) = adf_list_item_to_blocknote(
                         item,
                         if t == "bulletList" {

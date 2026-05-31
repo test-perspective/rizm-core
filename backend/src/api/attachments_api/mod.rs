@@ -19,8 +19,8 @@ mod handlers;
 mod meta;
 mod storage;
 
-pub use meta::AttachmentMeta;
 pub(crate) use meta::read_attachments_from_entity;
+pub use meta::AttachmentMeta;
 pub use storage::delete_project_attachments_dir;
 pub(crate) use storage::{
     attachment_path, attachments_root_from_db_path, write_import_attachment_bytes,

@@ -72,7 +72,10 @@ impl Db {
         })
     }
 
-    pub fn get_import_session(&self, session_id: &str) -> anyhow::Result<Option<ImportSessionRecord>> {
+    pub fn get_import_session(
+        &self,
+        session_id: &str,
+    ) -> anyhow::Result<Option<ImportSessionRecord>> {
         let conn = self.pool.get().context("get sqlite conn")?;
         let row: Option<(String, String, Option<String>, String, String, Option<String>, Option<String>, i64, i64)> = conn
             .query_row(
@@ -96,7 +99,17 @@ impl Db {
             .optional()
             .context("select import_session")?;
         Ok(row.map(
-            |(id, provider, project_id, created_by_user_id, connection_config_json, metadata_json, mapping_config_json, created_at, updated_at)| {
+            |(
+                id,
+                provider,
+                project_id,
+                created_by_user_id,
+                connection_config_json,
+                metadata_json,
+                mapping_config_json,
+                created_at,
+                updated_at,
+            )| {
                 ImportSessionRecord {
                     id,
                     provider,
@@ -212,7 +225,19 @@ impl Db {
             .optional()
             .context("select import_job")?;
         Ok(row.map(
-            |(id, session_id, project_id, status, progress_percent, processed_count, total_count, error_message, started_at, completed_at, created_at)| {
+            |(
+                id,
+                session_id,
+                project_id,
+                status,
+                progress_percent,
+                processed_count,
+                total_count,
+                error_message,
+                started_at,
+                completed_at,
+                created_at,
+            )| {
                 ImportJobRecord {
                     id,
                     session_id,
@@ -230,7 +255,10 @@ impl Db {
         ))
     }
 
-    pub fn get_import_job_by_project(&self, project_id: &str) -> anyhow::Result<Option<ImportJobRecord>> {
+    pub fn get_import_job_by_project(
+        &self,
+        project_id: &str,
+    ) -> anyhow::Result<Option<ImportJobRecord>> {
         let conn = self.pool.get().context("get sqlite conn")?;
         let row: Option<(String, String, String, String, i64, i64, Option<i64>, Option<String>, Option<i64>, Option<i64>, i64)> = conn
             .query_row(
@@ -256,7 +284,19 @@ impl Db {
             .optional()
             .context("select import_job by project")?;
         Ok(row.map(
-            |(id, session_id, project_id, status, progress_percent, processed_count, total_count, error_message, started_at, completed_at, created_at)| {
+            |(
+                id,
+                session_id,
+                project_id,
+                status,
+                progress_percent,
+                processed_count,
+                total_count,
+                error_message,
+                started_at,
+                completed_at,
+                created_at,
+            )| {
                 ImportJobRecord {
                     id,
                     session_id,
@@ -285,7 +325,11 @@ impl Db {
         Ok(())
     }
 
-    pub fn set_import_job_progress(&self, job_id: &str, progress_percent: i64) -> anyhow::Result<()> {
+    pub fn set_import_job_progress(
+        &self,
+        job_id: &str,
+        progress_percent: i64,
+    ) -> anyhow::Result<()> {
         let conn = self.pool.get().context("get sqlite conn")?;
         conn.execute(
             "UPDATE import_jobs SET progress_percent = ?1 WHERE id = ?2",
@@ -391,15 +435,26 @@ impl Db {
         Ok(out)
     }
 
-    pub fn get_user_import_config(&self, user_id: &str, provider: &str) -> anyhow::Result<Option<String>> {
+    pub fn get_user_import_config(
+        &self,
+        user_id: &str,
+        provider: &str,
+    ) -> anyhow::Result<Option<String>> {
         let key = format!("import_config:{}:{}", user_id, provider);
         let conn = self.pool.get().context("get sqlite conn")?;
-        conn.query_row("SELECT value FROM meta WHERE key = ?1", params![key], |r| r.get(0))
-            .optional()
-            .context("select user import config")
+        conn.query_row("SELECT value FROM meta WHERE key = ?1", params![key], |r| {
+            r.get(0)
+        })
+        .optional()
+        .context("select user import config")
     }
 
-    pub fn set_user_import_config(&self, user_id: &str, provider: &str, config_json: &str) -> anyhow::Result<()> {
+    pub fn set_user_import_config(
+        &self,
+        user_id: &str,
+        provider: &str,
+        config_json: &str,
+    ) -> anyhow::Result<()> {
         let conn = self.pool.get().context("get sqlite conn")?;
         let key = format!("import_config:{}:{}", user_id, provider);
         conn.execute(

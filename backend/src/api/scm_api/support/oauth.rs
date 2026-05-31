@@ -27,15 +27,18 @@ pub async fn load_bitbucket_config_and_token(
             .ok_or_else(|| ApiError::bad_request("bitbucket not connected"))?;
         (cfg_row, cred)
     };
-    let cfg: BitbucketProjectConfig =
-        serde_json::from_str(&cfg_row.config_json).map_err(|_| ApiError::bad_request("invalid bitbucket config"))?;
-    let mut token: BitbucketStoredToken = serde_json::from_str(&cred.token_json).map_err(|_| ApiError::internal())?;
+    let cfg: BitbucketProjectConfig = serde_json::from_str(&cfg_row.config_json)
+        .map_err(|_| ApiError::bad_request("invalid bitbucket config"))?;
+    let mut token: BitbucketStoredToken =
+        serde_json::from_str(&cred.token_json).map_err(|_| ApiError::internal())?;
     let now_ms = crate::time::now_ms();
     let missing_expiry = token.expires_in.is_none() || token.obtained_at.is_none();
     let expired = token_is_expired(&token, now_ms).unwrap_or(false);
     let should_refresh = force_refresh || missing_expiry || token_should_refresh(&token, now_ms);
     if (should_refresh || expired) && token.refresh_token.is_none() {
-        return Err(ApiError::unauthorized("bitbucket token expired, please reconnect"));
+        return Err(ApiError::unauthorized(
+            "bitbucket token expired, please reconnect",
+        ));
     }
     if should_refresh {
         let refresh_token = token
@@ -54,8 +57,12 @@ pub async fn load_bitbucket_config_and_token(
 }
 
 pub fn bitbucket_client_env() -> Result<(String, String), ApiError> {
-    let client_id = std::env::var("KEEL_BITBUCKET_CLIENT_ID").ok().filter(|s| !s.trim().is_empty());
-    let client_secret = std::env::var("KEEL_BITBUCKET_CLIENT_SECRET").ok().filter(|s| !s.trim().is_empty());
+    let client_id = std::env::var("KEEL_BITBUCKET_CLIENT_ID")
+        .ok()
+        .filter(|s| !s.trim().is_empty());
+    let client_secret = std::env::var("KEEL_BITBUCKET_CLIENT_SECRET")
+        .ok()
+        .filter(|s| !s.trim().is_empty());
     match (client_id, client_secret) {
         (Some(id), Some(secret)) => Ok((id, secret)),
         _ => Err(ApiError::bad_request(
@@ -65,13 +72,17 @@ pub fn bitbucket_client_env() -> Result<(String, String), ApiError> {
 }
 
 pub fn bitbucket_public_base_url() -> Result<String, ApiError> {
-    let base = std::env::var("KEEL_PUBLIC_BASE_URL").ok().filter(|s| !s.trim().is_empty());
-    base.ok_or_else(|| ApiError::bad_request("KEEL_PUBLIC_BASE_URL is required for Bitbucket OAuth"))
+    let base = std::env::var("KEEL_PUBLIC_BASE_URL")
+        .ok()
+        .filter(|s| !s.trim().is_empty());
+    base.ok_or_else(|| {
+        ApiError::bad_request("KEEL_PUBLIC_BASE_URL is required for Bitbucket OAuth")
+    })
 }
 
 pub fn random_urlsafe(len_bytes: usize) -> String {
-    use rand::RngCore;
     use base64::Engine;
+    use rand::RngCore;
 
     let mut buf = vec![0u8; len_bytes];
     rand::thread_rng().fill_bytes(&mut buf);
@@ -79,8 +90,8 @@ pub fn random_urlsafe(len_bytes: usize) -> String {
 }
 
 pub fn pkce_challenge_s256(code_verifier: &str) -> Result<String, ApiError> {
-    use sha2::{Digest, Sha256};
     use base64::Engine;
+    use sha2::{Digest, Sha256};
 
     let mut hasher = Sha256::new();
     hasher.update(code_verifier.as_bytes());
@@ -126,7 +137,10 @@ async fn refresh_bitbucket_token(
     let res = client
         .post("https://bitbucket.org/site/oauth2/access_token")
         .basic_auth(client_id, Some(client_secret))
-        .form(&[("grant_type", "refresh_token"), ("refresh_token", refresh_token)])
+        .form(&[
+            ("grant_type", "refresh_token"),
+            ("refresh_token", refresh_token),
+        ])
         .send()
         .await
         .map_err(|_| ApiError::internal())?;

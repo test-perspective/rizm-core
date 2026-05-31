@@ -9,7 +9,9 @@ use crate::models::{Project, ProjectConfig};
 use super::{Db, ProjectMeta};
 
 impl Db {
-    pub fn list_projects_meta(&self) -> anyhow::Result<Vec<(String, String, Option<String>, String, i64, i64)>> {
+    pub fn list_projects_meta(
+        &self,
+    ) -> anyhow::Result<Vec<(String, String, Option<String>, String, i64, i64)>> {
         let mut conn = self.pool.get().context("get sqlite conn")?;
         Self::list_projects_conn(&mut conn)
     }
@@ -65,12 +67,19 @@ impl Db {
     pub fn get_project_id_by_key(&self, project_key: &str) -> anyhow::Result<Option<String>> {
         let conn = self.pool.get().context("get sqlite conn")?;
         let key = Self::normalize_project_key(project_key);
-        conn.query_row("SELECT id FROM projects WHERE project_key = ?1", params![key], |r| r.get(0))
-            .optional()
-            .context("select project id by project_key")
+        conn.query_row(
+            "SELECT id FROM projects WHERE project_key = ?1",
+            params![key],
+            |r| r.get(0),
+        )
+        .optional()
+        .context("select project id by project_key")
     }
 
-    pub fn get_project_meta_by_key(&self, project_key: &str) -> anyhow::Result<Option<ProjectMeta>> {
+    pub fn get_project_meta_by_key(
+        &self,
+        project_key: &str,
+    ) -> anyhow::Result<Option<ProjectMeta>> {
         let conn = self.pool.get().context("get sqlite conn")?;
         let key = Self::normalize_project_key(project_key);
         let row: Option<(String, String, Option<String>, String)> = conn
@@ -122,7 +131,10 @@ impl Db {
         Ok(())
     }
 
-    pub fn list_entities_for_project(&self, project_id: &str) -> anyhow::Result<Vec<crate::models::Entity>> {
+    pub fn list_entities_for_project(
+        &self,
+        project_id: &str,
+    ) -> anyhow::Result<Vec<crate::models::Entity>> {
         let mut conn = self.pool.get().context("get sqlite conn")?;
         Self::list_entities_for_project_conn(&mut conn, project_id)
     }
@@ -160,7 +172,9 @@ impl Db {
 
     pub fn replace_project_state(&self, project: Project) -> anyhow::Result<()> {
         let mut conn = self.pool.get().context("get sqlite conn")?;
-        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate).context("begin transaction")?;
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .context("begin transaction")?;
 
         // Preserve wiki docs if the client omits them.
         // Client fetches wiki docs on-demand, so project state payload may not include `properties.doc`.
@@ -174,7 +188,9 @@ impl Db {
                 )
                 .context("prepare select existing wiki entities")?;
             let rows = stmt
-                .query_map(params![project.id], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+                .query_map(params![project.id], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                })
                 .context("query existing wiki entities")?;
             for r in rows {
                 let (id, props_json) = r?;
@@ -182,10 +198,7 @@ impl Db {
                     Ok(v) => v,
                     Err(_) => continue,
                 };
-                let doc = v
-                    .get("doc")
-                    .and_then(|d| d.as_str())
-                    .map(|s| s.to_string());
+                let doc = v.get("doc").and_then(|d| d.as_str()).map(|s| s.to_string());
                 if let Some(doc) = doc {
                     existing_wiki_doc_by_entity_id.insert(id, doc);
                 }
@@ -202,8 +215,12 @@ impl Db {
             .optional()
             .context("select existing manifest json")?;
 
-        let new_json = serde_json::to_string(&project.config.manifest).context("serialize incoming manifest for history")?;
-        let unchanged = old_manifest_json.as_ref().map(|s| s == &new_json).unwrap_or(false);
+        let new_json = serde_json::to_string(&project.config.manifest)
+            .context("serialize incoming manifest for history")?;
+        let unchanged = old_manifest_json
+            .as_ref()
+            .map(|s| s == &new_json)
+            .unwrap_or(false);
         let now_ms = crate::time::now_ms();
         if !unchanged {
             let parent_id: Option<String> = tx
@@ -243,7 +260,8 @@ impl Db {
         .with_context(|| format!("upsert project {}", project.id))?;
 
         // Upsert manifest
-        let manifest_json = serde_json::to_string(&project.config.manifest).context("serialize manifest")?;
+        let manifest_json =
+            serde_json::to_string(&project.config.manifest).context("serialize manifest")?;
         tx.execute(
             "INSERT INTO manifests (project_id, json) VALUES (?1, ?2)
              ON CONFLICT(project_id) DO UPDATE SET json = excluded.json",
@@ -305,7 +323,11 @@ impl Db {
 
         // Check if project exists
         let exists: Option<i64> = tx
-            .query_row("SELECT 1 FROM projects WHERE id = ?1", params![project_id], |row| row.get(0))
+            .query_row(
+                "SELECT 1 FROM projects WHERE id = ?1",
+                params![project_id],
+                |row| row.get(0),
+            )
             .optional()
             .context("check project exists")?;
         if exists.is_none() {
@@ -313,24 +335,43 @@ impl Db {
         }
 
         // Delete related data (FK cascade should handle some, but we delete explicitly for clarity)
-        tx.execute("DELETE FROM manifest_versions WHERE project_id = ?1", params![project_id])
-            .context("delete manifest_versions")?;
-        tx.execute("DELETE FROM manifests WHERE project_id = ?1", params![project_id])
-            .context("delete manifests")?;
-        tx.execute("DELETE FROM project_counters WHERE project_id = ?1", params![project_id])
-            .context("delete project_counters")?;
+        tx.execute(
+            "DELETE FROM manifest_versions WHERE project_id = ?1",
+            params![project_id],
+        )
+        .context("delete manifest_versions")?;
+        tx.execute(
+            "DELETE FROM manifests WHERE project_id = ?1",
+            params![project_id],
+        )
+        .context("delete manifests")?;
+        tx.execute(
+            "DELETE FROM project_counters WHERE project_id = ?1",
+            params![project_id],
+        )
+        .context("delete project_counters")?;
         // entities and project_policies should be deleted by FK cascade, but delete explicitly
-        tx.execute("DELETE FROM entities WHERE project_id = ?1", params![project_id])
-            .context("delete entities")?;
-        tx.execute("DELETE FROM project_policies WHERE project_id = ?1", params![project_id])
-            .context("delete project_policies")?;
+        tx.execute(
+            "DELETE FROM entities WHERE project_id = ?1",
+            params![project_id],
+        )
+        .context("delete entities")?;
+        tx.execute(
+            "DELETE FROM project_policies WHERE project_id = ?1",
+            params![project_id],
+        )
+        .context("delete project_policies")?;
         // Finally delete the project
         tx.execute("DELETE FROM projects WHERE id = ?1", params![project_id])
             .context("delete project")?;
 
         // If deleted project was active, switch to another project
         let current_active: Option<String> = tx
-            .query_row("SELECT value FROM meta WHERE key = 'active_project_id'", [], |row| row.get(0))
+            .query_row(
+                "SELECT value FROM meta WHERE key = 'active_project_id'",
+                [],
+                |row| row.get(0),
+            )
             .optional()
             .context("get active_project_id")?;
         if current_active.as_deref() == Some(project_id) {
@@ -357,4 +398,3 @@ impl Db {
         Ok(())
     }
 }
-

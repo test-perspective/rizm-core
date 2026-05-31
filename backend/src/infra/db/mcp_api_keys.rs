@@ -4,7 +4,10 @@ use rusqlite::{params, OptionalExtension};
 use super::{Db, UserMcpApiKeyRecord, UserRecord};
 
 impl Db {
-    pub fn get_user_mcp_api_key(&self, user_id: &str) -> anyhow::Result<Option<UserMcpApiKeyRecord>> {
+    pub fn get_user_mcp_api_key(
+        &self,
+        user_id: &str,
+    ) -> anyhow::Result<Option<UserMcpApiKeyRecord>> {
         let conn = self.pool.get().context("get sqlite conn")?;
         conn.query_row(
             "SELECT user_id, token_hash, created_at, updated_at, last_used_at, revoked_at
@@ -26,7 +29,11 @@ impl Db {
         .context("select user mcp api key")
     }
 
-    pub fn upsert_user_mcp_api_key_hash(&self, user_id: &str, token_hash: &str) -> anyhow::Result<()> {
+    pub fn upsert_user_mcp_api_key_hash(
+        &self,
+        user_id: &str,
+        token_hash: &str,
+    ) -> anyhow::Result<()> {
         let conn = self.pool.get().context("get sqlite conn")?;
         let now_ms = crate::time::now_ms();
         conn.execute(
@@ -55,7 +62,11 @@ impl Db {
         Ok(())
     }
 
-    pub fn touch_user_mcp_api_key_last_used(&self, user_id: &str, now_ms: i64) -> anyhow::Result<()> {
+    pub fn touch_user_mcp_api_key_last_used(
+        &self,
+        user_id: &str,
+        now_ms: i64,
+    ) -> anyhow::Result<()> {
         let conn = self.pool.get().context("get sqlite conn")?;
         conn.execute(
             "UPDATE user_mcp_api_keys
@@ -67,7 +78,10 @@ impl Db {
         Ok(())
     }
 
-    pub fn get_user_by_mcp_api_key_hash(&self, token_hash: &str) -> anyhow::Result<Option<UserRecord>> {
+    pub fn get_user_by_mcp_api_key_hash(
+        &self,
+        token_hash: &str,
+    ) -> anyhow::Result<Option<UserRecord>> {
         let conn = self.pool.get().context("get sqlite conn")?;
         conn.query_row(
             "SELECT u.id, u.email, u.password_hash, u.role, u.is_disabled, u.created_at, u.updated_at, u.last_login_at

@@ -2,8 +2,12 @@
 
 use serde_json::{json, Value};
 
-use super::marks::{adf_link_href_from_marks, adf_marks_to_styles, merge_adf_base_styles_into_segments};
-use crate::mcp::markdown::{jira_wiki_preprocessed_paragraph_to_inline_content, preprocess_jira_wiki_plain_text};
+use super::marks::{
+    adf_link_href_from_marks, adf_marks_to_styles, merge_adf_base_styles_into_segments,
+};
+use crate::mcp::markdown::{
+    jira_wiki_preprocessed_paragraph_to_inline_content, preprocess_jira_wiki_plain_text,
+};
 
 pub(in crate::import::adf) fn adf_inline_to_blocknote_content(nodes: &[Value]) -> Vec<Value> {
     let mut out = Vec::new();
