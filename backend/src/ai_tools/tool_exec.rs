@@ -87,6 +87,8 @@ fn execute_tool_call_sync(
         "list_tasks" => list_tasks(state, user, &call.arguments),
         "search_tasks" => search_tasks(state, user, &call.arguments),
         "get_task" => get_task(state, user, &call.arguments),
+        "create_task" => create_task(state, user, &call.arguments),
+        "update_task" => update_task(state, user, &call.arguments),
         "add_comment" => add_comment(state, user, &call.arguments),
         "search_wiki" => search_wiki(state, user, &call.arguments),
         "get_wiki_page" => get_wiki_page(state, user, &call.arguments),
@@ -334,6 +336,22 @@ pub(super) fn add_comment(
 ) -> Result<String, ApiError> {
     crate::mcp::tools::add_comment_for_target(state, user, args)
         .map_err(|e| ApiError::bad_request(format!("{e:#}")))
+}
+
+pub(super) fn create_task(
+    state: &AppState,
+    user: &AuthedUser,
+    args: &Value,
+) -> Result<String, ApiError> {
+    super::tool_exec_tasks::create_task(state, user, args)
+}
+
+pub(super) fn update_task(
+    state: &AppState,
+    user: &AuthedUser,
+    args: &Value,
+) -> Result<String, ApiError> {
+    super::tool_exec_tasks::update_task(state, user, args)
 }
 
 pub(super) fn get_project_manifest(

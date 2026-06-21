@@ -35,7 +35,8 @@ interface BoardViewProps {
   /** When set, report task order in that entity's lane for detail panel keyboard navigation. */
   openDetailEntityId?: string | null;
   onBoardLaneEntityOrderForDetailChange?: (taskIdsInLane: string[]) => void;
-  onCreateEntityInColumn?: (columnId: string) => void;
+  onInlineCreateInColumn?: (columnId: string, title: string) => void;
+  titleLikeProperty?: string;
 }
 
 export const BoardView = ({
@@ -53,7 +54,8 @@ export const BoardView = ({
   columnRenameInProgress = false,
   openDetailEntityId = null,
   onBoardLaneEntityOrderForDetailChange,
-  onCreateEntityInColumn,
+  onInlineCreateInColumn,
+  titleLikeProperty,
 }: BoardViewProps) => {
   const groupByProp = useMemo(
     () => (view.groupBy ? properties.find((p) => p.name === view.groupBy) : undefined),
@@ -203,7 +205,8 @@ export const BoardView = ({
                   scmLoading={scmLoading}
                   onScmRefresh={refreshScmState}
                   onRenameColumn={onRenameBoardColumn}
-                  onCreateEntityInColumn={onCreateEntityInColumn}
+                  onInlineCreate={onInlineCreateInColumn}
+                  titleLikeProperty={titleLikeProperty}
                 />
               ))}
             </div>

@@ -36,7 +36,19 @@ const baseProps = {
   scmIntegrationEnabled: false,
 };
 
-function renderBoardColumn(props: Partial<typeof baseProps & { onCreateEntityInColumn?: (columnId: string) => void }> = {}) {
+function setTextareaValue(textarea: HTMLTextAreaElement, value: string) {
+  const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+  setter?.call(textarea, value);
+  textarea.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function renderBoardColumn(
+  props: Partial<
+    typeof baseProps & {
+      onInlineCreate?: (columnId: string, title: string) => void;
+    }
+  > = {}
+) {
   const merged = { ...baseProps, ...props };
   const container = document.createElement('div');
   document.body.appendChild(container);
@@ -51,13 +63,13 @@ function renderBoardColumn(props: Partial<typeof baseProps & { onCreateEntityInC
   return { container, root };
 }
 
-describe('BoardColumn + Create', () => {
+describe('BoardColumn inline create', () => {
   beforeAll(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   });
 
-  it('renders + Create button when onCreateEntityInColumn is provided', () => {
-    const { container, root } = renderBoardColumn({ onCreateEntityInColumn: vi.fn() });
+  it('renders + Create button when onInlineCreate is provided', () => {
+    const { container, root } = renderBoardColumn({ onInlineCreate: vi.fn() });
 
     const button = container.querySelector('[data-testid="board-lane-create-In Progress"]');
     expect(button).not.toBeNull();
@@ -67,51 +79,143 @@ describe('BoardColumn + Create', () => {
     container.remove();
   });
 
-  it('renders + Create button at the bottom of the lane body', () => {
-    const entity: Entity = {
-      id: 'e1',
-      entityId: 'task',
-      createdAt: 1000,
-      updatedAt: 1000,
-      properties: { title: 'Existing task' },
-    };
-    const { container, root } = renderBoardColumn({
-      onCreateEntityInColumn: vi.fn(),
-      items: ['e1'],
-      entityById: { e1: entity },
-    });
-
-    const button = container.querySelector('[data-testid="board-lane-create-In Progress"]');
-    expect(button).not.toBeNull();
-
-    const body = button?.closest('.p-3');
-    expect(body).not.toBeNull();
-    expect(body?.lastElementChild).toBe(button);
-
-    act(() => root.unmount());
-    container.remove();
-  });
-
-  it('calls onCreateEntityInColumn with columnId when + Create is clicked', async () => {
-    const onCreateEntityInColumn = vi.fn();
-    const { container, root } = renderBoardColumn({ onCreateEntityInColumn });
+  it('shows inline create card at the bottom when + Create is clicked', async () => {
+    const { container, root } = renderBoardColumn({ onInlineCreate: vi.fn() });
 
     const button = container.querySelector(
       '[data-testid="board-lane-create-In Progress"]'
     ) as HTMLButtonElement;
-    expect(button).not.toBeNull();
 
     await act(async () => {
       button.click();
     });
 
-    expect(onCreateEntityInColumn).toHaveBeenCalledWith('In Progress');
+    expect(container.querySelector('[data-testid="board-lane-create-In Progress"]')).toBeNull();
+    expect(container.querySelector('[data-testid="board-inline-create-In Progress"]')).not.toBeNull();
+    expect(
+      container.querySelector('[data-testid="board-inline-create-input-In Progress"]')
+    ).not.toBeNull();
+
+    const body = container.querySelector('.p-3');
+    expect(body?.lastElementChild?.querySelector('[data-testid="board-inline-create-In Progress"]')).not.toBeNull();
 
     act(() => root.unmount());
     container.remove();
   });
 
-  it('does not render + Create button when onCreateEntityInColumn is not provided', () => {
+  it('calls onInlineCreate with columnId and title on Enter, then closes input', async () => {
+    const onInlineCreate = vi.fn();
+    const { container, root } = renderBoardColumn({ onInlineCreate });
+
+    const button = container.querySelector(
+      '[data-testid="board-lane-create-In Progress"]'
+    ) as HTMLButtonElement;
+
+    await act(async () => {
+      button.click();
+    });
+
+    const input = container.querySelector(
+      '[data-testid="board-inline-create-input-In Progress"]'
+    ) as HTMLTextAreaElement;
+
+    await act(async () => {
+      setTextareaValue(input, 'New inline task');
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    });
+
+    expect(onInlineCreate).toHaveBeenCalledWith('In Progress', 'New inline task');
+    expect(container.querySelector('[data-testid="board-inline-create-In Progress"]')).toBeNull();
+    expect(container.querySelector('[data-testid="board-lane-create-In Progress"]')).not.toBeNull();
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('discards inline create on Escape without calling onInlineCreate', async () => {
+    const onInlineCreate = vi.fn();
+    const { container, root } = renderBoardColumn({ onInlineCreate });
+
+    const button = container.querySelector(
+      '[data-testid="board-lane-create-In Progress"]'
+    ) as HTMLButtonElement;
+
+    await act(async () => {
+      button.click();
+    });
+
+    const input = container.querySelector(
+      '[data-testid="board-inline-create-input-In Progress"]'
+    ) as HTMLTextAreaElement;
+
+    await act(async () => {
+      setTextareaValue(input, 'Discarded task');
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    });
+
+    expect(onInlineCreate).not.toHaveBeenCalled();
+    expect(container.querySelector('[data-testid="board-inline-create-In Progress"]')).toBeNull();
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('discards inline create on blur without calling onInlineCreate', async () => {
+    const onInlineCreate = vi.fn();
+    const { container, root } = renderBoardColumn({ onInlineCreate });
+
+    const button = container.querySelector(
+      '[data-testid="board-lane-create-In Progress"]'
+    ) as HTMLButtonElement;
+
+    await act(async () => {
+      button.click();
+    });
+
+    const input = container.querySelector(
+      '[data-testid="board-inline-create-input-In Progress"]'
+    ) as HTMLTextAreaElement;
+
+    await act(async () => {
+      setTextareaValue(input, 'Discarded task');
+      input.blur();
+    });
+
+    expect(onInlineCreate).not.toHaveBeenCalled();
+    expect(container.querySelector('[data-testid="board-inline-create-In Progress"]')).toBeNull();
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('does not create when Enter is pressed with empty title', async () => {
+    const onInlineCreate = vi.fn();
+    const { container, root } = renderBoardColumn({ onInlineCreate });
+
+    const button = container.querySelector(
+      '[data-testid="board-lane-create-In Progress"]'
+    ) as HTMLButtonElement;
+
+    await act(async () => {
+      button.click();
+    });
+
+    const input = container.querySelector(
+      '[data-testid="board-inline-create-input-In Progress"]'
+    ) as HTMLTextAreaElement;
+
+    await act(async () => {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    });
+
+    expect(onInlineCreate).not.toHaveBeenCalled();
+    expect(container.querySelector('[data-testid="board-inline-create-In Progress"]')).toBeNull();
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('does not render + Create button when onInlineCreate is not provided', () => {
     const { container, root } = renderBoardColumn();
 
     const button = container.querySelector('[data-testid="board-lane-create-In Progress"]');

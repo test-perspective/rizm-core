@@ -88,7 +88,7 @@ pub fn tools_list_result() -> Value {
             },
             {
                 "name": "update_task",
-                "description": "Update a task by taskKey. Supports common fields and an optional patch object for additional task properties.",
+                "description": "Update a task by taskKey. Supports common fields and an optional patch object for additional task properties. Use labels to replace all labels; prefer addLabels/removeLabels for incremental label changes.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -97,7 +97,9 @@ pub fn tools_list_result() -> Value {
                         "description": { "type": "string", "description": "Markdown/plain text task description" },
                         "status": { "type": "string", "description": "Task status" },
                         "priority": { "type": "string", "description": "Task priority" },
-                        "labels": { "type": "array", "items": { "type": "string" }, "description": "Task labels" },
+                        "labels": { "type": "array", "items": { "type": "string" }, "description": "Replace all task labels with this array" },
+                        "addLabels": { "type": "array", "items": { "type": "string" }, "description": "Add labels without removing existing ones" },
+                        "removeLabels": { "type": "array", "items": { "type": "string" }, "description": "Remove specific labels while keeping others" },
                         "patch": { "type": "object", "description": "Additional task properties to patch. createdBy and updatedBy are ignored." }
                     },
                     "required": ["taskKey"],

@@ -95,6 +95,9 @@ fn tools_call_blocking(
             let status = read_string_arg(args, &["status"]);
             let priority = read_string_arg(args, &["priority"]);
             let labels = super::jsonrpc::read_string_array_arg(args, &["labels"]);
+            let add_labels = super::jsonrpc::read_string_array_arg(args, &["addLabels", "add_labels"]);
+            let remove_labels =
+                super::jsonrpc::read_string_array_arg(args, &["removeLabels", "remove_labels"]);
             let patch = args.get("patch").and_then(Value::as_object);
             let text = super::task_wiki::update_task_for_user(
                 state,
@@ -105,6 +108,8 @@ fn tools_call_blocking(
                 status.as_deref(),
                 priority.as_deref(),
                 labels.as_deref(),
+                add_labels.as_deref(),
+                remove_labels.as_deref(),
                 patch,
             )?;
             Ok(super::jsonrpc::tool_text_result(text))

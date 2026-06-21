@@ -416,4 +416,177 @@ mod tests {
             create_wiki_page_for_user(&state, &user, Some("P1A"), None, "", None).unwrap_err();
         assert!(format!("{err}").contains("title"));
     }
+
+    async fn create_task_with_labels(state: &AppState, labels: &[&str]) {
+        state
+            .db
+            .write()
+            .await
+            .create_entity_for_project(
+                "p1",
+                Some("t1"),
+                "task",
+                serde_json::json!({
+                    "title": "Label Task",
+                    "labels": labels
+                })
+                .as_object()
+                .cloned()
+                .unwrap_or_default(),
+            )
+            .expect("create task");
+    }
+
+    async fn task_labels_async(state: &AppState) -> Vec<String> {
+        state
+            .db
+            .read()
+            .await
+            .list_entities_for_project("p1")
+            .expect("list")
+            .into_iter()
+            .find(|e| e.properties.get("taskKey").and_then(|v| v.as_str()) == Some("P1A-1"))
+            .expect("task")
+            .properties
+            .get("labels")
+            .and_then(|v| v.as_array())
+            .expect("labels")
+            .iter()
+            .filter_map(|v| v.as_str().map(String::from))
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn update_task_add_labels_preserves_existing() {
+        let (_dir, state) = tmp_state("p1", "P1A");
+        create_task_with_labels(&state, &["alpha", "beta"]).await;
+        let user = admin_user();
+
+        tokio::task::spawn_blocking({
+            let state = state.clone();
+            let user = user.clone();
+            move || {
+                update_task_for_user(
+                    &state,
+                    &user,
+                    "P1A-1",
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(&["gamma".to_string(), "  ".to_string(), "gamma".to_string()]),
+                    None,
+                    None,
+                )
+            }
+        })
+        .await
+        .expect("join")
+        .expect("update");
+
+        assert_eq!(task_labels_async(&state).await, vec!["alpha", "beta", "gamma"]);
+    }
+
+    #[tokio::test]
+    async fn update_task_remove_labels_keeps_others() {
+        let (_dir, state) = tmp_state("p1", "P1A");
+        create_task_with_labels(&state, &["alpha", "beta", "gamma"]).await;
+        let user = admin_user();
+
+        tokio::task::spawn_blocking({
+            let state = state.clone();
+            let user = user.clone();
+            move || {
+                update_task_for_user(
+                    &state,
+                    &user,
+                    "P1A-1",
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(&["beta".to_string()]),
+                    None,
+                )
+            }
+        })
+        .await
+        .expect("join")
+        .expect("update");
+
+        assert_eq!(task_labels_async(&state).await, vec!["alpha", "gamma"]);
+    }
+
+    #[tokio::test]
+    async fn update_task_labels_replace_then_add_and_remove() {
+        let (_dir, state) = tmp_state("p1", "P1A");
+        create_task_with_labels(&state, &["old"]).await;
+        let user = admin_user();
+
+        tokio::task::spawn_blocking({
+            let state = state.clone();
+            let user = user.clone();
+            move || {
+                update_task_for_user(
+                    &state,
+                    &user,
+                    "P1A-1",
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(&["base".to_string()]),
+                    Some(&["extra".to_string()]),
+                    Some(&["base".to_string()]),
+                    None,
+                )
+            }
+        })
+        .await
+        .expect("join")
+        .expect("update");
+
+        assert_eq!(task_labels_async(&state).await, vec!["extra"]);
+    }
+
+    #[test]
+    fn update_task_add_labels_noop_when_already_present() {
+        let (_dir, state) = tmp_state("p1", "P1A");
+        state
+            .db
+            .blocking_read()
+            .create_entity_for_project(
+                "p1",
+                Some("t1"),
+                "task",
+                serde_json::json!({
+                    "title": "Label Task",
+                    "labels": ["alpha"]
+                })
+                .as_object()
+                .cloned()
+                .unwrap_or_default(),
+            )
+            .expect("create task");
+        let user = admin_user();
+
+        let err = update_task_for_user(
+            &state,
+            &user,
+            "P1A-1",
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(&["alpha".to_string()]),
+            None,
+            None,
+        )
+        .unwrap_err();
+        assert!(format!("{err}").contains("no task fields to update"));
+    }
 }

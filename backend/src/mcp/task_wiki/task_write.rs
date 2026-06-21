@@ -73,10 +73,23 @@ pub fn update_task_for_user(
     status: Option<&str>,
     priority: Option<&str>,
     labels: Option<&[String]>,
+    add_labels: Option<&[String]>,
+    remove_labels: Option<&[String]>,
     patch: Option<&serde_json::Map<String, Value>>,
 ) -> anyhow::Result<String> {
     let (project, entity) = resolve_task_for_write(state, user, task_key)?;
-    let patch = build_task_patch(user, title, description, status, priority, labels, patch)?;
+    let patch = build_task_patch(
+        user,
+        &entity,
+        title,
+        description,
+        status,
+        priority,
+        labels,
+        add_labels,
+        remove_labels,
+        patch,
+    )?;
     let changed_fields: Vec<String> = patch
         .keys()
         .filter(|k| k.as_str() != "updatedBy")
@@ -100,25 +113,109 @@ pub fn update_task_for_user(
 
 fn build_task_patch(
     user: &AuthedUser,
+    entity: &Entity,
     title: Option<&str>,
     description: Option<&str>,
     status: Option<&str>,
     priority: Option<&str>,
     labels: Option<&[String]>,
+    add_labels: Option<&[String]>,
+    remove_labels: Option<&[String]>,
     raw_patch: Option<&serde_json::Map<String, Value>>,
 ) -> anyhow::Result<serde_json::Map<String, Value>> {
     let mut patch = raw_patch.cloned().unwrap_or_default();
     patch.remove("createdBy");
     patch.remove("updatedBy");
     patch.remove("taskKey");
+    patch.remove("labels");
+    patch.remove("addLabels");
+    patch.remove("removeLabels");
 
     insert_optional_string(&mut patch, "title", title);
     insert_optional_string(&mut patch, "status", status);
     insert_optional_string(&mut patch, "priority", priority);
-    insert_optional_labels(&mut patch, labels);
+    apply_label_updates(&mut patch, entity, labels, add_labels, remove_labels);
     insert_optional_description(&mut patch, description)?;
     patch.insert("updatedBy".to_string(), Value::String(user.user_id.clone()));
     Ok(patch)
+}
+
+fn labels_from_entity(entity: &Entity) -> Vec<String> {
+    entity
+        .properties
+        .get("labels")
+        .and_then(Value::as_array)
+        .map(|arr| normalize_label_list(
+            &arr.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect::<Vec<_>>(),
+        ))
+        .unwrap_or_default()
+}
+
+fn normalize_label_list(labels: &[String]) -> Vec<String> {
+    let mut out = Vec::new();
+    for label in labels {
+        let trimmed = label.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if !out.iter().any(|existing| existing == trimmed) {
+            out.push(trimmed.to_string());
+        }
+    }
+    out
+}
+
+fn merge_labels(
+    current: &[String],
+    replace: Option<&[String]>,
+    add: Option<&[String]>,
+    remove: Option<&[String]>,
+) -> Vec<String> {
+    let mut merged = if let Some(replace) = replace {
+        normalize_label_list(replace)
+    } else {
+        current.to_vec()
+    };
+
+    if let Some(add) = add {
+        for label in normalize_label_list(add) {
+            if !merged.contains(&label) {
+                merged.push(label);
+            }
+        }
+    }
+
+    if let Some(remove) = remove {
+        let remove_set: std::collections::HashSet<String> = normalize_label_list(remove)
+            .into_iter()
+            .collect();
+        merged.retain(|label| !remove_set.contains(label));
+    }
+
+    merged
+}
+
+fn apply_label_updates(
+    patch: &mut serde_json::Map<String, Value>,
+    entity: &Entity,
+    labels: Option<&[String]>,
+    add_labels: Option<&[String]>,
+    remove_labels: Option<&[String]>,
+) {
+    if labels.is_none() && add_labels.is_none() && remove_labels.is_none() {
+        return;
+    }
+
+    let current = labels_from_entity(entity);
+    let merged = merge_labels(&current, labels, add_labels, remove_labels);
+    if merged == current {
+        return;
+    }
+
+    let values: Vec<Value> = merged.into_iter().map(Value::String).collect();
+    patch.insert("labels".to_string(), Value::Array(values));
 }
 
 fn insert_optional_string(

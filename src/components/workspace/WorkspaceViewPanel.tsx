@@ -56,7 +56,7 @@ type WorkspaceViewPanelProps = {
   searchQuery?: string;
   wikiCreateRef?: MutableRefObject<(() => void) | null>;
   notesPane?: WorkspaceNotesPaneConfig | null;
-  onCreateEntityInBoardColumn?: (columnId: string) => void;
+  onInlineCreateInBoardColumn?: (columnId: string, title: string) => void;
 };
 
 export function WorkspaceViewPanel({
@@ -90,7 +90,7 @@ export function WorkspaceViewPanel({
   searchQuery,
   wikiCreateRef,
   notesPane = null,
-  onCreateEntityInBoardColumn,
+  onInlineCreateInBoardColumn,
 }: WorkspaceViewPanelProps) {
   const boardMain = (
     <BoardView
@@ -114,7 +114,8 @@ export function WorkspaceViewPanel({
       columnRenameInProgress={boardColumnRenameBusy}
       openDetailEntityId={detailUrlEntityId}
       onBoardLaneEntityOrderForDetailChange={onDetailNavEntityOrderChange}
-      onCreateEntityInColumn={onCreateEntityInBoardColumn}
+      onInlineCreateInColumn={onInlineCreateInBoardColumn}
+      titleLikeProperty={currentEntity.titleLikeProperty}
     />
   );
 

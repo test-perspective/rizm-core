@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
+import './monaco/setup';
 import './index.css';
 import '@blocknote/core/fonts/inter.css';
 import '@blocknote/ariakit/style.css';

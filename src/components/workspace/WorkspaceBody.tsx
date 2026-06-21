@@ -14,6 +14,7 @@ import {
   setLastViewForProject,
   setLastWikiPageForProjectView,
 } from '../../workspace/storage';
+import type { CreateEntityOptions } from '../../workspace/useCreateEntityHandler';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
 type BuildPath = (args: { projectId: string; viewId: string; entityId?: string | null }) => string;
@@ -79,7 +80,7 @@ export type WorkspaceBodyProps = {
   setNotePanePickerOpen: (v: boolean) => void;
   setNotePanePickerTargetViewId: (v: string | null) => void;
   handleCreateProject: (opts: any) => void;
-  handleCreateEntity: (options?: { groupByValue?: string }) => void;
+  handleCreateEntity: (options?: CreateEntityOptions) => void;
   handleNavigateEntity: (entityId: string) => void;
   handleSearchResultSelect: (result: SearchResult, query: string) => void;
   handleNotePanePickerConfirm: (pageId: string, targetViewId: string) => void;
@@ -285,8 +286,8 @@ export function WorkspaceBody(props: WorkspaceBodyProps) {
           onRefreshProject={refreshActiveProject}
           onRenameBoardColumn={handleRenameBoardColumn}
           boardColumnRenameBusy={boardColumnRenameBusy}
-          onCreateEntityInBoardColumn={(columnId) =>
-            handleCreateEntity({ groupByValue: columnId })
+          onInlineCreateInBoardColumn={(columnId, title) =>
+            handleCreateEntity({ groupByValue: columnId, title, openDetail: false })
           }
           onWikiSelect={(id) => {
             if (effectiveViewId) {

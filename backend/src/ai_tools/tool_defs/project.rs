@@ -103,6 +103,53 @@ pub(super) fn project_tools() -> Vec<Value> {
         json!({
             "type": "function",
             "function": {
+                "name": "create_task",
+                "description": "Create a task in a project. The taskKey is generated from the project key unless taskKey is explicitly provided.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "projectKey": { "type": "string", "description": "Project key like REQ." },
+                        "projectId": { "type": "string", "description": "Project id." },
+                        "title": { "type": "string", "description": "Task title." },
+                        "description": { "type": "string", "description": "Optional Markdown/plain text task description." },
+                        "status": { "type": "string", "description": "Task status (e.g. Todo, In Progress)." },
+                        "priority": { "type": "string", "description": "Task priority (e.g. Low, Medium, High)." },
+                        "labels": { "type": "array", "items": { "type": "string" }, "description": "Initial task labels." },
+                        "taskKey": { "type": "string", "description": "Optional explicit task key like REQ-299." }
+                    },
+                    "required": ["title"],
+                    "additionalProperties": false
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
+                "name": "update_task",
+                "description": "Update a task by taskKey. Supports common fields and an optional patch object for additional task properties. Use addLabels/removeLabels for incremental label changes; avoid labels full replace unless you intend to overwrite all labels.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "taskKey": { "type": "string", "description": "Task key like REQ-299 (preferred when set)." },
+                        "entity_id": { "type": "string", "description": "Alias for taskKey (MCP read_entity parameter name)." },
+                        "entityId": { "type": "string", "description": "Alias for taskKey (camelCase)." },
+                        "title": { "type": "string", "description": "Task title." },
+                        "description": { "type": "string", "description": "Markdown/plain text task description." },
+                        "status": { "type": "string", "description": "Task status." },
+                        "priority": { "type": "string", "description": "Task priority." },
+                        "labels": { "type": "array", "items": { "type": "string" }, "description": "Replace all task labels with this array." },
+                        "addLabels": { "type": "array", "items": { "type": "string" }, "description": "Add labels without removing existing ones." },
+                        "removeLabels": { "type": "array", "items": { "type": "string" }, "description": "Remove specific labels while keeping others." },
+                        "patch": { "type": "object", "description": "Additional task properties to patch. createdBy and updatedBy are ignored." }
+                    },
+                    "required": [],
+                    "additionalProperties": false
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
                 "name": "add_comment",
                 "description": "Add a comment to a task or wiki page. Input text is Markdown/plain text and is stored as a BlockNote document.",
                 "parameters": {

@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import type { Entity, PropertyDefinition, BoardDivider, ViewConfig, UserSummary, ScmProjectConfig } from '../../types';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -12,6 +12,7 @@ import { computeOrderForMove, ORDER_KEY } from './boardOrder';
 import { randomUUID } from '../../utils/uuid';
 import { useAppDialog } from '../dialogs';
 import { GripVertical } from 'lucide-react';
+import { BoardInlineCreateCard } from './BoardInlineCreateCard';
 
 export const BoardColumn = ({
   columnId,
@@ -36,7 +37,8 @@ export const BoardColumn = ({
   scmLoading,
   onScmRefresh,
   onRenameColumn,
-  onCreateEntityInColumn,
+  onInlineCreate,
+  titleLikeProperty,
 }: {
   columnId: string;
   title: string;
@@ -60,9 +62,11 @@ export const BoardColumn = ({
   scmLoading?: boolean;
   onScmRefresh?: () => void;
   onRenameColumn?: (from: string, to: string) => void | Promise<void>;
-  onCreateEntityInColumn?: (columnId: string) => void;
+  onInlineCreate?: (columnId: string, title: string) => void;
+  titleLikeProperty?: string;
 }) => {
   const dialog = useAppDialog();
+  const [isCreating, setIsCreating] = useState(false);
   const dividerById = new Map<string, BoardDivider>();
   for (const d of boardDividers) {
     if (d.columnId === columnId) {
@@ -206,19 +210,36 @@ export const BoardColumn = ({
           );
         })}
       </SortableContext>
-      {onCreateEntityInColumn && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onCreateEntityInColumn(columnId);
-          }}
-          className="mt-1 w-full rounded-md px-2 py-2 text-left text-sm text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
-          type="button"
-          title="Create in this lane"
-          data-testid={`board-lane-create-${columnId}`}
-        >
-          + Create
-        </button>
+      {isCreating && onInlineCreate ? (
+        <div className="mt-1">
+          <BoardInlineCreateCard
+            columnId={columnId}
+            variant={isSingleColumn ? 'row' : 'card'}
+            placeholder={
+              titleLikeProperty === 'name' ? 'Enter a name...' : 'What needs to be done?'
+            }
+            onSubmit={(title) => {
+              onInlineCreate(columnId, title);
+              setIsCreating(false);
+            }}
+            onCancel={() => setIsCreating(false)}
+          />
+        </div>
+      ) : (
+        onInlineCreate && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsCreating(true);
+            }}
+            className="mt-1 w-full rounded-md px-2 py-2 text-left text-sm text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+            type="button"
+            title="Create in this lane"
+            data-testid={`board-lane-create-${columnId}`}
+          >
+            + Create
+          </button>
+        )
       )}
     </BoardColumnShell>
   );

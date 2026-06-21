@@ -1,7 +1,8 @@
 use serde_json::{json, Value as JsonValue};
 
 use super::{admin_user, app_state, tmp_db};
-use crate::ai_tools::tool_exec::{add_comment, get_task, list_tasks, search_tasks};
+use crate::ai_tools::tool_defs::build_tool_definitions;
+use crate::ai_tools::tool_exec::{create_task, get_task, update_task, add_comment, list_tasks, search_tasks};
 
 fn make_project_with_key(db: &crate::db::Db, id: &str, key: &str) {
     let project = crate::models::Project {
@@ -176,4 +177,188 @@ fn search_tasks_property_filter_allows_limit_above_twenty() {
         25,
         "property-filtered search should return all labeled tasks up to limit"
     );
+}
+
+#[test]
+fn build_tool_definitions_includes_task_write_tools() {
+    let user = admin_user();
+    let tools = build_tool_definitions(&user, None, false);
+    let names: Vec<String> = tools
+        .iter()
+        .filter_map(|t| {
+            t.get("function")
+                .and_then(|f| f.get("name"))
+                .and_then(|n| n.as_str())
+                .map(String::from)
+        })
+        .collect();
+    assert!(names.contains(&"create_task".to_string()));
+    assert!(names.contains(&"update_task".to_string()));
+}
+
+#[tokio::test]
+async fn create_task_creates_task_with_labels() {
+    let (_dir, db) = tmp_db();
+    make_project_with_key(&db, "p1", "P1A");
+    let state = app_state(db);
+    let user = admin_user();
+
+    let raw = tokio::task::spawn_blocking({
+        let state = state.clone();
+        let user = user.clone();
+        move || {
+            create_task(
+                &state,
+                &user,
+                &json!({
+                    "projectKey": "P1A",
+                    "title": "New Task",
+                    "labels": ["aia", "req-305"]
+                }),
+            )
+        }
+    })
+    .await
+    .expect("join")
+    .expect("create_task");
+    let parsed: JsonValue = serde_json::from_str(&raw).expect("parse");
+    assert_eq!(parsed.get("title").and_then(|v| v.as_str()), Some("New Task"));
+
+    let entities = state
+        .db
+        .read()
+        .await
+        .list_entities_for_project("p1")
+        .expect("list");
+    let task = entities
+        .into_iter()
+        .find(|e| e.properties.get("taskKey").and_then(|v| v.as_str()) == Some("P1A-1"))
+        .expect("task");
+    let labels = task
+        .properties
+        .get("labels")
+        .and_then(|v| v.as_array())
+        .expect("labels")
+        .iter()
+        .filter_map(|v| v.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(labels, vec!["aia", "req-305"]);
+}
+
+#[tokio::test]
+async fn update_task_add_labels_via_aia() {
+    let (_dir, db) = tmp_db();
+    make_project_with_key(&db, "p1", "P1A");
+    db.create_entity_for_project(
+        "p1",
+        Some("t1"),
+        "task",
+        serde_json::json!({
+            "title": "Label Task",
+            "labels": ["alpha"]
+        })
+        .as_object()
+        .cloned()
+        .unwrap_or_default(),
+    )
+    .expect("create task");
+    let state = app_state(db);
+    let user = admin_user();
+
+    tokio::task::spawn_blocking({
+        let state = state.clone();
+        let user = user.clone();
+        move || {
+            update_task(
+                &state,
+                &user,
+                &json!({
+                    "taskKey": "P1A-1",
+                    "addLabels": ["beta"]
+                }),
+            )
+        }
+    })
+    .await
+    .expect("join")
+    .expect("update_task");
+
+    let entities = state
+        .db
+        .read()
+        .await
+        .list_entities_for_project("p1")
+        .expect("list");
+    let task = entities
+        .into_iter()
+        .find(|e| e.properties.get("taskKey").and_then(|v| v.as_str()) == Some("P1A-1"))
+        .expect("task");
+    let labels = task
+        .properties
+        .get("labels")
+        .and_then(|v| v.as_array())
+        .expect("labels")
+        .iter()
+        .filter_map(|v| v.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(labels, vec!["alpha", "beta"]);
+}
+
+#[tokio::test]
+async fn update_task_remove_labels_via_aia() {
+    let (_dir, db) = tmp_db();
+    make_project_with_key(&db, "p1", "P1A");
+    db.create_entity_for_project(
+        "p1",
+        Some("t1"),
+        "task",
+        serde_json::json!({
+            "title": "Label Task",
+            "labels": ["alpha", "beta"]
+        })
+        .as_object()
+        .cloned()
+        .unwrap_or_default(),
+    )
+    .expect("create task");
+    let state = app_state(db);
+    let user = admin_user();
+
+    tokio::task::spawn_blocking({
+        let state = state.clone();
+        let user = user.clone();
+        move || {
+            update_task(
+                &state,
+                &user,
+                &json!({
+                    "entity_id": "P1A-1",
+                    "removeLabels": ["alpha"]
+                }),
+            )
+        }
+    })
+    .await
+    .expect("join")
+    .expect("update_task");
+
+    let entities = state
+        .db
+        .read()
+        .await
+        .list_entities_for_project("p1")
+        .expect("list");
+    let task = entities
+        .into_iter()
+        .find(|e| e.properties.get("taskKey").and_then(|v| v.as_str()) == Some("P1A-1"))
+        .expect("task");
+    let labels = task
+        .properties
+        .get("labels")
+        .and_then(|v| v.as_array())
+        .expect("labels")
+        .iter()
+        .filter_map(|v| v.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(labels, vec!["beta"]);
 }

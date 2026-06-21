@@ -132,6 +132,7 @@ pub(super) fn build_chat_system_prompt(
     s.push_str("Use tools to fetch project data or wiki pages only when needed.\n");
     s.push_str("When the user asks to save investigation results or notes to a wiki page, use create_wiki_page to create a new page with the content.\n");
     s.push_str("Release notes / wiki write-ups: use search_tasks with projectId or projectKey plus labels (and optional status/priority) to list relevant tasks; property-filtered search allows up to 100 results per call. For query-only semantic search, limit stays at 20. Use get_task with taskKey, or entity_id / entityId with the same value as MCP read_entity. Always pass non-empty Markdown in create_wiki_page content (or body); if fetch_url fails, write from task fields only.\n");
+    s.push_str("Task updates: use update_task to change title, status, priority, description, or other task fields. For label changes, prefer addLabels to attach labels and removeLabels to detach specific labels without affecting others; avoid labels full replace unless you intentionally want to overwrite every label on the task.\n");
     s.push_str("Keep responses concise and actionable.\n");
     s.push_str("For questions like \"How many tasks?\" or \"タスク数はいくつ?\", use list_tasks and report the totalCount from the response.\n");
     if let Some(project_id) = project_id {

@@ -39,6 +39,14 @@ fn build_tool_definitions_includes_admin_tools_when_admin_and_empty_project() {
         "should include get_task"
     );
     assert!(
+        names.contains(&"create_task".to_string()),
+        "should include create_task"
+    );
+    assert!(
+        names.contains(&"update_task".to_string()),
+        "should include update_task"
+    );
+    assert!(
         names.contains(&"add_comment".to_string()),
         "should include add_comment"
     );

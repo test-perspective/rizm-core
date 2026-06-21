@@ -404,6 +404,102 @@ async fn update_task_tool_updates_fields_and_ignores_actor_patch() {
 }
 
 #[tokio::test]
+async fn update_task_tool_add_labels_preserves_existing() {
+    let (_dir, state) = mk_state_with_project("p1", "P1A");
+    state
+        .db
+        .read()
+        .await
+        .create_entity_for_project(
+            "p1",
+            Some("t1"),
+            "task",
+            serde_json::json!({"title": "Task 1", "labels": ["alpha", "beta"]})
+                .as_object()
+                .cloned()
+                .unwrap_or_default(),
+        )
+        .expect("create task");
+    let admin = mk_user(Role::Admin);
+    let params = serde_json::json!({
+        "name": "update_task",
+        "arguments": {
+            "taskKey": "P1A-1",
+            "addLabels": ["gamma"]
+        }
+    });
+
+    crate::mcp::tools::tools_call(&state, &admin, params)
+        .await
+        .expect("tools_call");
+
+    let entities = state
+        .db
+        .read()
+        .await
+        .list_entities_for_project("p1")
+        .expect("list entities");
+    let labels = entities
+        .iter()
+        .find(|e| e.properties.get("taskKey").and_then(Value::as_str) == Some("P1A-1"))
+        .expect("task")
+        .properties
+        .get("labels")
+        .and_then(Value::as_array)
+        .expect("labels");
+    let label_strings: Vec<&str> = labels.iter().filter_map(Value::as_str).collect();
+    assert_eq!(label_strings, vec!["alpha", "beta", "gamma"]);
+}
+
+#[tokio::test]
+async fn update_task_tool_remove_labels_keeps_others() {
+    let (_dir, state) = mk_state_with_project("p1", "P1A");
+    state
+        .db
+        .read()
+        .await
+        .create_entity_for_project(
+            "p1",
+            Some("t1"),
+            "task",
+            serde_json::json!({"title": "Task 1", "labels": ["alpha", "beta", "gamma"]})
+                .as_object()
+                .cloned()
+                .unwrap_or_default(),
+        )
+        .expect("create task");
+    let admin = mk_user(Role::Admin);
+    let params = serde_json::json!({
+        "name": "update_task",
+        "arguments": {
+            "taskKey": "P1A-1",
+            "removeLabels": ["beta"]
+        }
+    });
+
+    crate::mcp::tools::tools_call(&state, &admin, params)
+        .await
+        .expect("tools_call");
+
+    let entities = state
+        .db
+        .read()
+        .await
+        .list_entities_for_project("p1")
+        .expect("list entities");
+    let labels = entities
+        .iter()
+        .find(|e| e.properties.get("taskKey").and_then(Value::as_str) == Some("P1A-1"))
+        .expect("task")
+        .properties
+        .get("labels")
+        .and_then(Value::as_array)
+        .expect("labels");
+    let label_strings: Vec<&str> = labels.iter().filter_map(Value::as_str).collect();
+    assert_eq!(label_strings, vec!["alpha", "gamma"]);
+}
+
+#[tokio::test]
 async fn project_manifest_tools_list_dry_run_and_apply() {
     let (_dir, state) = mk_state_with_project("p1", "P1A");
     let admin = mk_user(Role::Admin);
