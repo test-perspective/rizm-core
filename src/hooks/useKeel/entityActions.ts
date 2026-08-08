@@ -1,7 +1,7 @@
 import { createEntityApi, deleteEntityApi } from '../../api/entities';
 import type { Entity } from '../../types';
 import { createEntity } from '../../utils/storage';
-import type { CoreRefs, CoreSetters } from './actionsTypes';
+import type { CoreRefs, CoreSetters, MutableRef } from './actionsTypes';
 import {
   enqueueModifyEntityPatch,
   type ModifyEntityPumpContext,
@@ -14,9 +14,24 @@ export function addEntityAction(args: {
   properties: Record<string, unknown>;
   setActiveProject: CoreSetters['setActiveProject'];
   entityEtagByIdRef: CoreRefs['entityEtagByIdRef'];
+  pendingCreatedEntitiesRef: CoreRefs['pendingCreatedEntitiesRef'];
+  activeProjectIdRef: MutableRef<string>;
 }) {
-  const { activeProjectId, entityId, properties, setActiveProject, entityEtagByIdRef } = args;
+  const {
+    activeProjectId,
+    entityId,
+    properties,
+    setActiveProject,
+    entityEtagByIdRef,
+    pendingCreatedEntitiesRef,
+    activeProjectIdRef,
+  } = args;
   const placeholder = createEntity(entityId, properties);
+  pendingCreatedEntitiesRef.current.set(placeholder.id, {
+    projectId: activeProjectId,
+    entity: placeholder,
+    status: 'creating',
+  });
   setActiveProject((prev) => {
     if (!prev) return prev;
     return { ...prev, entities: [placeholder, ...(prev.entities ?? [])] };
@@ -24,16 +39,32 @@ export function addEntityAction(args: {
 
   createEntityApi(activeProjectId, placeholder.id, entityId, properties)
     .then(({ entity, etag }) => {
+      const pending = pendingCreatedEntitiesRef.current.get(entity.id);
+      if (!pending) return;
+      pendingCreatedEntitiesRef.current.set(entity.id, {
+        projectId: activeProjectId,
+        entity,
+        status: 'confirmed',
+        etag,
+        confirmedAt: Date.now(),
+      });
       entityEtagByIdRef.current[entity.id] = etag;
+      if (activeProjectIdRef.current !== activeProjectId) return;
       setActiveProject((prev) => {
-        if (!prev) return prev;
-        return { ...prev, entities: (prev.entities ?? []).map((e) => (e.id === entity.id ? entity : e)) };
+        if (!prev || prev.id !== activeProjectId) return prev;
+        const exists = (prev.entities ?? []).some((existing) => existing.id === entity.id);
+        const entities = exists
+          ? (prev.entities ?? []).map((existing) => (existing.id === entity.id ? entity : existing))
+          : [entity, ...(prev.entities ?? [])];
+        return { ...prev, entities };
       });
     })
     .catch((e) => {
       console.error('Failed to create entity:', e);
+      pendingCreatedEntitiesRef.current.delete(placeholder.id);
+      if (activeProjectIdRef.current !== activeProjectId) return;
       setActiveProject((prev) => {
-        if (!prev) return prev;
+        if (!prev || prev.id !== activeProjectId) return prev;
         return { ...prev, entities: (prev.entities ?? []).filter((e) => e.id !== placeholder.id) };
       });
     });
@@ -73,10 +104,19 @@ export function removeEntityAction(args: {
   id: string;
   setActiveProject: CoreSetters['setActiveProject'];
   entityEtagByIdRef: CoreRefs['entityEtagByIdRef'];
+  pendingCreatedEntitiesRef: CoreRefs['pendingCreatedEntitiesRef'];
   refreshActiveProject: RefreshAfterConflict;
 }) {
-  const { activeProjectId, id, setActiveProject, entityEtagByIdRef, refreshActiveProject } = args;
+  const {
+    activeProjectId,
+    id,
+    setActiveProject,
+    entityEtagByIdRef,
+    pendingCreatedEntitiesRef,
+    refreshActiveProject,
+  } = args;
   const etag = entityEtagByIdRef.current[id] ?? `"0"`;
+  pendingCreatedEntitiesRef.current.delete(id);
   setActiveProject((prev) => {
     if (!prev) return prev;
     return { ...prev, entities: (prev.entities ?? []).filter((e) => e.id !== id) };

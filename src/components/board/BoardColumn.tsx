@@ -67,6 +67,8 @@ export const BoardColumn = ({
 }) => {
   const dialog = useAppDialog();
   const [isCreating, setIsCreating] = useState(false);
+  // Keep the typed-but-unsubmitted title in memory so Escape/blur doesn't lose it (REQ-308).
+  const [createDraft, setCreateDraft] = useState('');
   const dividerById = new Map<string, BoardDivider>();
   for (const d of boardDividers) {
     if (d.columnId === columnId) {
@@ -218,11 +220,16 @@ export const BoardColumn = ({
             placeholder={
               titleLikeProperty === 'name' ? 'Enter a name...' : 'What needs to be done?'
             }
+            initialValue={createDraft}
             onSubmit={(title) => {
               onInlineCreate(columnId, title);
+              setCreateDraft('');
               setIsCreating(false);
             }}
-            onCancel={() => setIsCreating(false)}
+            onCancel={(draft) => {
+              setCreateDraft(draft);
+              setIsCreating(false);
+            }}
           />
         </div>
       ) : (

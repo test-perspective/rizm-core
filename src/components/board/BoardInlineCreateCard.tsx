@@ -4,18 +4,20 @@ type BoardInlineCreateCardProps = {
   columnId: string;
   variant?: 'card' | 'row';
   placeholder?: string;
+  initialValue?: string;
   onSubmit: (title: string) => void;
-  onCancel: () => void;
+  onCancel: (draft: string) => void;
 };
 
 export const BoardInlineCreateCard = ({
   columnId,
   variant = 'card',
   placeholder = 'What needs to be done?',
+  initialValue = '',
   onSubmit,
   onCancel,
 }: BoardInlineCreateCardProps) => {
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState(initialValue);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const submittedRef = useRef(false);
 
@@ -26,7 +28,7 @@ export const BoardInlineCreateCard = ({
   const handleConfirm = () => {
     const trimmed = value.trim();
     if (!trimmed) {
-      onCancel();
+      onCancel(value);
       return;
     }
     submittedRef.current = true;
@@ -35,7 +37,7 @@ export const BoardInlineCreateCard = ({
 
   const handleBlur = () => {
     if (submittedRef.current) return;
-    onCancel();
+    onCancel(value);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -46,7 +48,7 @@ export const BoardInlineCreateCard = ({
     }
     if (e.key === 'Escape') {
       e.preventDefault();
-      onCancel();
+      onCancel(value);
     }
   };
 

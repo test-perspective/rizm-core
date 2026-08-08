@@ -3,6 +3,7 @@ import { Entity, Project, ProjectManifest, ProjectMeta, ViewConfig } from '../ty
 import { fetchProjectState, fetchProjectsIndex } from '../api/projects';
 import { type PutManifestOptions } from '../api/manifest';
 import { applyProjectState } from './useKeel/projectState';
+import type { PendingCreatedEntity } from './useKeel/actionsTypes';
 import {
   addEntityAction,
   applyServerEntityAction,
@@ -32,6 +33,7 @@ export const useKeel = () => {
   const loadTokenRef = useRef(0);
   const entityEtagByIdRef = useRef<Record<string, string>>({});
   const manifestEtagRef = useRef<string>('0');
+  const pendingCreatedEntitiesRef = useRef<Map<string, PendingCreatedEntity>>(new Map());
   const projectRefreshBlockedRef = useRef(false);
 
   const setProjectRefreshBlocked = useCallback((blocked: boolean) => {
@@ -70,6 +72,7 @@ export const useKeel = () => {
               setActiveProjectId,
               manifestEtagRef,
               entityEtagByIdRef,
+              pendingCreatedEntitiesRef,
             });
             projectLoaded = true;
             break;
@@ -87,6 +90,7 @@ export const useKeel = () => {
           setActiveProject(null);
             entityEtagByIdRef.current = {};
             manifestEtagRef.current = '0';
+            pendingCreatedEntitiesRef.current.clear();
         }
       } catch (e) {
         console.error('Failed to load data:', e);
@@ -96,6 +100,7 @@ export const useKeel = () => {
           setActiveProject(null);
           entityEtagByIdRef.current = {};
           manifestEtagRef.current = '0';
+          pendingCreatedEntitiesRef.current.clear();
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -128,6 +133,7 @@ export const useKeel = () => {
           setActiveProjectId,
           manifestEtagRef,
           entityEtagByIdRef,
+          pendingCreatedEntitiesRef,
         });
       } catch (e) {
         if (activeProjectIdRef.current !== requestedProjectId) return;
@@ -156,6 +162,7 @@ export const useKeel = () => {
         setActiveProjectId,
         manifestEtagRef,
         entityEtagByIdRef,
+        pendingCreatedEntitiesRef,
       });
       return project;
     } catch (e) {
@@ -176,6 +183,8 @@ export const useKeel = () => {
       properties,
       setActiveProject,
       entityEtagByIdRef,
+      pendingCreatedEntitiesRef,
+      activeProjectIdRef,
     });
   }, [activeProjectId]);
 
@@ -196,6 +205,7 @@ export const useKeel = () => {
       id,
       setActiveProject,
       entityEtagByIdRef,
+      pendingCreatedEntitiesRef,
       refreshActiveProject,
     });
   }, [activeProjectId, refreshActiveProject]);
@@ -261,6 +271,7 @@ export const useKeel = () => {
       setActiveProjectId,
       manifestEtagRef,
       entityEtagByIdRef,
+      pendingCreatedEntitiesRef,
     });
   }, []);
 

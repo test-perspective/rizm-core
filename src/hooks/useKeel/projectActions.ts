@@ -53,8 +53,16 @@ export async function reloadAction(args: {
   setActiveProjectId: CoreSetters['setActiveProjectId'];
   manifestEtagRef: CoreRefs['manifestEtagRef'];
   entityEtagByIdRef: CoreRefs['entityEtagByIdRef'];
+  pendingCreatedEntitiesRef: CoreRefs['pendingCreatedEntitiesRef'];
 }): Promise<ReloadResult> {
-  const { setProjects, setActiveProject, setActiveProjectId, manifestEtagRef, entityEtagByIdRef } = args;
+  const {
+    setProjects,
+    setActiveProject,
+    setActiveProjectId,
+    manifestEtagRef,
+    entityEtagByIdRef,
+    pendingCreatedEntitiesRef,
+  } = args;
   const index = await fetchProjectsIndex();
   setProjects(index.projects);
   setActiveProjectId(index.activeProjectId);
@@ -67,6 +75,7 @@ export async function reloadAction(args: {
     setActiveProjectId,
     manifestEtagRef,
     entityEtagByIdRef,
+    pendingCreatedEntitiesRef,
   });
   return { activeProjectId: index.activeProjectId, projects: index.projects };
 }

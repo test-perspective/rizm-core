@@ -215,6 +215,115 @@ describe('BoardColumn inline create', () => {
     container.remove();
   });
 
+  it('restores the draft after Escape when reopening the inline create', async () => {
+    const onInlineCreate = vi.fn();
+    const { container, root } = renderBoardColumn({ onInlineCreate });
+
+    await act(async () => {
+      (
+        container.querySelector('[data-testid="board-lane-create-In Progress"]') as HTMLButtonElement
+      ).click();
+    });
+
+    let input = container.querySelector(
+      '[data-testid="board-inline-create-input-In Progress"]'
+    ) as HTMLTextAreaElement;
+
+    await act(async () => {
+      setTextareaValue(input, 'Kept draft');
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    });
+
+    expect(onInlineCreate).not.toHaveBeenCalled();
+    expect(container.querySelector('[data-testid="board-inline-create-In Progress"]')).toBeNull();
+
+    await act(async () => {
+      (
+        container.querySelector('[data-testid="board-lane-create-In Progress"]') as HTMLButtonElement
+      ).click();
+    });
+
+    input = container.querySelector(
+      '[data-testid="board-inline-create-input-In Progress"]'
+    ) as HTMLTextAreaElement;
+    expect(input.value).toBe('Kept draft');
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('restores the draft after blur when reopening the inline create', async () => {
+    const onInlineCreate = vi.fn();
+    const { container, root } = renderBoardColumn({ onInlineCreate });
+
+    await act(async () => {
+      (
+        container.querySelector('[data-testid="board-lane-create-In Progress"]') as HTMLButtonElement
+      ).click();
+    });
+
+    let input = container.querySelector(
+      '[data-testid="board-inline-create-input-In Progress"]'
+    ) as HTMLTextAreaElement;
+
+    await act(async () => {
+      setTextareaValue(input, 'Blurred draft');
+      input.blur();
+    });
+
+    expect(onInlineCreate).not.toHaveBeenCalled();
+
+    await act(async () => {
+      (
+        container.querySelector('[data-testid="board-lane-create-In Progress"]') as HTMLButtonElement
+      ).click();
+    });
+
+    input = container.querySelector(
+      '[data-testid="board-inline-create-input-In Progress"]'
+    ) as HTMLTextAreaElement;
+    expect(input.value).toBe('Blurred draft');
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('clears the draft after a successful create', async () => {
+    const onInlineCreate = vi.fn();
+    const { container, root } = renderBoardColumn({ onInlineCreate });
+
+    await act(async () => {
+      (
+        container.querySelector('[data-testid="board-lane-create-In Progress"]') as HTMLButtonElement
+      ).click();
+    });
+
+    let input = container.querySelector(
+      '[data-testid="board-inline-create-input-In Progress"]'
+    ) as HTMLTextAreaElement;
+
+    await act(async () => {
+      setTextareaValue(input, 'Submitted task');
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    });
+
+    expect(onInlineCreate).toHaveBeenCalledWith('In Progress', 'Submitted task');
+
+    await act(async () => {
+      (
+        container.querySelector('[data-testid="board-lane-create-In Progress"]') as HTMLButtonElement
+      ).click();
+    });
+
+    input = container.querySelector(
+      '[data-testid="board-inline-create-input-In Progress"]'
+    ) as HTMLTextAreaElement;
+    expect(input.value).toBe('');
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
   it('does not render + Create button when onInlineCreate is not provided', () => {
     const { container, root } = renderBoardColumn();
 
