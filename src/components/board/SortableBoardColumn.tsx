@@ -25,8 +25,13 @@ interface SortableBoardColumnProps {
   scmLoading?: boolean;
   onScmRefresh?: () => void;
   onRenameColumn?: (from: string, to: string) => void | Promise<void>;
-  onInlineCreate?: (columnId: string, title: string) => void;
+  onInlineCreate?: (
+    columnId: string,
+    title: string,
+    options?: { order?: number }
+  ) => string | undefined;
   titleLikeProperty?: string;
+  isDragActive?: boolean;
 }
 
 export const SortableBoardColumn = ({
@@ -53,6 +58,7 @@ export const SortableBoardColumn = ({
   onRenameColumn,
   onInlineCreate,
   titleLikeProperty,
+  isDragActive,
 }: SortableBoardColumnProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: columnId,
@@ -91,6 +97,7 @@ export const SortableBoardColumn = ({
         onRenameColumn={onRenameColumn}
         onInlineCreate={onInlineCreate}
         titleLikeProperty={titleLikeProperty}
+        isDragActive={isDragActive}
       />
     </div>
   );

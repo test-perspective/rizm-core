@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Entity } from '../../types';
-import { computeOrderForMove, ORDER_KEY, getOrder, sortEntitiesForBoard, computeOrderForNewEntityAtTopInLane, computeOrderForNewEntityAtBottomInLane } from './boardOrder';
+import { computeOrderForMove, ORDER_KEY, getOrder, sortEntitiesForBoard, computeOrderForNewEntityAtIndexInLane, computeOrderForNewEntityAtBottomInLane } from './boardOrder';
 
 describe('boardOrder', () => {
   const createEntity = (id: string, order: number | null, createdAt: number = 1000): Entity => ({
@@ -159,65 +159,94 @@ describe('boardOrder', () => {
     });
   });
 
-  describe('computeOrderForNewEntityAtTopInLane', () => {
-    it('should return 0 when lane is empty', () => {
-      const laneEntities: Entity[] = [];
-      const order = computeOrderForNewEntityAtTopInLane(laneEntities);
-      expect(order).toBe(0);
+  describe('computeOrderForNewEntityAtIndexInLane', () => {
+    const laneOf = (...entities: Entity[]) => {
+      const entityById: Record<string, Entity> = {};
+      for (const e of entities) entityById[e.id] = e;
+      return { ids: entities.map((e) => e.id), entityById };
+    };
+
+    it('should return 0 for an empty lane', () => {
+      expect(computeOrderForNewEntityAtIndexInLane([], 0, {})).toEqual({ order: 0, reindex: [] });
     });
 
-    it('should return minOrder - ORDER_GAP when lane has entities with orders', () => {
-      const laneEntities: Entity[] = [
+    it('should compute the midpoint when inserting between two ordered items', () => {
+      const { ids, entityById } = laneOf(createEntity('1', 1000), createEntity('2', 3000));
+      expect(computeOrderForNewEntityAtIndexInLane(ids, 1, entityById)).toEqual({
+        order: 2000,
+        reindex: [],
+      });
+    });
+
+    it('should place the new entity before the first item when inserting at the top', () => {
+      const { ids, entityById } = laneOf(createEntity('1', 2000), createEntity('2', 3000));
+      expect(computeOrderForNewEntityAtIndexInLane(ids, 0, entityById)).toEqual({
+        order: 1000,
+        reindex: [],
+      });
+    });
+
+    it('should delegate to the bottom helper when inserting at the end', () => {
+      const { ids, entityById } = laneOf(createEntity('1', 1000), createEntity('2', 3000));
+      expect(computeOrderForNewEntityAtIndexInLane(ids, 2, entityById)).toEqual({
+        order: 4000,
+        reindex: [],
+      });
+    });
+
+    it('should omit the order when appending to a lane whose peers have no order', () => {
+      const { ids, entityById } = laneOf(createEntity('1', null), createEntity('2', null));
+      expect(computeOrderForNewEntityAtIndexInLane(ids, 2, entityById)).toEqual({
+        order: null,
+        reindex: [],
+      });
+    });
+
+    it('should clamp an out-of-range index to the end', () => {
+      const { ids, entityById } = laneOf(createEntity('1', 1000));
+      expect(computeOrderForNewEntityAtIndexInLane(ids, 99, entityById)).toEqual({
+        order: 2000,
+        reindex: [],
+      });
+    });
+
+    it('should reindex with a free slot when a neighbour has no order', () => {
+      const { ids, entityById } = laneOf(
         createEntity('1', 1000),
-        createEntity('2', 3000),
-        createEntity('3', 2000),
-      ];
-      const order = computeOrderForNewEntityAtTopInLane(laneEntities);
-      // Minimum order is 1000, so new order should be 1000 - 1000 = 0
-      expect(order).toBe(0);
-    });
-
-    it('should return minOrder - ORDER_GAP when lane has entities with orders (negative min)', () => {
-      const laneEntities: Entity[] = [
-        createEntity('1', -1000),
-        createEntity('2', 0),
-        createEntity('3', 1000),
-      ];
-      const order = computeOrderForNewEntityAtTopInLane(laneEntities);
-      // Minimum order is -1000, so new order should be -1000 - 1000 = -2000
-      expect(order).toBe(-2000);
-    });
-
-    it('should return 0 when lane has only entities without orders', () => {
-      const laneEntities: Entity[] = [
-        createEntity('1', null),
         createEntity('2', null),
-        createEntity('3', null),
-      ];
-      const order = computeOrderForNewEntityAtTopInLane(laneEntities);
-      // No existing orders, so should return 0
-      expect(order).toBe(0);
+        createEntity('3', 3000)
+      );
+      // Inserting between '2' (no order) and '3'
+      expect(computeOrderForNewEntityAtIndexInLane(ids, 2, entityById)).toEqual({
+        order: 2000,
+        reindex: [
+          { entityId: '1', order: 0 },
+          { entityId: '2', order: 1000 },
+          { entityId: '3', order: 3000 },
+        ],
+      });
     });
 
-    it('should ignore entities without orders and use only those with orders', () => {
-      const laneEntities: Entity[] = [
-        createEntity('1', null),
-        createEntity('2', 2000),
-        createEntity('3', null),
-        createEntity('4', 5000),
-      ];
-      const order = computeOrderForNewEntityAtTopInLane(laneEntities);
-      // Minimum order among entities with orders is 2000, so new order should be 2000 - 1000 = 1000
-      expect(order).toBe(1000);
+    it('should reindex with a free slot when the gap is exhausted', () => {
+      const { ids, entityById } = laneOf(createEntity('1', 1000), createEntity('2', 1000.00001));
+      expect(computeOrderForNewEntityAtIndexInLane(ids, 1, entityById)).toEqual({
+        order: 1000,
+        reindex: [
+          { entityId: '1', order: 0 },
+          { entityId: '2', order: 2000 },
+        ],
+      });
     });
 
-    it('should handle single entity with order', () => {
-      const laneEntities: Entity[] = [
-        createEntity('1', 5000),
-      ];
-      const order = computeOrderForNewEntityAtTopInLane(laneEntities);
-      // Minimum order is 5000, so new order should be 5000 - 1000 = 4000
-      expect(order).toBe(4000);
+    it('should reindex when the first item of the lane has no order', () => {
+      const { ids, entityById } = laneOf(createEntity('1', null), createEntity('2', 2000));
+      expect(computeOrderForNewEntityAtIndexInLane(ids, 0, entityById)).toEqual({
+        order: 0,
+        reindex: [
+          { entityId: '1', order: 1000 },
+          { entityId: '2', order: 2000 },
+        ],
+      });
     });
   });
 

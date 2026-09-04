@@ -11,6 +11,8 @@ export type CreateEntityOptions = {
   title?: string;
   /** When false, skip navigating to the entity detail panel. Defaults to true. */
   openDetail?: boolean;
+  /** Explicit board order (__keelOrder). When omitted the entity is appended to the lane. */
+  order?: number;
 };
 
 type UseCreateEntityHandlerArgs = {
@@ -56,6 +58,7 @@ export function useCreateEntityHandler({
         properties: currentEntity.properties,
         currentEntities,
         groupByValue: options?.groupByValue,
+        order: options?.order,
       });
 
       const titleLikeProperty = resolveTitleLikeProperty(currentEntity);

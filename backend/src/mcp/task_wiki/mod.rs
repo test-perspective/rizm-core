@@ -1,14 +1,25 @@
 //! Shared task and wiki tools for MCP and AI Tools.
 
 mod project;
+mod task_relations;
+mod task_relations_view;
 mod task_write;
+mod task_write_fields;
+mod task_write_input;
 mod tasks;
+#[cfg(test)]
+mod tests_relations;
 mod wiki;
 
 pub use project::resolve_project;
+pub use task_relations_view::{derive_relations, done_status_from_manifest, DerivedRelations};
 pub use task_write::{create_task_for_user, update_task_for_user};
+pub use task_write_input::{TaskCreateInput, TaskUpdateInput};
 pub use tasks::{list_tasks_for_user, search_tasks_for_user};
-pub use wiki::{create_wiki_page_for_user, get_wiki_page_for_user, search_wiki_for_user};
+pub use wiki::{
+    create_wiki_page_for_user, get_wiki_page_for_user, list_wiki_pages_for_user,
+    search_wiki_for_user, update_wiki_page_for_user,
+};
 
 #[cfg(test)]
 mod tests {
@@ -57,6 +68,47 @@ mod tests {
             last_login_at: None,
             session_id: "s1".to_string(),
         }
+    }
+
+    fn viewer_user() -> crate::auth::AuthedUser {
+        crate::auth::AuthedUser {
+            user_id: "u2".to_string(),
+            email: "viewer@example.local".to_string(),
+            role: Role::Viewer,
+            last_login_at: None,
+            session_id: "s2".to_string(),
+        }
+    }
+
+    fn create_wiki_entity(state: &AppState, id: &str, title: &str, doc: &str) {
+        state
+            .db
+            .blocking_read()
+            .create_entity_for_project(
+                "p1",
+                Some(id),
+                "wikiPage",
+                serde_json::json!({"title": title, "doc": doc})
+                    .as_object()
+                    .cloned()
+                    .unwrap_or_default(),
+            )
+            .expect("create wiki");
+    }
+
+    fn wiki_doc_blocks(state: &AppState, id: &str) -> Vec<serde_json::Value> {
+        let doc = state
+            .db
+            .blocking_read()
+            .get_entity_for_project("p1", id)
+            .expect("get entity")
+            .expect("entity exists")
+            .properties
+            .get("doc")
+            .and_then(|v| v.as_str())
+            .expect("doc")
+            .to_string();
+        serde_json::from_str(&doc).expect("doc json")
     }
 
     #[test]
@@ -244,6 +296,160 @@ mod tests {
         assert_eq!(page.get("id").and_then(|i| i.as_str()), Some("w1"));
     }
 
+    fn insert_wiki(state: &AppState, id: &str, props: serde_json::Value) {
+        state
+            .db
+            .blocking_read()
+            .create_entity_for_project(
+                "p1",
+                Some(id),
+                "wikiPage",
+                props.as_object().cloned().unwrap_or_default(),
+            )
+            .expect("create wiki");
+    }
+
+    #[test]
+    fn list_wiki_pages_returns_pages_in_order() {
+        let (_dir, state) = tmp_state("p1", "P1A");
+        insert_wiki(
+            &state,
+            "w3",
+            serde_json::json!({"title": "Third", "__keelOrder": 3000}),
+        );
+        insert_wiki(
+            &state,
+            "w1",
+            serde_json::json!({"title": "First", "__keelOrder": 1000}),
+        );
+        insert_wiki(
+            &state,
+            "w2",
+            serde_json::json!({"title": "Second", "__keelOrder": 2000}),
+        );
+        let user = admin_user();
+
+        let out = list_wiki_pages_for_user(&state, &user, Some("P1A"), None, 10)
+            .expect("list_wiki_pages");
+        let v: serde_json::Value = serde_json::from_str(&out).expect("parse");
+        assert_eq!(v.get("totalCount").and_then(|c| c.as_i64()), Some(3));
+        assert_eq!(v.get("projectKey").and_then(|k| k.as_str()), Some("P1A"));
+        let pages = v.get("pages").and_then(|p| p.as_array()).expect("pages");
+        assert_eq!(pages.len(), 3);
+        let titles: Vec<&str> = pages
+            .iter()
+            .filter_map(|p| p.get("title").and_then(|t| t.as_str()))
+            .collect();
+        assert_eq!(titles, vec!["First", "Second", "Third"]);
+        assert_eq!(pages[0].get("order").and_then(|o| o.as_i64()), Some(1000));
+    }
+
+    #[test]
+    fn list_wiki_pages_omits_doc_body() {
+        let (_dir, state) = tmp_state("p1", "P1A");
+        const SECRET: &str = "UNIQUE_DOC_BODY_SHOULD_NOT_LEAK";
+        insert_wiki(
+            &state,
+            "w1",
+            serde_json::json!({
+                "title": "Secret page",
+                "doc": SECRET,
+                "__keelOrder": 1000
+            }),
+        );
+        let user = admin_user();
+
+        let out = list_wiki_pages_for_user(&state, &user, Some("P1A"), None, 10)
+            .expect("list_wiki_pages");
+        assert!(
+            !out.contains(SECRET),
+            "list output must not include page body: {out}"
+        );
+        let v: serde_json::Value = serde_json::from_str(&out).expect("parse");
+        let page = &v.get("pages").and_then(|p| p.as_array()).expect("pages")[0];
+        assert!(page.get("doc").is_none());
+        assert_eq!(page.get("title").and_then(|t| t.as_str()), Some("Secret page"));
+    }
+
+    #[test]
+    fn list_wiki_pages_includes_folder_and_parent() {
+        let (_dir, state) = tmp_state("p1", "P1A");
+        insert_wiki(
+            &state,
+            "folder1",
+            serde_json::json!({
+                "title": "Notes",
+                "nodeType": "folder",
+                "__keelOrder": 1000
+            }),
+        );
+        insert_wiki(
+            &state,
+            "child1",
+            serde_json::json!({
+                "title": "Child note",
+                "nodeType": "page",
+                "parentId": "folder1",
+                "__keelOrder": 2000
+            }),
+        );
+        let user = admin_user();
+
+        let out = list_wiki_pages_for_user(&state, &user, Some("P1A"), None, 10)
+            .expect("list_wiki_pages");
+        let v: serde_json::Value = serde_json::from_str(&out).expect("parse");
+        let pages = v.get("pages").and_then(|p| p.as_array()).expect("pages");
+        let folder = pages
+            .iter()
+            .find(|p| p.get("id").and_then(|i| i.as_str()) == Some("folder1"))
+            .expect("folder");
+        assert_eq!(folder.get("nodeType").and_then(|t| t.as_str()), Some("folder"));
+        assert!(folder.get("parentId").and_then(|v| v.as_str()).is_none());
+        let child = pages
+            .iter()
+            .find(|p| p.get("id").and_then(|i| i.as_str()) == Some("child1"))
+            .expect("child");
+        assert_eq!(child.get("nodeType").and_then(|t| t.as_str()), Some("page"));
+        assert_eq!(
+            child.get("parentId").and_then(|i| i.as_str()),
+            Some("folder1")
+        );
+    }
+
+    #[test]
+    fn list_wiki_pages_total_count_exceeds_limit() {
+        let (_dir, state) = tmp_state("p1", "P1A");
+        for i in 1..=5 {
+            insert_wiki(
+                &state,
+                &format!("w{i}"),
+                serde_json::json!({
+                    "title": format!("Page {i}"),
+                    "__keelOrder": i * 1000
+                }),
+            );
+        }
+        let user = admin_user();
+        let out = list_wiki_pages_for_user(&state, &user, Some("P1A"), None, 2)
+            .expect("list_wiki_pages");
+        let v: serde_json::Value = serde_json::from_str(&out).expect("parse");
+        assert_eq!(v.get("totalCount").and_then(|c| c.as_i64()), Some(5));
+        let pages = v.get("pages").and_then(|p| p.as_array()).expect("pages");
+        assert_eq!(pages.len(), 2);
+        assert_eq!(
+            pages[0].get("title").and_then(|t| t.as_str()),
+            Some("Page 1")
+        );
+    }
+
+    #[test]
+    fn list_wiki_pages_requires_project() {
+        let (_dir, state) = tmp_state("p1", "P1A");
+        let user = admin_user();
+        let err = list_wiki_pages_for_user(&state, &user, None, None, 10).unwrap_err();
+        assert!(format!("{err}").contains("projectKey or projectId"));
+    }
+
     #[tokio::test]
     async fn create_wiki_page_creates_with_title_and_content() {
         let (_dir, state) = tmp_state("p1", "P1A");
@@ -417,6 +623,260 @@ mod tests {
         assert!(format!("{err}").contains("title"));
     }
 
+    #[tokio::test]
+    async fn update_wiki_page_replace_swaps_whole_body() {
+        let (_dir, state) = tmp_state("p1", "P1A");
+        tokio::task::spawn_blocking({
+            let state = state.clone();
+            move || {
+                create_wiki_entity(
+                    &state,
+                    "w1",
+                    "Progress",
+                    "[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"old body\",\"styles\":{}}],\"children\":[]}]",
+                );
+                let user = admin_user();
+
+                let out = update_wiki_page_for_user(
+                    &state,
+                    &user,
+                    Some("P1A"),
+                    None,
+                    Some("w1"),
+                    None,
+                    "# New Heading\n\n| Name | Value |\n| --- | --- |\n| alpha | 1 |",
+                    None,
+                )
+                .expect("update");
+                let v: serde_json::Value = serde_json::from_str(&out).expect("parse");
+                assert_eq!(v.get("pageId").and_then(|i| i.as_str()), Some("w1"));
+                assert_eq!(v.get("mode").and_then(|m| m.as_str()), Some("replace"));
+
+                let blocks = wiki_doc_blocks(&state, "w1");
+                assert_eq!(
+                    blocks[0].get("type").and_then(|v| v.as_str()),
+                    Some("heading")
+                );
+                assert!(
+                    blocks
+                        .iter()
+                        .any(|b| b.get("type").and_then(|v| v.as_str()) == Some("table")),
+                    "markdown table should become a BlockNote table: {blocks:?}"
+                );
+                let serialized = serde_json::to_string(&blocks).expect("serialize");
+                assert!(
+                    !serialized.contains("old body"),
+                    "replace must drop the previous body: {serialized}"
+                );
+            }
+        })
+        .await
+        .expect("join");
+    }
+
+    #[tokio::test]
+    async fn update_wiki_page_append_keeps_existing_blocks() {
+        let (_dir, state) = tmp_state("p1", "P1A");
+        tokio::task::spawn_blocking({
+            let state = state.clone();
+            move || {
+                create_wiki_entity(
+                    &state,
+                    "w1",
+                    "Progress",
+                    "[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"existing intro\",\"styles\":{}}],\"children\":[]}]",
+                );
+                let user = admin_user();
+
+                update_wiki_page_for_user(
+                    &state,
+                    &user,
+                    Some("P1A"),
+                    None,
+                    Some("w1"),
+                    None,
+                    "## Update 2\n\n- done",
+                    Some("append"),
+                )
+                .expect("append");
+
+                let blocks = wiki_doc_blocks(&state, "w1");
+                assert!(
+                    blocks.len() >= 3,
+                    "expected old + appended blocks: {blocks:?}"
+                );
+                assert_eq!(
+                    blocks[0]["content"][0]["text"].as_str(),
+                    Some("existing intro"),
+                    "existing blocks must be preserved"
+                );
+                assert_eq!(
+                    blocks[1].get("type").and_then(|v| v.as_str()),
+                    Some("heading"),
+                    "appended markdown should follow existing blocks"
+                );
+            }
+        })
+        .await
+        .expect("join");
+    }
+
+    #[tokio::test]
+    async fn update_wiki_page_drops_collab_state() {
+        let (_dir, state) = tmp_state("p1", "P1A");
+        tokio::task::spawn_blocking({
+            let state = state.clone();
+            move || {
+                create_wiki_entity(&state, "w1", "Progress", "[]");
+                state
+                    .db
+                    .blocking_read()
+                    .upsert_wiki_collab_state_for_project(
+                        "p1",
+                        "w1",
+                        "[]",
+                        &[1_u8, 2, 3],
+                        Some("u1"),
+                    )
+                    .expect("upsert collab");
+                let user = admin_user();
+
+                update_wiki_page_for_user(
+                    &state,
+                    &user,
+                    Some("P1A"),
+                    None,
+                    Some("w1"),
+                    None,
+                    "fresh",
+                    None,
+                )
+                .expect("update");
+
+                let collab = state
+                    .db
+                    .blocking_read()
+                    .get_wiki_collab_state_for_project("p1", "w1")
+                    .expect("read collab");
+                assert!(
+                    collab.is_none(),
+                    "CRDT snapshot must be dropped so the editor re-seeds from doc"
+                );
+            }
+        })
+        .await
+        .expect("join");
+    }
+
+    #[tokio::test]
+    async fn update_wiki_page_resolves_by_title_and_rejects_ambiguous() {
+        let (_dir, state) = tmp_state("p1", "P1A");
+        tokio::task::spawn_blocking({
+            let state = state.clone();
+            move || {
+                create_wiki_entity(&state, "w1", "Unique Page", "[]");
+                create_wiki_entity(&state, "w2", "Dup", "[]");
+                create_wiki_entity(&state, "w3", "Dup", "[]");
+                let user = admin_user();
+
+                let out = update_wiki_page_for_user(
+                    &state,
+                    &user,
+                    Some("P1A"),
+                    None,
+                    None,
+                    Some("Unique Page"),
+                    "by title",
+                    None,
+                )
+                .expect("update by title");
+                let v: serde_json::Value = serde_json::from_str(&out).expect("parse");
+                assert_eq!(v.get("pageId").and_then(|i| i.as_str()), Some("w1"));
+
+                let err = update_wiki_page_for_user(
+                    &state,
+                    &user,
+                    Some("P1A"),
+                    None,
+                    None,
+                    Some("Dup"),
+                    "text",
+                    None,
+                )
+                .unwrap_err();
+                assert!(format!("{err}").contains("ambiguous"));
+
+                let err = update_wiki_page_for_user(
+                    &state,
+                    &user,
+                    Some("P1A"),
+                    None,
+                    None,
+                    Some("Missing"),
+                    "text",
+                    None,
+                )
+                .unwrap_err();
+                assert!(format!("{err}").contains("not found"));
+            }
+        })
+        .await
+        .expect("join");
+    }
+
+    #[test]
+    fn update_wiki_page_rejects_invalid_mode_and_empty_content() {
+        let (_dir, state) = tmp_state("p1", "P1A");
+        create_wiki_entity(&state, "w1", "Page", "[]");
+        let user = admin_user();
+
+        let err = update_wiki_page_for_user(
+            &state,
+            &user,
+            Some("P1A"),
+            None,
+            Some("w1"),
+            None,
+            "text",
+            Some("prepend"),
+        )
+        .unwrap_err();
+        assert!(format!("{err}").contains("invalid mode"));
+
+        let err = update_wiki_page_for_user(
+            &state,
+            &user,
+            Some("P1A"),
+            None,
+            Some("w1"),
+            None,
+            "  ",
+            None,
+        )
+        .unwrap_err();
+        assert!(format!("{err}").contains("content is required"));
+    }
+
+    #[test]
+    fn update_wiki_page_requires_write_permission() {
+        let (_dir, state) = tmp_state("p1", "P1A");
+        create_wiki_entity(&state, "w1", "Page", "[]");
+        let user = viewer_user();
+
+        let err = update_wiki_page_for_user(
+            &state,
+            &user,
+            Some("P1A"),
+            None,
+            Some("w1"),
+            None,
+            "text",
+            None,
+        )
+        .unwrap_err();
+        assert!(format!("{err}").contains("insufficient permissions"));
+    }
+
     async fn create_task_with_labels(state: &AppState, labels: &[&str]) {
         state
             .db
@@ -469,15 +929,15 @@ mod tests {
                 update_task_for_user(
                     &state,
                     &user,
-                    "P1A-1",
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    Some(&["gamma".to_string(), "  ".to_string(), "gamma".to_string()]),
-                    None,
-                    None,
+                    TaskUpdateInput {
+                        task_key: "P1A-1".to_string(),
+                        add_labels: Some(vec![
+                            "gamma".to_string(),
+                            "  ".to_string(),
+                            "gamma".to_string(),
+                        ]),
+                        ..Default::default()
+                    },
                 )
             }
         })
@@ -501,15 +961,11 @@ mod tests {
                 update_task_for_user(
                     &state,
                     &user,
-                    "P1A-1",
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    Some(&["beta".to_string()]),
-                    None,
+                    TaskUpdateInput {
+                        task_key: "P1A-1".to_string(),
+                        remove_labels: Some(vec!["beta".to_string()]),
+                        ..Default::default()
+                    },
                 )
             }
         })
@@ -533,15 +989,13 @@ mod tests {
                 update_task_for_user(
                     &state,
                     &user,
-                    "P1A-1",
-                    None,
-                    None,
-                    None,
-                    None,
-                    Some(&["base".to_string()]),
-                    Some(&["extra".to_string()]),
-                    Some(&["base".to_string()]),
-                    None,
+                    TaskUpdateInput {
+                        task_key: "P1A-1".to_string(),
+                        labels: Some(vec!["base".to_string()]),
+                        add_labels: Some(vec!["extra".to_string()]),
+                        remove_labels: Some(vec!["base".to_string()]),
+                        ..Default::default()
+                    },
                 )
             }
         })
@@ -576,15 +1030,11 @@ mod tests {
         let err = update_task_for_user(
             &state,
             &user,
-            "P1A-1",
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some(&["alpha".to_string()]),
-            None,
-            None,
+            TaskUpdateInput {
+                task_key: "P1A-1".to_string(),
+                add_labels: Some(vec!["alpha".to_string()]),
+                ..Default::default()
+            },
         )
         .unwrap_err();
         assert!(format!("{err}").contains("no task fields to update"));

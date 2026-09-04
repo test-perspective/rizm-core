@@ -31,26 +31,38 @@ pub fn read_string_arg(args: &Value, keys: &[&str]) -> Option<String> {
 }
 
 pub fn read_string_array_arg(args: &Value, keys: &[&str]) -> Option<Vec<String>> {
+    let items = read_present_string_array_arg(args, keys)?;
+    if items.is_empty() {
+        None
+    } else {
+        Some(items)
+    }
+}
+
+/// Like `read_string_array_arg`, but `[]` / `""` / `null` mean "present and empty"
+/// (used to clear relation fields) instead of "omitted".
+pub fn read_present_string_array_arg(args: &Value, keys: &[&str]) -> Option<Vec<String>> {
     let obj = args.as_object()?;
     for k in keys {
-        if let Some(v) = obj.get(*k) {
-            if let Some(arr) = v.as_array() {
-                let items: Vec<String> = arr
-                    .iter()
-                    .filter_map(|x| x.as_str())
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty())
-                    .collect();
-                if !items.is_empty() {
-                    return Some(items);
-                }
+        let Some(v) = obj.get(*k) else { continue };
+        if v.is_null() {
+            return Some(vec![]);
+        }
+        if let Some(arr) = v.as_array() {
+            let items: Vec<String> = arr
+                .iter()
+                .filter_map(|x| x.as_str())
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+            return Some(items);
+        }
+        if let Some(s) = v.as_str() {
+            let s = s.trim();
+            if s.is_empty() {
+                return Some(vec![]);
             }
-            if let Some(s) = v.as_str() {
-                let s = s.trim();
-                if !s.is_empty() {
-                    return Some(vec![s.to_string()]);
-                }
-            }
+            return Some(vec![s.to_string()]);
         }
     }
     None

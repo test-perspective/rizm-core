@@ -80,7 +80,7 @@ export type WorkspaceBodyProps = {
   setNotePanePickerOpen: (v: boolean) => void;
   setNotePanePickerTargetViewId: (v: string | null) => void;
   handleCreateProject: (opts: any) => void;
-  handleCreateEntity: (options?: CreateEntityOptions) => void;
+  handleCreateEntity: (options?: CreateEntityOptions) => Entity | undefined;
   handleNavigateEntity: (entityId: string) => void;
   handleSearchResultSelect: (result: SearchResult, query: string) => void;
   handleNotePanePickerConfirm: (pageId: string, targetViewId: string) => void;
@@ -286,8 +286,13 @@ export function WorkspaceBody(props: WorkspaceBodyProps) {
           onRefreshProject={refreshActiveProject}
           onRenameBoardColumn={handleRenameBoardColumn}
           boardColumnRenameBusy={boardColumnRenameBusy}
-          onInlineCreateInBoardColumn={(columnId, title) =>
-            handleCreateEntity({ groupByValue: columnId, title, openDetail: false })
+          onInlineCreateInBoardColumn={(columnId, title, options) =>
+            handleCreateEntity({
+              groupByValue: columnId,
+              title,
+              openDetail: false,
+              order: options?.order,
+            })?.id
           }
           onWikiSelect={(id) => {
             if (effectiveViewId) {

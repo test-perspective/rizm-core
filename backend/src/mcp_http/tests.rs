@@ -673,6 +673,257 @@ async fn create_wiki_page_tool_creates_page() {
     assert_eq!(wiki.len(), 1);
 }
 
+#[test]
+fn tools_list_includes_update_wiki_page() {
+    let tools = crate::mcp_http::protocol::tools_list_result();
+    let names: Vec<&str> = tools
+        .get("tools")
+        .and_then(|t| t.as_array())
+        .expect("tools array")
+        .iter()
+        .filter_map(|t| t.get("name").and_then(|n| n.as_str()))
+        .collect();
+    assert!(
+        names.contains(&"update_wiki_page"),
+        "tools/list should expose update_wiki_page: {names:?}"
+    );
+}
+
+#[test]
+fn tools_list_includes_list_wiki_pages() {
+    let tools = crate::mcp_http::protocol::tools_list_result();
+    let list = tools
+        .get("tools")
+        .and_then(|t| t.as_array())
+        .expect("tools array");
+    let names: Vec<&str> = list
+        .iter()
+        .filter_map(|t| t.get("name").and_then(|n| n.as_str()))
+        .collect();
+    assert!(
+        names.contains(&"list_wiki_pages"),
+        "tools/list should expose list_wiki_pages: {names:?}"
+    );
+    let tool = list
+        .iter()
+        .find(|t| t.get("name").and_then(|n| n.as_str()) == Some("list_wiki_pages"))
+        .expect("list_wiki_pages tool");
+    assert_eq!(
+        tool.get("inputSchema")
+            .and_then(|s| s.get("additionalProperties")),
+        Some(&Value::Bool(false))
+    );
+}
+
+#[tokio::test]
+async fn list_wiki_pages_tool_returns_pages() {
+    let (_dir, state) = mk_state_with_project("p1", "P1A");
+    let admin = mk_user(Role::Admin);
+    crate::mcp::tools::tools_call(
+        &state,
+        &admin,
+        serde_json::json!({
+            "name": "create_wiki_page",
+            "arguments": {
+                "projectKey": "P1A",
+                "title": "Inventory note",
+                "content": "# Body that must not appear in list output"
+            }
+        }),
+    )
+    .await
+    .expect("create");
+
+    let result = crate::mcp::tools::tools_call(
+        &state,
+        &admin,
+        serde_json::json!({
+            "name": "list_wiki_pages",
+            "arguments": { "projectKey": "P1A", "limit": 50 }
+        }),
+    )
+    .await
+    .expect("list_wiki_pages");
+    let content = tool_result_text(&result);
+    assert!(
+        !content.contains("Body that must not appear"),
+        "list must omit page body: {content}"
+    );
+    let v: Value = serde_json::from_str(&content).expect("parse");
+    assert_eq!(v.get("totalCount").and_then(|c| c.as_i64()), Some(1));
+    let pages = v.get("pages").and_then(|p| p.as_array()).expect("pages");
+    assert_eq!(pages.len(), 1);
+    assert_eq!(
+        pages[0].get("title").and_then(|t| t.as_str()),
+        Some("Inventory note")
+    );
+    assert!(pages[0].get("id").and_then(|i| i.as_str()).is_some());
+    assert!(pages[0].get("doc").is_none());
+}
+
+fn tool_result_text(result: &Value) -> String {
+    result
+        .get("content")
+        .and_then(|c| c.as_array())
+        .and_then(|a| a.first())
+        .and_then(|c| c.get("text"))
+        .and_then(|t| t.as_str())
+        .expect("content text")
+        .to_string()
+}
+
+// REQ-315 E2E: create -> update (replace) -> get must show the new body.
+#[tokio::test]
+async fn update_wiki_page_tool_replaces_page_body() {
+    let (_dir, state) = mk_state_with_project("p1", "P1A");
+    let admin = mk_user(Role::Admin);
+
+    let created = crate::mcp::tools::tools_call(
+        &state,
+        &admin,
+        serde_json::json!({
+            "name": "create_wiki_page",
+            "arguments": {
+                "projectKey": "P1A",
+                "title": "Progress",
+                "content": "# Old\n\nfirst version"
+            }
+        }),
+    )
+    .await
+    .expect("create");
+    let created: Value = serde_json::from_str(&tool_result_text(&created)).expect("parse create");
+    let page_id = created
+        .get("pageId")
+        .and_then(|i| i.as_str())
+        .expect("pageId")
+        .to_string();
+
+    let updated = crate::mcp::tools::tools_call(
+        &state,
+        &admin,
+        serde_json::json!({
+            "name": "update_wiki_page",
+            "arguments": {
+                "projectKey": "P1A",
+                "pageId": page_id,
+                "content": "# New\n\nsecond version",
+                "mode": "replace"
+            }
+        }),
+    )
+    .await
+    .expect("update");
+    let updated: Value = serde_json::from_str(&tool_result_text(&updated)).expect("parse update");
+    assert_eq!(updated.get("mode").and_then(|m| m.as_str()), Some("replace"));
+
+    let fetched = crate::mcp::tools::tools_call(
+        &state,
+        &admin,
+        serde_json::json!({
+            "name": "get_wiki_page",
+            "arguments": { "projectKey": "P1A", "pageId": page_id }
+        }),
+    )
+    .await
+    .expect("get");
+    let fetched: Value = serde_json::from_str(&tool_result_text(&fetched)).expect("parse get");
+    let doc = fetched["page"]["doc"].as_str().expect("doc");
+    let blocks: Vec<Value> = serde_json::from_str(doc).expect("doc json");
+    assert_eq!(
+        blocks[0].get("type").and_then(|v| v.as_str()),
+        Some("heading")
+    );
+    assert!(doc.contains("second version"), "doc should be replaced: {doc}");
+    assert!(!doc.contains("first version"), "old body must be gone: {doc}");
+}
+
+#[tokio::test]
+async fn update_wiki_page_tool_appends_by_title() {
+    let (_dir, state) = mk_state_with_project("p1", "P1A");
+    let admin = mk_user(Role::Admin);
+
+    crate::mcp::tools::tools_call(
+        &state,
+        &admin,
+        serde_json::json!({
+            "name": "create_wiki_page",
+            "arguments": {
+                "projectKey": "P1A",
+                "title": "Progress",
+                "content": "intro paragraph"
+            }
+        }),
+    )
+    .await
+    .expect("create");
+
+    crate::mcp::tools::tools_call(
+        &state,
+        &admin,
+        serde_json::json!({
+            "name": "update_wiki_page",
+            "arguments": {
+                "projectKey": "P1A",
+                "wikiPageTitle": "Progress",
+                "content": "## Update 1\n\nappended line",
+                "mode": "append"
+            }
+        }),
+    )
+    .await
+    .expect("append");
+
+    let fetched = crate::mcp::tools::tools_call(
+        &state,
+        &admin,
+        serde_json::json!({
+            "name": "get_wiki_page",
+            "arguments": { "projectKey": "P1A", "wikiPageTitle": "Progress" }
+        }),
+    )
+    .await
+    .expect("get");
+    let fetched: Value = serde_json::from_str(&tool_result_text(&fetched)).expect("parse get");
+    let doc = fetched["page"]["doc"].as_str().expect("doc");
+    assert!(doc.contains("intro paragraph"), "existing body kept: {doc}");
+    assert!(doc.contains("appended line"), "new content appended: {doc}");
+}
+
+#[tokio::test]
+async fn update_wiki_page_tool_requires_write_permission() {
+    let (_dir, state) = mk_state_with_project("p1", "P1A");
+    let admin = mk_user(Role::Admin);
+    let viewer = mk_user(Role::Viewer);
+
+    crate::mcp::tools::tools_call(
+        &state,
+        &admin,
+        serde_json::json!({
+            "name": "create_wiki_page",
+            "arguments": { "projectKey": "P1A", "title": "Progress", "content": "body" }
+        }),
+    )
+    .await
+    .expect("create");
+
+    let err = crate::mcp::tools::tools_call(
+        &state,
+        &viewer,
+        serde_json::json!({
+            "name": "update_wiki_page",
+            "arguments": {
+                "projectKey": "P1A",
+                "wikiPageTitle": "Progress",
+                "content": "hacked"
+            }
+        }),
+    )
+    .await
+    .expect_err("viewer should fail");
+    assert!(format!("{err:#}").contains("insufficient permissions"));
+}
+
 #[tokio::test]
 async fn post_mcp_initialize_authenticates_without_blocking_read_panic() {
     let (_dir, state) = mk_state_with_project("p1", "P1A");

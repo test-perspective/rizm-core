@@ -115,6 +115,18 @@ pub fn default_manifest() -> ProjectManifest {
                         visible: Some(true),
                     },
                     PropertyDefinition {
+                        name: "parentTaskKey".to_string(),
+                        type_: PropertyType::Link,
+                        options: None,
+                        visible: Some(true),
+                    },
+                    PropertyDefinition {
+                        name: "blockedBy".to_string(),
+                        type_: PropertyType::Link,
+                        options: None,
+                        visible: Some(true),
+                    },
+                    PropertyDefinition {
                         name: "labels".to_string(),
                         type_: PropertyType::Labels,
                         options: None,
@@ -294,7 +306,7 @@ mod tests {
         assert_eq!(m.entities[1].default_view.as_deref(), Some("wiki"));
 
         // properties
-        assert_eq!(m.entities[0].properties.len(), 9);
+        assert_eq!(m.entities[0].properties.len(), 11);
         let names: Vec<_> = m.entities[0]
             .properties
             .iter()
@@ -311,6 +323,8 @@ mod tests {
                 "assigneeId",
                 "Description",
                 "link",
+                "parentTaskKey",
+                "blockedBy",
                 "labels"
             ]
         );

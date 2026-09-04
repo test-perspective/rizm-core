@@ -31,6 +31,10 @@ fn build_tool_definitions_includes_admin_tools_when_admin_and_empty_project() {
         "should include list_tasks"
     );
     assert!(
+        names.contains(&"list_wiki_pages".to_string()),
+        "should include list_wiki_pages"
+    );
+    assert!(
         names.contains(&"search_tasks".to_string()),
         "should include search_tasks"
     );

@@ -135,6 +135,7 @@ pub(super) fn build_chat_system_prompt(
     s.push_str("Task updates: use update_task to change title, status, priority, description, or other task fields. For label changes, prefer addLabels to attach labels and removeLabels to detach specific labels without affecting others; avoid labels full replace unless you intentionally want to overwrite every label on the task.\n");
     s.push_str("Keep responses concise and actionable.\n");
     s.push_str("For questions like \"How many tasks?\" or \"タスク数はいくつ?\", use list_tasks and report the totalCount from the response.\n");
+    s.push_str("For questions like \"What wiki pages exist?\" or \"How many notes?\", use list_wiki_pages and report the totalCount from the response. Do not guess keywords with search_wiki when the user wants a full inventory.\n");
     if let Some(project_id) = project_id {
         if !project_id.trim().is_empty() {
             s.push_str("\nCurrent project id:\n");
@@ -374,6 +375,7 @@ mod tests {
         assert!(prompt.contains("Release notes"));
         assert!(prompt.contains("entity_id"));
         assert!(prompt.contains("create_wiki_page"));
+        assert!(prompt.contains("list_wiki_pages"));
     }
 
     #[test]

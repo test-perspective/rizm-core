@@ -52,3 +52,4 @@ mod tool_exec_admin_groups;
 mod tool_exec_admin_policy;
 mod tool_exec_admin_users;
 mod tool_exec_tasks;
+mod tool_exec_wiki;

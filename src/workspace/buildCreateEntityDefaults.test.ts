@@ -84,6 +84,23 @@ describe('buildDefaultPropertiesForNewEntity', () => {
     expect(props[ORDER_KEY]).toBe(6000);
   });
 
+  test('uses an explicit order instead of appending to the lane', () => {
+    const view = boardView();
+    const props = buildDefaultPropertiesForNewEntity({
+      currentView: view,
+      properties: [statusProp, titleProp],
+      currentEntities: [
+        taskEntity('1', 'In Progress', 2000),
+        taskEntity('2', 'In Progress', 5000),
+      ],
+      groupByValue: 'In Progress',
+      order: 3500,
+    });
+
+    expect(props.status).toBe('In Progress');
+    expect(props[ORDER_KEY]).toBe(3500);
+  });
+
   test('omits order when lane peers have no __keelOrder so new entity sorts last by createdAt', () => {
     const view = boardView();
     const props = buildDefaultPropertiesForNewEntity({

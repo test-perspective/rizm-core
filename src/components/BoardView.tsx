@@ -35,7 +35,11 @@ interface BoardViewProps {
   /** When set, report task order in that entity's lane for detail panel keyboard navigation. */
   openDetailEntityId?: string | null;
   onBoardLaneEntityOrderForDetailChange?: (taskIdsInLane: string[]) => void;
-  onInlineCreateInColumn?: (columnId: string, title: string) => void;
+  onInlineCreateInColumn?: (
+    columnId: string,
+    title: string,
+    options?: { order?: number }
+  ) => string | undefined;
   titleLikeProperty?: string;
 }
 
@@ -156,6 +160,9 @@ export const BoardView = ({
     view.groupBy,
   ]);
 
+  // Hide the between-card insert slots while anything is being dragged (REQ-310).
+  const isDragActive = Boolean(activeEntity || activeDivider || activeColumnId);
+
   const collisionDetectionStrategy = useCallback(
     createBoardCollisionDetection(displayColumns),
     [displayColumns]
@@ -206,6 +213,7 @@ export const BoardView = ({
                   onScmRefresh={refreshScmState}
                   onRenameColumn={onRenameBoardColumn}
                   onInlineCreate={onInlineCreateInColumn}
+                  isDragActive={isDragActive}
                   titleLikeProperty={titleLikeProperty}
                 />
               ))}

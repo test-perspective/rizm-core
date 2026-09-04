@@ -2,6 +2,7 @@ import { Menu, Plus } from 'lucide-react';
 import type { Entity, EntityDefinition, ProjectMeta, ViewConfig } from '../../types';
 import { BoardViewMenu, type ViewTitleNotesMenu } from '../BoardViewMenu';
 import { ProjectOverflowMenu } from '../sidebar/ProjectOverflowMenu';
+import { ProjectSelect } from '../common/ProjectSelect';
 
 export type WorkspaceNotesChromeProps = {
   projects: ProjectMeta[];
@@ -51,19 +52,14 @@ export function WorkspaceHeader({
           data-testid="workspace-header-notes-chrome"
         >
           <img src="/brand/logo.png" alt="Rizm" className="h-6 shrink-0" />
-          <select
+          {/* REQ-312: プロジェクトが多数でも探せるよう入力補完付きの選択に変更。 */}
+          <ProjectSelect
+            projects={notesChrome.projects}
             value={notesChrome.activeProjectId}
-            onChange={(e) => notesChrome.onProjectChange(e.target.value)}
-            className="min-w-0 max-w-[200px] bg-zinc-900 border border-zinc-800 text-white text-sm rounded-md px-2 py-1.5 outline-none focus:ring-2 focus:ring-violet-600"
-            aria-label="Project"
-          >
-            {notesChrome.projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-                {p.projectKey ? ` (${p.projectKey})` : ''}
-              </option>
-            ))}
-          </select>
+            onChange={notesChrome.onProjectChange}
+            className="min-w-0 w-[200px]"
+            testId="workspace-header-project-select"
+          />
           <ProjectOverflowMenu
             onOpenProjectDetail={notesChrome.onOpenProjectDetail}
             onAddProject={notesChrome.onAddProject}

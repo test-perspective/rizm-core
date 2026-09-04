@@ -64,54 +64,13 @@ fn tools_call_blocking(
             Ok(super::jsonrpc::tool_text_result(text))
         }
         "create_task" => {
-            let pk = read_string_arg(args, &["projectKey", "project_key"]);
-            let pid = read_string_arg(args, &["projectId", "project_id"]);
-            let title =
-                read_string_arg(args, &["title"]).context("missing required argument: title")?;
-            let description = read_string_arg(args, &["description", "body", "content"]);
-            let status = read_string_arg(args, &["status"]);
-            let priority = read_string_arg(args, &["priority"]);
-            let labels = super::jsonrpc::read_string_array_arg(args, &["labels"]);
-            let task_key = read_string_arg(args, &["taskKey", "task_key"]);
-            let text = super::task_wiki::create_task_for_user(
-                state,
-                user,
-                pk.as_deref(),
-                pid.as_deref(),
-                &title,
-                description.as_deref(),
-                status.as_deref(),
-                priority.as_deref(),
-                labels.as_deref(),
-                task_key.as_deref(),
-            )?;
+            let input = super::task_wiki::TaskCreateInput::from_mcp_args(args)?;
+            let text = super::task_wiki::create_task_for_user(state, user, input)?;
             Ok(super::jsonrpc::tool_text_result(text))
         }
         "update_task" => {
-            let task_key = read_string_arg(args, &["taskKey", "task_key", "entity_id", "entityId"])
-                .context("missing required argument: taskKey")?;
-            let title = read_string_arg(args, &["title"]);
-            let description = read_string_arg(args, &["description", "body", "content"]);
-            let status = read_string_arg(args, &["status"]);
-            let priority = read_string_arg(args, &["priority"]);
-            let labels = super::jsonrpc::read_string_array_arg(args, &["labels"]);
-            let add_labels = super::jsonrpc::read_string_array_arg(args, &["addLabels", "add_labels"]);
-            let remove_labels =
-                super::jsonrpc::read_string_array_arg(args, &["removeLabels", "remove_labels"]);
-            let patch = args.get("patch").and_then(Value::as_object);
-            let text = super::task_wiki::update_task_for_user(
-                state,
-                user,
-                &task_key,
-                title.as_deref(),
-                description.as_deref(),
-                status.as_deref(),
-                priority.as_deref(),
-                labels.as_deref(),
-                add_labels.as_deref(),
-                remove_labels.as_deref(),
-                patch,
-            )?;
+            let input = super::task_wiki::TaskUpdateInput::from_mcp_args(args)?;
+            let text = super::task_wiki::update_task_for_user(state, user, input)?;
             Ok(super::jsonrpc::tool_text_result(text))
         }
         "list_projects" => {
@@ -212,56 +171,9 @@ fn tools_call_blocking(
             )?;
             Ok(super::jsonrpc::tool_text_result(text))
         }
-        "search_wiki" => {
-            let query = read_string_arg(args, &["query", "q"])
-                .context("missing required argument: query")?;
-            let pk = read_string_arg(args, &["projectKey", "project_key"]);
-            let pid = read_string_arg(args, &["projectId", "project_id"]);
-            let limit = args
-                .get("limit")
-                .and_then(Value::as_i64)
-                .unwrap_or(10)
-                .clamp(1, 20) as usize;
-            let text = super::task_wiki::search_wiki_for_user(
-                state,
-                user,
-                &query,
-                pk.as_deref(),
-                pid.as_deref(),
-                limit,
-            )?;
-            Ok(super::jsonrpc::tool_text_result(text))
-        }
-        "get_wiki_page" => {
-            let pk = read_string_arg(args, &["projectKey", "project_key"]);
-            let pid = read_string_arg(args, &["projectId", "project_id"]);
-            let page_id = read_string_arg(args, &["pageId", "page_id"]);
-            let title = read_string_arg(args, &["wikiPageTitle", "wiki_page_title", "title"]);
-            let text = super::task_wiki::get_wiki_page_for_user(
-                state,
-                user,
-                pk.as_deref(),
-                pid.as_deref(),
-                page_id.as_deref(),
-                title.as_deref(),
-            )?;
-            Ok(super::jsonrpc::tool_text_result(text))
-        }
-        "create_wiki_page" => {
-            let pk = read_string_arg(args, &["projectKey", "project_key"]);
-            let pid = read_string_arg(args, &["projectId", "project_id"]);
-            let title =
-                read_string_arg(args, &["title"]).context("missing required argument: title")?;
-            let content = read_string_arg(args, &["content", "body"]);
-            let text = super::task_wiki::create_wiki_page_for_user(
-                state,
-                user,
-                pk.as_deref(),
-                pid.as_deref(),
-                &title,
-                content.as_deref(),
-            )?;
-            Ok(super::jsonrpc::tool_text_result(text))
+        "list_wiki_pages" | "search_wiki" | "get_wiki_page" | "create_wiki_page"
+        | "update_wiki_page" => {
+            super::wiki_tools::wiki_tool_call(state, user, name, args)
         }
         _ => Ok(super::jsonrpc::tool_error_result(format!(
             "unknown tool: {name}"
@@ -307,7 +219,19 @@ pub fn read_entity_by_task_key_for_user(
         })
         .ok_or_else(|| anyhow::anyhow!("task not found: {canonical_task_key}"))?;
 
-    Ok(task.properties.clone())
+    let manifest = db
+        .get_manifest_with_etag(&project.id)
+        .context("get manifest")?
+        .map(|(manifest, _)| manifest);
+    let done_status = super::task_wiki::done_status_from_manifest(manifest.as_ref());
+
+    let mut props = task.properties.clone();
+    props.insert(
+        "_relations".to_string(),
+        super::task_wiki::derive_relations(&canonical_task_key, &entities, done_status.as_deref())
+            .to_json(),
+    );
+    Ok(props)
 }
 
 pub fn add_comment_for_target(

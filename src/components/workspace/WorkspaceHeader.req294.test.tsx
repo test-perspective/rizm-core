@@ -56,7 +56,10 @@ describe('WorkspaceHeader REQ-294 notes chrome project menu order', () => {
 
     const chrome = container.querySelector('[data-testid="workspace-header-notes-chrome"]');
     expect(chrome).not.toBeNull();
-    const projectSelect = chrome!.querySelector('select[aria-label="Project"]') as HTMLSelectElement;
+    // REQ-312: project picker is now an Autocomplete input, not a native select.
+    const projectSelect = chrome!.querySelector(
+      '[data-testid="workspace-header-project-select"]'
+    ) as HTMLInputElement;
     const overflowBtn = chrome!.querySelector(
       '[data-testid="workspace-header-project-overflow-menu"]'
     ) as HTMLButtonElement;

@@ -8,6 +8,8 @@ export type BuildCreateEntityDefaultsArgs = {
   currentEntities: Entity[];
   /** When set (board lane +Create), use this column value instead of the leftmost visible lane. */
   groupByValue?: string;
+  /** Explicit __keelOrder (board lane insert). When omitted the entity is appended to the lane. */
+  order?: number;
 };
 
 export function buildDefaultPropertiesForNewEntity({
@@ -15,6 +17,7 @@ export function buildDefaultPropertiesForNewEntity({
   properties,
   currentEntities,
   groupByValue,
+  order,
 }: BuildCreateEntityDefaultsArgs): Record<string, unknown> {
   const initialGroupByValue =
     currentView.type === 'board'
@@ -35,13 +38,16 @@ export function buildDefaultPropertiesForNewEntity({
     }
   });
 
-  if (currentView.type === 'board' && initialGroupByValue && currentView.groupBy) {
+  if (order !== undefined) {
+    // Caller (board lane insert) already resolved the exact slot.
+    defaultProps[ORDER_KEY] = order;
+  } else if (currentView.type === 'board' && initialGroupByValue && currentView.groupBy) {
     const laneEntities = currentEntities.filter(
       (e) => e.properties[currentView.groupBy!] === initialGroupByValue
     );
-    const order = computeOrderForNewEntityAtBottomInLane(laneEntities);
-    if (order !== null) {
-      defaultProps[ORDER_KEY] = order;
+    const bottomOrder = computeOrderForNewEntityAtBottomInLane(laneEntities);
+    if (bottomOrder !== null) {
+      defaultProps[ORDER_KEY] = bottomOrder;
     }
   }
 

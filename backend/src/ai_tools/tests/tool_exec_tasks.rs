@@ -362,3 +362,64 @@ async fn update_task_remove_labels_via_aia() {
         .collect::<Vec<_>>();
     assert_eq!(labels, vec!["beta"]);
 }
+
+#[tokio::test]
+async fn create_task_persists_blocked_by_and_get_task_derives_relations() {
+    let (_dir, db) = tmp_db();
+    make_project_with_key(&db, "p1", "P1A");
+    db.create_entity_for_project(
+        "p1",
+        Some("t1"),
+        "task",
+        serde_json::json!({"title": "Gate A", "status": "Todo"})
+            .as_object()
+            .cloned()
+            .unwrap_or_default(),
+    )
+    .expect("create blocker");
+    let state = app_state(db);
+    let user = admin_user();
+
+    let (create_raw, get_raw) = tokio::task::spawn_blocking({
+        let state = state.clone();
+        let user = user.clone();
+        move || {
+            let create_raw = create_task(
+                &state,
+                &user,
+                &json!({
+                    "projectKey": "P1A",
+                    "title": "Gate B",
+                    "blockedBy": ["P1A-1"]
+                }),
+            )?;
+            let get_raw = get_task(&state, &user, &json!({ "taskKey": "P1A-2" }))?;
+            Ok::<_, crate::ApiError>((create_raw, get_raw))
+        }
+    })
+    .await
+    .expect("join")
+    .expect("create_task");
+    let parsed: JsonValue = serde_json::from_str(&create_raw).expect("parse");
+    assert_eq!(parsed.get("taskKey").and_then(|v| v.as_str()), Some("P1A-2"));
+
+    let parsed: JsonValue = serde_json::from_str(&get_raw).expect("parse");
+    let task = parsed.get("task").expect("task");
+    let blocked_by = task
+        .get("blockedBy")
+        .and_then(|v| v.as_array())
+        .expect("blockedBy");
+    assert_eq!(
+        blocked_by
+            .iter()
+            .filter_map(|v| v.as_str())
+            .collect::<Vec<_>>(),
+        vec!["P1A-1"]
+    );
+    assert_eq!(
+        task.get("_relations")
+            .and_then(|r| r.get("ready"))
+            .and_then(|v| v.as_bool()),
+        Some(false)
+    );
+}

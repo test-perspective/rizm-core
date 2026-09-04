@@ -13,6 +13,7 @@ mod tool_defs;
 mod tool_exec;
 mod tool_exec_admin;
 mod tool_exec_tasks;
+mod tool_exec_wiki;
 use tool_defs::build_tool_definitions;
 use tool_exec::{append_tool_calls, parse_tool_calls};
 

@@ -56,7 +56,11 @@ type WorkspaceViewPanelProps = {
   searchQuery?: string;
   wikiCreateRef?: MutableRefObject<(() => void) | null>;
   notesPane?: WorkspaceNotesPaneConfig | null;
-  onInlineCreateInBoardColumn?: (columnId: string, title: string) => void;
+  onInlineCreateInBoardColumn?: (
+    columnId: string,
+    title: string,
+    options?: { order?: number }
+  ) => string | undefined;
 };
 
 export function WorkspaceViewPanel({

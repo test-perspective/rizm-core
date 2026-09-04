@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 
 import { fetchProjectState, fetchWikiPages, moveWikiPage } from '../../api/projects';
+import { ProjectSelect } from '../common/ProjectSelect';
 import type { Entity, ProjectMeta } from '../../types';
 import { setLastWikiPageForProjectView } from '../../workspace/storage';
 import {
@@ -161,22 +162,16 @@ export function WikiMoveDialog({
         </p>
         {loadError && <p className="text-sm text-red-400">{loadError}</p>}
         {saveError && <p className="text-sm text-red-400">{saveError}</p>}
-        <FormControl fullWidth size="small" disabled={listLoading || saving}>
-          <InputLabel id="wiki-move-project-label">Destination project</InputLabel>
-          <Select
-            labelId="wiki-move-project-label"
-            label="Destination project"
-            value={destProjectId}
-            onChange={(e) => setDestProjectId(String(e.target.value))}
-          >
-            {projects.map((p) => (
-              <MenuItem key={p.id} value={p.id}>
-                {p.name}
-                {p.projectKey ? ` (${p.projectKey})` : ''}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        {/* REQ-312: プロジェクトが多数でも探せるよう入力補完付きの選択に変更。 */}
+        <ProjectSelect
+          projects={projects}
+          value={destProjectId}
+          onChange={setDestProjectId}
+          label="Destination project"
+          ariaLabel="Destination project"
+          disabled={listLoading || saving}
+          testId="wiki-move-project-select"
+        />
         <FormControl fullWidth size="small" disabled={listLoading || saving}>
           <InputLabel id="wiki-move-parent-label">Destination parent</InputLabel>
           <Select

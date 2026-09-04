@@ -45,7 +45,12 @@ function setTextareaValue(textarea: HTMLTextAreaElement, value: string) {
 function renderBoardColumn(
   props: Partial<
     typeof baseProps & {
-      onInlineCreate?: (columnId: string, title: string) => void;
+      onInlineCreate?: (
+        columnId: string,
+        title: string,
+        options?: { order?: number }
+      ) => string | undefined;
+      isDragActive?: boolean;
     }
   > = {}
 ) {
@@ -103,8 +108,8 @@ describe('BoardColumn inline create', () => {
     container.remove();
   });
 
-  it('calls onInlineCreate with columnId and title on Enter, then closes input', async () => {
-    const onInlineCreate = vi.fn();
+  it('calls onInlineCreate with columnId, title and order on Enter, then keeps the input open', async () => {
+    const onInlineCreate = vi.fn(() => 'new-1');
     const { container, root } = renderBoardColumn({ onInlineCreate });
 
     const button = container.querySelector(
@@ -124,9 +129,14 @@ describe('BoardColumn inline create', () => {
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
     });
 
-    expect(onInlineCreate).toHaveBeenCalledWith('In Progress', 'New inline task');
-    expect(container.querySelector('[data-testid="board-inline-create-In Progress"]')).toBeNull();
-    expect(container.querySelector('[data-testid="board-lane-create-In Progress"]')).not.toBeNull();
+    expect(onInlineCreate).toHaveBeenCalledWith('In Progress', 'New inline task', { order: 0 });
+    // The input stays open on the next slot so several tasks can be typed in a row (REQ-310).
+    const reopened = container.querySelector(
+      '[data-testid="board-inline-create-input-In Progress"]'
+    ) as HTMLTextAreaElement;
+    expect(reopened).not.toBeNull();
+    expect(reopened.value).toBe('');
+    expect(container.querySelector('[data-testid="board-lane-create-In Progress"]')).toBeNull();
 
     act(() => root.unmount());
     container.remove();
@@ -289,7 +299,7 @@ describe('BoardColumn inline create', () => {
   });
 
   it('clears the draft after a successful create', async () => {
-    const onInlineCreate = vi.fn();
+    const onInlineCreate = vi.fn(() => 'new-1');
     const { container, root } = renderBoardColumn({ onInlineCreate });
 
     await act(async () => {
@@ -307,8 +317,17 @@ describe('BoardColumn inline create', () => {
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
     });
 
-    expect(onInlineCreate).toHaveBeenCalledWith('In Progress', 'Submitted task');
+    expect(onInlineCreate).toHaveBeenCalledWith('In Progress', 'Submitted task', { order: 0 });
 
+    input = container.querySelector(
+      '[data-testid="board-inline-create-input-In Progress"]'
+    ) as HTMLTextAreaElement;
+    expect(input.value).toBe('');
+
+    // ...and it stays empty after closing and reopening.
+    await act(async () => {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    });
     await act(async () => {
       (
         container.querySelector('[data-testid="board-lane-create-In Progress"]') as HTMLButtonElement

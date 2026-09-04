@@ -169,6 +169,8 @@ export const getDefaultManifest = (): ProjectManifest =>
           { name: 'assigneeId', type: 'user', visible: true },
           { name: 'Description', type: 'richtext', visible: true },
           { name: 'link', type: 'link', visible: true },
+          { name: 'parentTaskKey', type: 'link', visible: true },
+          { name: 'blockedBy', type: 'link', visible: true },
           { name: 'labels', type: 'labels', visible: true },
         ],
         defaultView: 'list',

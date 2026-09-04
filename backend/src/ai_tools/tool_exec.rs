@@ -90,9 +90,11 @@ fn execute_tool_call_sync(
         "create_task" => create_task(state, user, &call.arguments),
         "update_task" => update_task(state, user, &call.arguments),
         "add_comment" => add_comment(state, user, &call.arguments),
-        "search_wiki" => search_wiki(state, user, &call.arguments),
-        "get_wiki_page" => get_wiki_page(state, user, &call.arguments),
-        "create_wiki_page" => create_wiki_page(state, user, &call.arguments),
+        "list_wiki_pages" => super::tool_exec_wiki::list_wiki_pages(state, user, &call.arguments),
+        "search_wiki" => super::tool_exec_wiki::search_wiki(state, user, &call.arguments),
+        "get_wiki_page" => super::tool_exec_wiki::get_wiki_page(state, user, &call.arguments),
+        "create_wiki_page" => super::tool_exec_wiki::create_wiki_page(state, user, &call.arguments),
+        "update_wiki_page" => super::tool_exec_wiki::update_wiki_page(state, user, &call.arguments),
         _ => Ok(json!({ "error": "unknown tool" }).to_string()),
     }
 }
@@ -380,117 +382,4 @@ pub(super) fn get_project_manifest(
         None => Ok(json!({ "error": "not found" }).to_string()),
         Some(m) => Ok(json!({ "projectId": project_id, "manifest": m }).to_string()),
     }
-}
-
-fn search_wiki(state: &AppState, user: &AuthedUser, args: &Value) -> Result<String, ApiError> {
-    let query = args
-        .get("query")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .trim()
-        .to_string();
-    if query.is_empty() {
-        return Ok(json!({ "pages": [] }).to_string());
-    }
-    let pk = args
-        .get("projectKey")
-        .and_then(|v| v.as_str())
-        .map(|s| s.trim().to_string());
-    let pid = args
-        .get("projectId")
-        .and_then(|v| v.as_str())
-        .map(|s| s.trim().to_string());
-    let limit = args
-        .get("limit")
-        .and_then(|v| v.as_i64())
-        .unwrap_or(5)
-        .clamp(1, 20) as usize;
-
-    let text = crate::mcp::task_wiki::search_wiki_for_user(
-        state,
-        user,
-        &query,
-        pk.as_deref().filter(|s| !s.is_empty()),
-        pid.as_deref().filter(|s| !s.is_empty()),
-        limit,
-    )
-    .map_err(|e| ApiError::bad_request(format!("{e:#}")))?;
-
-    let parsed: Value = serde_json::from_str(&text).map_err(|_| ApiError::internal())?;
-    let empty: Vec<Value> = vec![];
-    let results = parsed
-        .get("results")
-        .and_then(|v| v.as_array())
-        .unwrap_or(&empty);
-    let pages: Vec<Value> = results
-        .iter()
-        .map(|r| {
-            json!({
-                "id": r.get("entityPk").and_then(|v| v.as_str()).unwrap_or(""),
-                "title": r.get("title").and_then(|v| v.as_str()).unwrap_or("Untitled"),
-                "updatedAt": r.get("updatedAt").unwrap_or(&json!(0)),
-                "snippet": r.get("preview").and_then(|v| v.as_str()).unwrap_or("")
-            })
-        })
-        .collect();
-    Ok(json!({ "pages": pages }).to_string())
-}
-
-fn get_wiki_page(state: &AppState, user: &AuthedUser, args: &Value) -> Result<String, ApiError> {
-    let pk = args
-        .get("projectKey")
-        .and_then(|v| v.as_str())
-        .map(|s| s.trim().to_string());
-    let pid = args
-        .get("projectId")
-        .and_then(|v| v.as_str())
-        .map(|s| s.trim().to_string());
-    let page_id = args
-        .get("pageId")
-        .and_then(|v| v.as_str())
-        .map(|s| s.trim().to_string());
-    let title = args
-        .get("title")
-        .and_then(|v| v.as_str())
-        .map(|s| s.trim().to_string());
-    let text = crate::mcp::task_wiki::get_wiki_page_for_user(
-        state,
-        user,
-        pk.as_deref().filter(|s| !s.is_empty()),
-        pid.as_deref().filter(|s| !s.is_empty()),
-        page_id.as_deref().filter(|s| !s.is_empty()),
-        title.as_deref().filter(|s| !s.is_empty()),
-    )
-    .map_err(|e| ApiError::bad_request(format!("{e:#}")))?;
-    Ok(text)
-}
-
-fn create_wiki_page(state: &AppState, user: &AuthedUser, args: &Value) -> Result<String, ApiError> {
-    let pk = args
-        .get("projectKey")
-        .and_then(|v| v.as_str())
-        .map(|s| s.trim().to_string());
-    let pid = args
-        .get("projectId")
-        .and_then(|v| v.as_str())
-        .map(|s| s.trim().to_string());
-    let title = args
-        .get("title")
-        .and_then(|v| v.as_str())
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty());
-    let from_body = args.get("body").and_then(|v| v.as_str());
-    let from_content = args.get("content").and_then(|v| v.as_str());
-    let content = from_content.or(from_body).map(|s| s.to_string());
-    let title = title.ok_or_else(|| ApiError::bad_request("title is required"))?;
-    let text = crate::mcp::task_wiki::create_wiki_page_for_user(
-        state,
-        user,
-        pk.as_deref().filter(|s| !s.is_empty()),
-        pid.as_deref().filter(|s| !s.is_empty()),
-        &title,
-        content.as_deref(),
-    )
-    .map_err(|e| ApiError::bad_request(format!("{e:#}")))?;
-    Ok(text)
 }

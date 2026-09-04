@@ -104,7 +104,7 @@ pub(super) fn project_tools() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "create_task",
-                "description": "Create a task in a project. The taskKey is generated from the project key unless taskKey is explicitly provided.",
+                "description": "Create a task in a project. The taskKey is generated from the project key unless taskKey is explicitly provided. Optional parentTaskKey/blockedBy/link store link-type properties. Optional blocks adds this task to each target's blockedBy (not stored on the created task).",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -115,7 +115,11 @@ pub(super) fn project_tools() -> Vec<Value> {
                         "status": { "type": "string", "description": "Task status (e.g. Todo, In Progress)." },
                         "priority": { "type": "string", "description": "Task priority (e.g. Low, Medium, High)." },
                         "labels": { "type": "array", "items": { "type": "string" }, "description": "Initial task labels." },
-                        "taskKey": { "type": "string", "description": "Optional explicit task key like REQ-299." }
+                        "taskKey": { "type": "string", "description": "Optional explicit task key like REQ-299." },
+                        "parentTaskKey": { "type": "string", "description": "Parent task key (single). Stored as a link-type parentTaskKey property." },
+                        "blockedBy": { "type": "array", "items": { "type": "string" }, "description": "Task keys that block this task. Stored as a link-type blockedBy property." },
+                        "blocks": { "type": "array", "items": { "type": "string" }, "description": "Task keys this task blocks. Adds this task to each target's blockedBy; not stored on this task." },
+                        "link": { "type": "array", "items": { "type": "string" }, "description": "Related task keys stored in the link property." }
                     },
                     "required": ["title"],
                     "additionalProperties": false
@@ -126,7 +130,7 @@ pub(super) fn project_tools() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "update_task",
-                "description": "Update a task by taskKey. Supports common fields and an optional patch object for additional task properties. Use addLabels/removeLabels for incremental label changes; avoid labels full replace unless you intend to overwrite all labels.",
+                "description": "Update a task by taskKey. Supports common fields and an optional patch object for additional task properties. Use addLabels/removeLabels for incremental label changes; avoid labels full replace unless you intend to overwrite all labels. parentTaskKey/blockedBy/link update stored link properties. blocks adds this task to each target's blockedBy (not stored on this task). Relation arguments are idempotent: requesting links that already exist succeeds with an empty changedFields.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -140,7 +144,13 @@ pub(super) fn project_tools() -> Vec<Value> {
                         "labels": { "type": "array", "items": { "type": "string" }, "description": "Replace all task labels with this array." },
                         "addLabels": { "type": "array", "items": { "type": "string" }, "description": "Add labels without removing existing ones." },
                         "removeLabels": { "type": "array", "items": { "type": "string" }, "description": "Remove specific labels while keeping others." },
-                        "patch": { "type": "object", "description": "Additional task properties to patch. createdBy and updatedBy are ignored." }
+                        "parentTaskKey": { "type": "string", "description": "Parent task key (single). Pass empty string to clear." },
+                        "blockedBy": { "type": "array", "items": { "type": "string" }, "description": "Replace blockedBy with this array of task keys. Pass [] to clear." },
+                        "addBlockedBy": { "type": "array", "items": { "type": "string" }, "description": "Add blocking task keys without replacing blockedBy." },
+                        "removeBlockedBy": { "type": "array", "items": { "type": "string" }, "description": "Remove blocking task keys while keeping others." },
+                        "blocks": { "type": "array", "items": { "type": "string" }, "description": "Task keys this task blocks. Adds this task to each target's blockedBy; never removes existing ones. Not stored on this task." },
+                        "link": { "type": "array", "items": { "type": "string" }, "description": "Replace the link property with these task keys. Pass [] to clear." },
+                        "patch": { "type": "object", "description": "Additional task properties to patch. Relation and server-owned keys (createdBy, updatedBy, taskKey, labels, parentTaskKey, blockedBy, blocks, link) are ignored; use the dedicated arguments instead." }
                     },
                     "required": [],
                     "additionalProperties": false
@@ -163,6 +173,23 @@ pub(super) fn project_tools() -> Vec<Value> {
                         "text": { "type": "string", "description": "Comment body in Markdown/plain text." }
                     },
                     "required": ["targetType", "text"],
+                    "additionalProperties": false
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
+                "name": "list_wiki_pages",
+                "description": "List wiki pages in a project without keyword search. Returns totalCount (including folders), pages (id, title, nodeType, parentId, order, updatedAt), projectId, projectKey. Use totalCount for \"How many wiki pages?\" questions. Does not return page bodies; use get_wiki_page for content.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "projectId": { "type": "string", "description": "Project id." },
+                        "projectKey": { "type": "string", "description": "Project key like REQ." },
+                        "limit": { "type": "integer", "description": "Max results (1-100).", "minimum": 1, "maximum": 100 }
+                    },
+                    "required": [],
                     "additionalProperties": false
                 }
             }
@@ -246,6 +273,27 @@ pub(super) fn project_tools() -> Vec<Value> {
                         "body": { "type": "string", "description": "Alias for content (Markdown body)." }
                     },
                     "required": ["title"],
+                    "additionalProperties": false
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
+                "name": "update_wiki_page",
+                "description": "Update the body of an existing wiki page identified by pageId or wikiPageTitle. mode=replace (default) replaces the whole body; mode=append appends Markdown content at the end. If the page is open in a browser, the editor may overwrite this update on its next autosave; update while the page is closed, or reload afterwards.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "projectId": { "type": "string", "description": "Project id that owns the wiki." },
+                        "projectKey": { "type": "string", "description": "Project key like REQ." },
+                        "pageId": { "type": "string", "description": "Wiki page id (preferred)." },
+                        "wikiPageTitle": { "type": "string", "description": "Wiki page title (used when pageId omitted; must be unique)." },
+                        "content": { "type": "string", "description": "Markdown body (preferred)." },
+                        "body": { "type": "string", "description": "Alias for content (Markdown body)." },
+                        "mode": { "type": "string", "enum": ["replace", "append"], "description": "replace (default): replace whole body. append: add content at the end." }
+                    },
+                    "required": ["content"],
                     "additionalProperties": false
                 }
             }

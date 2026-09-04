@@ -1,5 +1,6 @@
 import type { ProjectMeta } from '../../types';
 import { ProjectOverflowMenu } from './ProjectOverflowMenu';
+import { ProjectSelect } from '../common/ProjectSelect';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
 interface SidebarProjectSectionProps {
@@ -31,17 +32,14 @@ export function SidebarProjectSection({
           </span>
         </div>
         <div className="flex items-center gap-2 min-w-0">
-          <select
+          {/* REQ-312: プロジェクトが多数でも探せるよう入力補完付きの選択に変更。 */}
+          <ProjectSelect
+            projects={projects}
             value={activeProjectId}
-            onChange={(e) => onProjectChange(e.target.value)}
-            className="flex-1 min-w-0 bg-zinc-900 border border-zinc-800 text-white text-sm rounded-md px-2 py-1.5 outline-none focus:ring-2 focus:ring-violet-600"
-          >
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}{p.projectKey ? ` (${p.projectKey})` : ''}
-              </option>
-            ))}
-          </select>
+            onChange={onProjectChange}
+            className="flex-1 min-w-0"
+            testId="sidebar-project-select"
+          />
           {/* REQ-286: Project Details / Add Project are desktop-only — mobile keeps just the picker. */}
           {!isMobile && (
             <ProjectOverflowMenu

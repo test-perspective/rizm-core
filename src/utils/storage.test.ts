@@ -42,6 +42,8 @@ describe('storage utils', () => {
       'assigneeId',
       'Description',
       'link',
+      'parentTaskKey',
+      'blockedBy',
       'labels',
     ]);
   });

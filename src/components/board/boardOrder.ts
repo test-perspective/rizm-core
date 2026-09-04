@@ -14,6 +14,16 @@ export const getOrder = (e: Entity | undefined): number | null => {
   return isFiniteNumber(v) ? v : null;
 };
 
+/**
+ * Midpoint between two orders, or null when the gap is too tight to bisect safely.
+ * Single place for the bisection rule so move and insert stay consistent.
+ */
+const orderBetween = (prevOrder: number, nextOrder: number): number | null => {
+  const gap = nextOrder - prevOrder;
+  if (gap > ORDER_EPS) return prevOrder + gap / 2;
+  return null;
+};
+
 export const sortEntitiesForBoard = (a: Entity, b: Entity) => {
   const ao = getOrder(a);
   const bo = getOrder(b);
@@ -53,9 +63,9 @@ export const computeOrderForMove = (
   const nextOrder = nextId ? getOrder(entityById[nextId]) : null;
 
   if (prevOrder !== null && nextOrder !== null) {
-    const gap = nextOrder - prevOrder;
-    if (gap > ORDER_EPS) {
-      return { order: prevOrder + gap / 2, reindex: [] };
+    const between = orderBetween(prevOrder, nextOrder);
+    if (between !== null) {
+      return { order: between, reindex: [] };
     }
     // too tight → reindex whole column
   } else if (prevOrder !== null && nextOrder === null) {
@@ -70,33 +80,6 @@ export const computeOrderForMove = (
     order: i * ORDER_GAP,
   }));
   return { order: idx < 0 ? 0 : idx * ORDER_GAP, reindex };
-};
-
-/**
- * Compute order value for a new entity to be placed at the top of a lane.
- * Returns a value that is less than the minimum existing order in the lane,
- * ensuring the new entity appears first when sorted by __keelOrder.
- *
- * @param laneEntities - Entities in the target lane (column)
- * @returns Order value for the new entity (guaranteed to be first)
- */
-export const computeOrderForNewEntityAtTopInLane = (laneEntities: Entity[]): number => {
-  // Find all existing orders in the lane
-  const existingOrders = laneEntities
-    .map((e) => getOrder(e))
-    .filter((o): o is number => o !== null);
-
-  if (existingOrders.length === 0) {
-    // No existing orders: start at 0
-    return 0;
-  }
-
-  // Find minimum order in the lane
-  const minOrder = Math.min(...existingOrders);
-
-  // Return a value smaller than the minimum to ensure it appears first
-  // This handles both positive and negative orders correctly
-  return minOrder - ORDER_GAP;
 };
 
 /**
@@ -118,3 +101,47 @@ export const computeOrderForNewEntityAtBottomInLane = (laneEntities: Entity[]): 
   return maxOrder + ORDER_GAP;
 };
 
+/**
+ * Compute the order value for a new entity inserted at `insertIndex` of a lane (REQ-310).
+ *
+ * @param laneTaskIds - task ids of the lane in display order (dividers already stripped)
+ * @param insertIndex - slot to insert into, 0..laneTaskIds.length (length === bottom)
+ * @returns the new entity's order (null means "omit __keelOrder", same as the bottom helper)
+ *          plus the orders that existing lane entities must be renumbered to.
+ */
+export const computeOrderForNewEntityAtIndexInLane = (
+  laneTaskIds: string[],
+  insertIndex: number,
+  entityById: Record<string, Entity>
+): { order: number | null; reindex: OrderReindex } => {
+  const clamped = Math.max(0, Math.min(insertIndex, laneTaskIds.length));
+
+  // Appending keeps the existing behavior, including the "omit the key" case.
+  if (clamped === laneTaskIds.length) {
+    const laneEntities = laneTaskIds
+      .map((id) => entityById[id])
+      .filter((e): e is Entity => Boolean(e));
+    return { order: computeOrderForNewEntityAtBottomInLane(laneEntities), reindex: [] };
+  }
+
+  const prevOrder = clamped > 0 ? getOrder(entityById[laneTaskIds[clamped - 1]]) : null;
+  const nextOrder = getOrder(entityById[laneTaskIds[clamped]]);
+
+  if (prevOrder !== null && nextOrder !== null) {
+    const between = orderBetween(prevOrder, nextOrder);
+    if (between !== null) {
+      return { order: between, reindex: [] };
+    }
+    // too tight → reindex the lane
+  } else if (clamped === 0 && nextOrder !== null) {
+    return { order: nextOrder - ORDER_GAP, reindex: [] };
+  }
+
+  // A neighbour has no order (or the gap is exhausted): renumber the lane and
+  // leave exactly one slot free at `clamped` for the new entity.
+  const reindex: OrderReindex = laneTaskIds.map((id, i) => ({
+    entityId: id,
+    order: (i < clamped ? i : i + 1) * ORDER_GAP,
+  }));
+  return { order: clamped * ORDER_GAP, reindex };
+};

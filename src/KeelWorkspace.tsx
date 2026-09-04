@@ -7,6 +7,7 @@ import { useAppDialog } from './components/dialogs';
 import { consumeReturnToProjectDetailsAfterScmOAuth } from './workspace/storage';
 import { useResolvedUsers } from './workspace/useResolvedUsers';
 import { useWorkspaceRouting } from './workspace/useWorkspaceRouting';
+import { useRecordRecentProject } from './workspace/useRecordRecentProject';
 import { useCreateEntityHandler } from './workspace/useCreateEntityHandler';
 import { resolveViewIdForSearchKind } from './workspace/searchRouting';
 import { useWorkspaceManifestHandlers } from './workspace/useWorkspaceManifestHandlers';
@@ -186,6 +187,9 @@ export function KeelWorkspace() {
   const activeProjectKey =
     activeProject?.projectKey?.trim() || projects.find((p) => p.id === activeProjectId)?.projectKey?.trim() || activeProjectId;
   const projectKeyById = new Map(projects.map((p) => [p.id, p.projectKey ?? p.id]));
+
+  // REQ-312: プロジェクト選択の候補を「最近表示した順」に並べるための記録。
+  useRecordRecentProject({ loading, projects, activeProjectId });
 
   // Always refresh on view change to reflect other users' updates.
   useEffect(() => {

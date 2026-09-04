@@ -6,3 +6,4 @@ pub mod markdown;
 pub mod project_tools;
 pub mod task_wiki;
 pub mod tools;
+pub mod wiki_tools;
