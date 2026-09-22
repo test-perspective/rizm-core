@@ -40,6 +40,13 @@ async fn main() -> anyhow::Result<()> {
     let csrf_allowed_origin = std::env::var("KEEL_CSRF_ALLOWED_ORIGIN")
         .ok()
         .filter(|s| !s.trim().is_empty());
+    // Idle window before auto-logout. A bad value (unparsable, negative, or
+    // absurdly small) must never be able to log an entire deployment out, so
+    // anything under a minute falls back to the 24h default.
+    let session_idle_ttl_ms = std::env::var("KEEL_SESSION_IDLE_TTL_MS")
+        .ok()
+        .and_then(|v| v.trim().parse::<i64>().ok())
+        .filter(|v| *v >= 60_000);
     let dev_admin_login_enabled = std::env::var("KEEL_DEV_ADMIN_LOGIN")
         .ok()
         .and_then(|v| {
@@ -62,6 +69,9 @@ async fn main() -> anyhow::Result<()> {
     auth_cfg.cookie_secure = cookie_secure;
     auth_cfg.csrf_allowed_origin = csrf_allowed_origin;
     auth_cfg.dev_admin_login_enabled = dev_admin_login_enabled;
+    if let Some(ttl) = session_idle_ttl_ms {
+        auth_cfg.session_ttl_ms = ttl;
+    }
 
     let state = AppState {
         db: Arc::new(tokio::sync::RwLock::new(db)),
@@ -102,6 +112,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(crate::api::attachments_api::router())
         .merge(crate::api::manifest_api::router())
         .merge(crate::api::tasks_api::router())
+        .merge(crate::api::tasks_move_api::router())
         .merge(crate::api::permissions_api::router())
         .merge(crate::api::search_api::router())
         .merge(crate::api::scm_api::router())

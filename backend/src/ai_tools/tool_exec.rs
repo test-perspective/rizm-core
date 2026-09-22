@@ -89,6 +89,7 @@ fn execute_tool_call_sync(
         "get_task" => get_task(state, user, &call.arguments),
         "create_task" => create_task(state, user, &call.arguments),
         "update_task" => update_task(state, user, &call.arguments),
+        "move_tasks" => super::tool_exec_tasks::move_tasks(state, user, &call.arguments),
         "add_comment" => add_comment(state, user, &call.arguments),
         "list_wiki_pages" => super::tool_exec_wiki::list_wiki_pages(state, user, &call.arguments),
         "search_wiki" => super::tool_exec_wiki::search_wiki(state, user, &call.arguments),

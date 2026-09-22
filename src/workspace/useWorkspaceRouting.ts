@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import type { Entity, ProjectManifest, ProjectMeta } from '../types';
+import { buildWorkspacePath } from './entityRouting';
 import { getLastViewForProject, getLastWikiPageForProjectView, setLastViewForProject } from './storage';
 
 type UseWorkspaceRoutingArgs = {
@@ -33,13 +34,7 @@ export const useWorkspaceRouting = ({
   pendingUrlProjectId,
   clearPendingUrlProjectId,
 }: UseWorkspaceRoutingArgs) => {
-  const buildPath = (p: { projectId: string; viewId: string; entityId?: string | null }): string => {
-    const project = encodeURIComponent(p.projectId);
-    const view = encodeURIComponent(p.viewId);
-    const base = `/p/${project}/v/${view}`;
-    if (p.entityId) return `${base}/e/${encodeURIComponent(p.entityId)}`;
-    return base;
-  };
+  const buildPath = buildWorkspacePath;
 
   const effectiveViewId = useMemo((): string | null => {
     if (!manifest) return null;
@@ -88,11 +83,11 @@ export const useWorkspaceRouting = ({
     }
 
     if (locationPathname === '/' && activeProjectId && effectiveViewId) {
-      navigate(buildPath({ projectId: activeProjectId, viewId: effectiveViewId }), { replace: true });
+      navigate(buildWorkspacePath({ projectId: activeProjectId, viewId: effectiveViewId }), { replace: true });
       return;
     }
     if (urlProjectId && !urlViewId && effectiveViewId) {
-      navigate(buildPath({ projectId: urlProjectId, viewId: effectiveViewId }), { replace: true });
+      navigate(buildWorkspacePath({ projectId: urlProjectId, viewId: effectiveViewId }), { replace: true });
       return;
     }
 
@@ -102,7 +97,7 @@ export const useWorkspaceRouting = ({
       if (urlEntityId) {
         const exists = pagesForView.some((p) => p.id === urlEntityId);
         if (!exists) {
-          navigate(buildPath({ projectId: activeProjectId, viewId: effectiveViewId }), { replace: true });
+          navigate(buildWorkspacePath({ projectId: activeProjectId, viewId: effectiveViewId }), { replace: true });
         }
         return;
       }
@@ -111,7 +106,7 @@ export const useWorkspaceRouting = ({
       const savedValid = saved && pagesForView.some((p) => p.id === saved);
       const fallback = savedValid ? saved! : (pagesForView[0]?.id ?? null);
       if (fallback) {
-        navigate(buildPath({ projectId: activeProjectId, viewId: effectiveViewId, entityId: fallback }), {
+        navigate(buildWorkspacePath({ projectId: activeProjectId, viewId: effectiveViewId, entityId: fallback }), {
           replace: true,
         });
       }
@@ -121,7 +116,7 @@ export const useWorkspaceRouting = ({
     if (currentView.type !== 'wiki' && effectiveViewId && urlEntityId) {
       const exists = currentEntities.some((e) => e.id === urlEntityId);
       if (!exists) {
-        navigate(buildPath({ projectId: activeProjectId, viewId: effectiveViewId }), { replace: true });
+        navigate(buildWorkspacePath({ projectId: activeProjectId, viewId: effectiveViewId }), { replace: true });
       }
     }
   }, [

@@ -9,6 +9,34 @@ use super::{Db, ManifestWriteError};
 
 mod visibility;
 
+/// A manifest's optimistic-lock token, owned by the manifest row itself.
+///
+/// It used to be derived from the newest `manifest_versions` row (falling back to
+/// `projects.updated_at`). Both move for reasons that have nothing to do with the
+/// manifest -- every entity write bumps `projects.updated_at` -- and a `silent` PUT
+/// returned a token no later read would agree with, so the second manifest write of a
+/// session always failed with 412 and the caller's change was silently rolled back.
+/// See REQ-322.
+fn new_manifest_etag() -> String {
+    Uuid::new_v4().to_string()
+}
+
+/// `"0"` is the shared "no manifest stored yet" sentinel (see the frontend's
+/// `manifestEtagRef` default and the `parent_id` handling below).
+fn current_manifest_etag(
+    conn: &rusqlite::Connection,
+    project_id: &str,
+) -> rusqlite::Result<String> {
+    let etag: Option<Option<String>> = conn
+        .query_row(
+            "SELECT etag FROM manifests WHERE project_id = ?1",
+            params![project_id],
+            |r| r.get(0),
+        )
+        .optional()?;
+    Ok(etag.flatten().unwrap_or_else(|| "0".to_string()))
+}
+
 impl Db {
     pub fn get_manifest_with_etag(
         &self,
@@ -31,31 +59,7 @@ impl Db {
 
         let manifest = Self::get_manifest_for_project_conn(&mut conn, project_id)?
             .unwrap_or_else(|| default_manifest());
-        // Try to get ETag from manifest_versions first (for history entries)
-        let etag: Option<String> = conn
-            .query_row(
-                "SELECT id FROM manifest_versions WHERE project_id = ?1 ORDER BY created_at DESC LIMIT 1",
-                params![project_id],
-                |r| r.get(0),
-            )
-            .optional()
-            .context("select manifest etag from versions")?;
-        // If no history entry exists, use project updated_at as ETag
-        let etag = if let Some(id) = etag {
-            id
-        } else {
-            let updated_at: Option<i64> = conn
-                .query_row(
-                    "SELECT updated_at FROM projects WHERE id = ?1",
-                    params![project_id],
-                    |r| r.get(0),
-                )
-                .optional()
-                .context("select project updated_at for etag")?;
-            updated_at
-                .map(|t| t.to_string())
-                .unwrap_or_else(|| "0".to_string())
-        };
+        let etag = current_manifest_etag(&conn, project_id).context("select manifest etag")?;
         Ok(Some((manifest, etag)))
     }
 
@@ -89,30 +93,8 @@ impl Db {
             return Err(ManifestWriteError::NotFound);
         }
 
-        // Get current ETag (from manifest_versions or projects.updated_at)
-        let current_etag: Option<String> = tx
-            .query_row(
-                "SELECT id FROM manifest_versions WHERE project_id = ?1 ORDER BY created_at DESC LIMIT 1",
-                params![project_id],
-                |r| r.get(0),
-            )
-            .optional()
-            .map_err(|_| ManifestWriteError::NotFound)?;
-        let current_etag = if let Some(id) = current_etag {
-            id
-        } else {
-            let updated_at: Option<i64> = tx
-                .query_row(
-                    "SELECT updated_at FROM projects WHERE id = ?1",
-                    params![project_id],
-                    |r| r.get(0),
-                )
-                .optional()
-                .map_err(|_| ManifestWriteError::NotFound)?;
-            updated_at
-                .map(|t| t.to_string())
-                .unwrap_or_else(|| "0".to_string())
-        };
+        let current_etag =
+            current_manifest_etag(&tx, project_id).map_err(|_| ManifestWriteError::NotFound)?;
         if current_etag != expected_etag {
             return Err(ManifestWriteError::Conflict { current_etag });
         }
@@ -130,12 +112,13 @@ impl Db {
                 serde_json::to_string(&default_manifest()).unwrap_or_else(|_| "{}".to_string())
             });
         let json = serde_json::to_string(&manifest).map_err(|_| ManifestWriteError::NotFound)?;
+        let new_etag = new_manifest_etag();
 
         // Apply as current manifest.
         tx.execute(
-            "INSERT INTO manifests (project_id, json) VALUES (?1, ?2)
-             ON CONFLICT(project_id) DO UPDATE SET json = excluded.json",
-            params![project_id, json],
+            "INSERT INTO manifests (project_id, json, etag) VALUES (?1, ?2, ?3)
+             ON CONFLICT(project_id) DO UPDATE SET json = excluded.json, etag = excluded.etag",
+            params![project_id, json, new_etag],
         )
         .map_err(|_| ManifestWriteError::NotFound)?;
 
@@ -146,9 +129,10 @@ impl Db {
         )
         .map_err(|_| ManifestWriteError::NotFound)?;
 
-        // Only append history snapshot if source is specified and not "silent"
+        // Only append history snapshot if source is specified and not "silent".
+        // The ETag no longer depends on this: it is the manifest row's own token.
         let should_record_history = source.is_some() && source != Some("silent");
-        let new_etag = if should_record_history {
+        if should_record_history {
             // Ensure first visible history item has a restorable baseline snapshot.
             let visible_history_count: i64 = tx
                 .query_row(
@@ -175,6 +159,17 @@ impl Db {
                 .map_err(|_| ManifestWriteError::NotFound)?;
             }
 
+            // Link to the previous snapshot. `expected_etag` used to double as the
+            // parent version id; now that it is a manifest token, read the parent back.
+            let parent_id: Option<String> = tx
+                .query_row(
+                    "SELECT id FROM manifest_versions WHERE project_id = ?1 ORDER BY created_at DESC LIMIT 1",
+                    params![project_id],
+                    |r| r.get(0),
+                )
+                .optional()
+                .map_err(|_| ManifestWriteError::NotFound)?;
+
             let new_id = Uuid::new_v4().to_string();
             let source_str = source.unwrap_or("manifest_put");
             tx.execute(
@@ -187,16 +182,12 @@ impl Db {
                     actor_user_id,
                     source_str,
                     message,
-                    if expected_etag == "0" { Option::<String>::None } else { Some(expected_etag.to_string()) },
+                    parent_id,
                     json,
                 ],
             )
             .map_err(|_| ManifestWriteError::NotFound)?;
-            new_id
-        } else {
-            // Use updated_at as ETag when not recording history
-            now_ms.to_string()
-        };
+        }
 
         tx.execute(
             "INSERT INTO meta (key, value) VALUES ('version', ?1)
@@ -336,11 +327,12 @@ impl Db {
 
         let now = crate::time::now_ms();
 
-        // Apply as current manifest.
+        // Apply as current manifest. A revert has to invalidate every open client's
+        // manifest ETag, so mint a fresh one.
         tx.execute(
-            "INSERT INTO manifests (project_id, json) VALUES (?1, ?2)
-             ON CONFLICT(project_id) DO UPDATE SET json = excluded.json",
-            params![project_id, target_json],
+            "INSERT INTO manifests (project_id, json, etag) VALUES (?1, ?2, ?3)
+             ON CONFLICT(project_id) DO UPDATE SET json = excluded.json, etag = excluded.etag",
+            params![project_id, target_json, new_manifest_etag()],
         )
         .context("upsert manifests for revert")?;
 

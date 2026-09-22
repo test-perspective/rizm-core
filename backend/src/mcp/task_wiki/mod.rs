@@ -1,6 +1,8 @@
 //! Shared task and wiki tools for MCP and AI Tools.
 
 mod project;
+mod task_move;
+mod task_move_manifest;
 mod task_relations;
 mod task_relations_view;
 mod task_write;
@@ -9,9 +11,12 @@ mod task_write_input;
 mod tasks;
 #[cfg(test)]
 mod tests_relations;
+#[cfg(test)]
+mod tests_task_move;
 mod wiki;
 
 pub use project::resolve_project;
+pub use task_move::{move_tasks, move_tasks_for_user, TaskMoveInput, TaskMoveResult};
 pub use task_relations_view::{derive_relations, done_status_from_manifest, DerivedRelations};
 pub use task_write::{create_task_for_user, update_task_for_user};
 pub use task_write_input::{TaskCreateInput, TaskUpdateInput};

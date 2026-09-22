@@ -305,13 +305,14 @@ export const useWikiCollaboration = ({
     };
   }, [active, hasInitialBlob, pageId, projectId, provider, ydoc]);
 
-  return {
-    enabled: active && !!provider,
-    provider,
-    fragment,
-    user: {
-      name: userName?.trim() || 'Anonymous',
-      color: pickUserColor(userName?.trim() || 'anonymous'),
-    },
+  const user = {
+    name: userName?.trim() || 'Anonymous',
+    color: pickUserColor(userName?.trim() || 'anonymous'),
   };
+
+  // Discriminated union so callers that check `enabled` get a non-null provider,
+  // which BlockNote's CollaborationOptions requires.
+  return provider && active
+    ? ({ enabled: true, provider, fragment, user } as const)
+    : ({ enabled: false, provider: null, fragment, user } as const);
 };

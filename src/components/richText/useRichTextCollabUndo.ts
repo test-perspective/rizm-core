@@ -25,7 +25,9 @@ export function useRichTextCollabUndo(
       if (!isUndo && !isRedo) return;
       const activeElement = document.activeElement as HTMLElement | null;
       if (!containerRef.current?.contains(activeElement)) return;
-      const builtInState = getCollabUndoAvailability(editor as Parameters<typeof getCollabUndoAvailability>[0]);
+      const builtInState = getCollabUndoAvailability(
+        editor as unknown as Parameters<typeof getCollabUndoAvailability>[0]
+      );
       const canUseBuiltIn = isUndo ? builtInState.canUndo : builtInState.canRedo;
       if (canUseBuiltIn) return;
       const currentDoc = JSON.stringify(editor.document);

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Entity, PropertyDefinition } from '../types';
-import { SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { FolderInput, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { SchemaEditorDialog } from './SchemaEditorDialog';
 import { AttachmentsSection } from './entityDetail/attachments/AttachmentsSection';
 import { CommentsSection } from './entityDetail/comments/CommentsSection';
@@ -9,6 +9,7 @@ import type { EntityDetailPanelProps } from './entityDetail/entityDetailPanelTyp
 import { useEntityDetailPanelModel } from './entityDetail/useEntityDetailPanelModel';
 import { shouldSuppressAdjacentEntityNavigation } from '../utils/entityDetailKeyboardGuards';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { useTaskMove } from './tasks/taskMoveContext';
 
 const DEFAULT_WIDTH = 672;
 const MIN_WIDTH = 360;
@@ -81,6 +82,7 @@ export const EntityDetailPanel = ({
     onDelete,
   });
 
+  const requestTaskMove = useTaskMove();
   const isMobile = useIsMobile();
   const [panelWidth, setPanelWidth] = useState(() =>
     Math.min(DEFAULT_WIDTH, typeof window !== 'undefined' ? window.innerWidth : DEFAULT_WIDTH)
@@ -237,6 +239,17 @@ export const EntityDetailPanel = ({
               >
                 <SlidersHorizontal className="w-4 h-4" />
                 <span className="text-sm">Edit Fields</span>
+              </button>
+            )}
+            {isTask && requestTaskMove && (
+              <button
+                data-testid="entity-detail-move-to-project"
+                onClick={() => requestTaskMove([entity])}
+                className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-900 rounded-md transition-colors"
+                type="button"
+                title="Move to project"
+              >
+                <FolderInput className="w-5 h-5" />
               </button>
             )}
             <button

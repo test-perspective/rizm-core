@@ -35,9 +35,18 @@ function hasInvalidSelectionRect(rect: DOMRect | undefined): boolean {
   return false;
 }
 
+/**
+ * Fork of BlockNote's FormattingToolbarController that only opens the toolbar when the
+ * editor is focused, the selection is a real range, and its bounding box is usable.
+ * Upstream still has none of those guards as of 0.54, so this cannot be replaced by
+ * the built-in controller yet. Everything else mirrors upstream and should be
+ * re-synced against it on each BlockNote upgrade.
+ */
 export function StableFormattingToolbarController(props: {
   formattingToolbar?: FC<FormattingToolbarProps>;
   floatingUIOptions?: FloatingUIOptions;
+  /** Overrides the DOM node the popover portals into; defaults to editor.portalElement. */
+  portalElement?: HTMLElement | null;
 }) {
   const editor = useBlockNoteEditor<BlockSchema, InlineContentSchema, StyleSchema>();
   const formattingToolbar = useExtension(FormattingToolbarExtension, { editor });
@@ -93,8 +102,10 @@ export function StableFormattingToolbarController(props: {
 
   const floatingUIOptions = useMemo<FloatingUIOptions>(
     () => ({
+      ...props.floatingUIOptions,
       useFloatingOptions: {
         open: stableOpen,
+        // Needed as hooks like `useDismiss` call `onOpenChange` to change the open state.
         onOpenChange: (open, _event, reason) => {
           formattingToolbar.store.setState(open);
           if (reason === 'escape-key') {
@@ -103,19 +114,21 @@ export function StableFormattingToolbarController(props: {
         },
         placement,
         middleware: [offset(10), shift(), flip()],
+        ...props.floatingUIOptions?.useFloatingOptions,
+      },
+      // REQ-223: Prevent the toolbar from stealing focus when selecting with the keyboard
+      // or pressing Delete. BlockNote 0.54 disables the focus manager outright for the
+      // same reason, which subsumes the initialFocus/modal pair used before.
+      focusManagerProps: {
+        disabled: true,
+        ...props.floatingUIOptions?.focusManagerProps,
       },
       elementProps: {
         style: {
           zIndex: 40,
         },
+        ...props.floatingUIOptions?.elementProps,
       },
-      // REQ-223: Prevent toolbar from stealing focus when selecting with keyboard or pressing Delete.
-      // initialFocus: -1 = do not move focus to toolbar on open; modal: false = focus stays in editor.
-      focusManagerProps: {
-        initialFocus: -1,
-        modal: false,
-      },
-      ...props.floatingUIOptions,
     }),
     [stableOpen, placement, props.floatingUIOptions, formattingToolbar.store, editor]
   );
@@ -123,7 +136,11 @@ export function StableFormattingToolbarController(props: {
   const Component = props.formattingToolbar || FormattingToolbar;
 
   return (
-    <PositionPopover position={position} {...floatingUIOptions}>
+    <PositionPopover
+      position={position}
+      portalElement={props.portalElement}
+      {...floatingUIOptions}
+    >
       {stableOpen && <Component />}
     </PositionPopover>
   );

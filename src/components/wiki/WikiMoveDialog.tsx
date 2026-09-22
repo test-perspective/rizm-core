@@ -33,6 +33,16 @@ export type WikiMoveDialogProps = {
   pages: Entity[];
   projects: ProjectMeta[];
   onRefreshProject: () => void | Promise<unknown>;
+  /**
+   * Called right after the move succeeds, before the project refresh and any navigation.
+   * REQ-319: lets the caller drop cached page bodies whose attachment URLs still point at
+   * the source project.
+   */
+  onMoved?: (info: {
+    movedPageIds: string[];
+    destinationProjectId: string;
+    crossProject: boolean;
+  }) => void;
 };
 
 export function WikiMoveDialog({
@@ -43,6 +53,7 @@ export function WikiMoveDialog({
   pages,
   projects,
   onRefreshProject,
+  onMoved,
 }: WikiMoveDialogProps) {
   const navigate = useNavigate();
   const [destProjectId, setDestProjectId] = useState(sourceProjectId);
@@ -112,10 +123,15 @@ export function WikiMoveDialog({
       const destinationParentId = destParentId;
       const before =
         beforePageId === '' || beforePageId === '__end__' ? null : beforePageId;
-      await moveWikiPage(sourceProjectId, pageId, {
+      const moved = await moveWikiPage(sourceProjectId, pageId, {
         destinationProjectId: destProjectId,
         destinationParentId,
         beforePageId: before,
+      });
+      onMoved?.({
+        movedPageIds: moved.movedPageIds,
+        destinationProjectId: destProjectId,
+        crossProject: destProjectId !== sourceProjectId,
       });
       await onRefreshProject();
       if (destProjectId !== sourceProjectId) {
@@ -143,6 +159,7 @@ export function WikiMoveDialog({
     sourceProjectId,
     pageId,
     destProjectId,
+    onMoved,
     onRefreshProject,
     navigate,
     onClose,
@@ -215,7 +232,12 @@ export function WikiMoveDialog({
         <Button onClick={() => onClose()} disabled={saving}>
           Cancel
         </Button>
-        <Button variant="contained" onClick={() => void handleSave()} disabled={saving || listLoading}>
+        <Button
+          variant="contained"
+          data-testid="wiki-move-confirm"
+          onClick={() => void handleSave()}
+          disabled={saving || listLoading}
+        >
           Move
         </Button>
       </DialogActions>

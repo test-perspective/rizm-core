@@ -18,3 +18,4 @@ export {
   transformManifestAction,
   updateViewConfigAction,
 } from './manifestActions';
+export type { ManifestWriteOptions } from './manifestActions';

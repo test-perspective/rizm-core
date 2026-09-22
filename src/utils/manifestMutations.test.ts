@@ -110,6 +110,29 @@ describe('manifestMutations', () => {
     expect(v.visibleProperties.includes('status')).toBe(false);
   });
 
+  // The 412 retry in putManifestWith412Retries replays the caller's intent on the
+  // server's newest manifest, which may already reflect the same change (REQ-322).
+  it('treats an already-removed property as done when missingOk is set', () => {
+    const removed = removePropertyFromEntity(base, 'task', 'stage');
+    expect(() => removePropertyFromEntity(removed, 'task', 'stage')).toThrow();
+    expect(removePropertyFromEntity(removed, 'task', 'stage', { missingOk: true })).toBe(removed);
+  });
+
+  it('keeps taskKey protected even with missingOk', () => {
+    expect(() => removePropertyFromEntity(base, 'task', 'taskKey', { missingOk: true })).toThrow(
+      /server-managed/
+    );
+  });
+
+  it('treats an already-present property as done when existingOk is set', () => {
+    const prop = { name: 'owner', type: 'text', visible: true } as const;
+    const added = addPropertyToEntity(base, 'task', 'table', prop);
+    expect(() => addPropertyToEntity(added, 'task', 'table', prop)).toThrow();
+    const again = addPropertyToEntity(added, 'task', 'table', prop, { existingOk: true });
+    const names = again.entities[0].properties.map((p) => p.name);
+    expect(names.filter((n) => n === 'owner')).toHaveLength(1);
+  });
+
   it('reorders non-list views while keeping list views at their positions', () => {
     const manifest: ProjectManifest = {
       name: 'Test',

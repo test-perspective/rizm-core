@@ -1,4 +1,4 @@
-//! Pure helpers for wiki subtree move: parent-id access, sort keys, URL rewrite, subtree walk.
+//! Pure helpers for wiki subtree move: parent-id access, sort keys, subtree walk.
 
 use serde_json::Map;
 use std::collections::{HashMap, HashSet};
@@ -23,19 +23,6 @@ pub(super) fn wiki_sort_key(e: &Entity) -> (i64, i64, String) {
         .map(|f| f as i64)
         .unwrap_or(0);
     (order, e.created_at, e.id.clone())
-}
-
-pub(super) fn rewrite_project_in_attachment_urls(
-    s: &str,
-    from_proj: &str,
-    to_proj: &str,
-) -> String {
-    if from_proj == to_proj {
-        return s.to_string();
-    }
-    let from_pat = format!("/api/projects/{}/entities/", from_proj);
-    let to_pat = format!("/api/projects/{}/entities/", to_proj);
-    s.replace(&from_pat, &to_pat)
 }
 
 pub(super) fn collect_subtree_ids(

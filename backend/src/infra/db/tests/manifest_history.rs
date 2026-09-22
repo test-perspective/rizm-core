@@ -14,22 +14,22 @@ fn manifest_versions_include_name_and_can_be_fetched() {
 
     let mut updated = current_manifest.clone();
     updated.name = "History Manifest".to_string();
-    let new_id = db
-        .put_manifest_if_match(
-            DEFAULT_PROJECT_ID,
-            &etag,
-            updated,
-            Some("ai_transform"),
-            Some("Make it a CRM"),
-            None,
-        )
-        .expect("put manifest with history");
+    db.put_manifest_if_match(
+        DEFAULT_PROJECT_ID,
+        &etag,
+        updated,
+        Some("ai_transform"),
+        Some("Make it a CRM"),
+        None,
+    )
+    .expect("put manifest with history");
 
+    // The write returns the manifest's ETag, not a version id (see REQ-322), so the
+    // new version is read back from the history listing.
     let versions = db
         .list_manifest_versions(DEFAULT_PROJECT_ID, 50, 0)
         .expect("list manifest versions");
-    let latest = versions.first().expect("has history entry");
-    assert_eq!(latest.id, new_id);
+    let new_id = versions.first().expect("has history entry").id.clone();
 
     let detail = db
         .get_manifest_version(DEFAULT_PROJECT_ID, &new_id)
@@ -67,24 +67,29 @@ fn first_visible_manifest_history_includes_initial_seed_once() {
 
     let mut m1 = base_manifest.clone();
     m1.name = "After First Change".to_string();
-    let v1 = db
-        .put_manifest_if_match(
-            project_id,
-            &etag1,
-            m1,
-            Some("ai_transform"),
-            Some("first"),
-            None,
-        )
-        .expect("put first manifest history");
+    db.put_manifest_if_match(
+        project_id,
+        &etag1,
+        m1,
+        Some("ai_transform"),
+        Some("first"),
+        None,
+    )
+    .expect("put first manifest history");
 
     let versions_after_first = db
         .list_manifest_versions(project_id, 50, 0)
         .expect("list versions after first change");
     assert_eq!(versions_after_first.len(), 2);
-    assert_eq!(versions_after_first[0].id, v1);
     assert_eq!(versions_after_first[0].source, "ai_transform");
     assert_eq!(versions_after_first[1].source, "seed");
+    // The new version still links to the newest snapshot that preceded it (which may
+    // be a hidden-source one, e.g. `project_state_put`), as it did when `parent_id`
+    // was taken from the caller's ETag.
+    assert!(
+        versions_after_first[0].parent_id.is_some(),
+        "a new version links to the snapshot it replaced"
+    );
 
     let seed_id = versions_after_first
         .iter()

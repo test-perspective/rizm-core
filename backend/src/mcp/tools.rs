@@ -73,6 +73,11 @@ fn tools_call_blocking(
             let text = super::task_wiki::update_task_for_user(state, user, input)?;
             Ok(super::jsonrpc::tool_text_result(text))
         }
+        "move_tasks" => {
+            let input = super::task_wiki::TaskMoveInput::from_mcp_args(args)?;
+            let text = super::task_wiki::move_tasks_for_user(state, user, input)?;
+            Ok(super::jsonrpc::tool_text_result(text))
+        }
         "list_projects" => {
             let text = super::project_tools::list_projects_for_user(state, user)?;
             Ok(super::jsonrpc::tool_text_result(text))

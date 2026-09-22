@@ -12,5 +12,6 @@ pub mod projects_api;
 pub mod scm_api;
 pub mod search_api;
 pub mod tasks_api;
+pub mod tasks_move_api;
 pub mod users_api;
 pub mod wiki_api;

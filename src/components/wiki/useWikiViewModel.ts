@@ -14,6 +14,7 @@ import type { WikiEditStartAnchor } from './WikiEditorPane';
 import type { WikiViewProps } from './wikiViewTypes';
 import { useWikiPersistenceAndActions } from './useWikiPersistenceAndActions';
 import { useWikiDnd } from './useWikiDnd';
+import { useForgetCachedPageBodies } from './useForgetCachedPageBodies';
 
 export function useWikiViewModel({
   projectId,
@@ -176,6 +177,13 @@ export function useWikiViewModel({
     setExpandedFolderIds,
     query,
     onUpdatePage,
+  });
+
+  const forgetCachedPageBodies = useForgetCachedPageBodies({
+    setDocById,
+    setLastSavedDocById,
+    setCrdtBlobById,
+    lastSyncedUpdatedAtByIdRef,
   });
 
   const selected = useMemo(() => {
@@ -401,6 +409,7 @@ export function useWikiViewModel({
     docById,
     crdtBlobById,
     setCrdtBlobById,
+    forgetCachedPageBodies,
     editorResetTokenById,
     loadingDocId,
     pendingEditAnchorById,

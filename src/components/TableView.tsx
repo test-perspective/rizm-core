@@ -43,11 +43,14 @@ export const TableView = ({
     handleCopyTaskKey,
     handleCopyDetailUrl,
     handleContextMenuOpenDetail,
+    handleMoveToProject,
+    moveTargetCount,
   } = useTableContextMenu({
     entities,
     view,
     projectId,
     onEntityClick,
+    apiRef,
   });
 
   const state = useTableViewState({
@@ -197,6 +200,8 @@ export const TableView = ({
           onOpenDetail={handleContextMenuOpenDetail}
           onCopyTaskKey={handleCopyTaskKey}
           onCopyDetailUrl={handleCopyDetailUrl}
+          onMoveToProject={handleMoveToProject}
+          moveTargetCount={moveTargetCount}
         />
         <div className="border-t border-zinc-800">
           <TablePagination

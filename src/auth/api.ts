@@ -42,6 +42,17 @@ export async function apiFetch(path: string, init?: RequestInit, skipAuthRefresh
   return res;
 }
 
+/**
+ * Reset the server-side idle countdown (REQ-320).
+ *
+ * `skipAuthRefresh` is required: a 401 here means the session is already gone,
+ * and the caller's own refresh handles the redirect. Letting the global 401
+ * handler fire would re-enter refresh twice on the same tick.
+ */
+export async function postHeartbeat(): Promise<Response> {
+  return apiFetch('/api/auth/heartbeat', { method: 'POST' }, true);
+}
+
 export async function apiJson<T>(path: string, init?: RequestInit, skipAuthRefresh = false): Promise<T> {
   const res = await apiFetch(path, init, skipAuthRefresh);
   if (!res.ok) {

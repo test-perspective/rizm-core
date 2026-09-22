@@ -6,6 +6,10 @@ import { useRichTextPasteAndUpload } from './useRichTextPasteAndUpload';
 
 type PasteHandler = ReturnType<typeof useRichTextPasteAndUpload>['pasteHandler'];
 
+/** The handler only touches a few editor methods; stub just those. */
+const stubEditor = (methods: Record<string, unknown>) =>
+  methods as unknown as Parameters<PasteHandler>[0]['editor'];
+
 function PasteHandlerProbe({ onReady }: { onReady: (handler: PasteHandler) => void }) {
   const { pasteHandler } = useRichTextPasteAndUpload(
     async () => {
@@ -45,14 +49,14 @@ describe('useRichTextPasteAndUpload result behavior', () => {
                 : '',
         },
       } as unknown as ClipboardEvent,
-      editor: {
+      editor: stubEditor({
         pasteHTML: () => {},
         pasteMarkdown: (value: string) => {
           parsedBlocks = parserEditor.tryParseMarkdownToBlocks(value);
         },
         insertInlineContent: () => {},
         updateBlock: () => {},
-      },
+      }),
       defaultPasteHandler: () => {
         throw new Error('markdown paste should not fall back to default handler');
       },
@@ -106,7 +110,7 @@ describe('useRichTextPasteAndUpload result behavior', () => {
                 : '',
         },
       } as unknown as ClipboardEvent,
-      editor: {
+      editor: stubEditor({
         pasteHTML: () => {
           throw new Error('Confluence table paste should use the default paste handler');
         },
@@ -115,7 +119,7 @@ describe('useRichTextPasteAndUpload result behavior', () => {
         },
         insertInlineContent: () => {},
         updateBlock: () => {},
-      },
+      }),
       defaultPasteHandler: () => {
         parsedBlocks = parserEditor.tryParseHTMLToBlocks(confluenceHtml);
         return true;
@@ -173,7 +177,7 @@ describe('useRichTextPasteAndUpload result behavior', () => {
                 : '',
         },
       } as unknown as ClipboardEvent,
-      editor: {
+      editor: stubEditor({
         pasteHTML: () => {
           throw new Error('wiki BlockNote paste should avoid the HTML parser');
         },
@@ -182,7 +186,7 @@ describe('useRichTextPasteAndUpload result behavior', () => {
         },
         insertInlineContent: () => {},
         updateBlock: () => {},
-      },
+      }),
       defaultPasteHandler: () => {
         throw new Error('wiki BlockNote paste should not fall back to default HTML handler');
       },

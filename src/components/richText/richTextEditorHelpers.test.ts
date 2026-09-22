@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { parseDoc, resolveRelativeApiUrlsInBlockNoteBlocks } from './richTextEditorHelpers';
+import {
+  createTaskLinkSchema,
+  parseDoc,
+  resolveRelativeApiUrlsInBlockNoteBlocks,
+} from './richTextEditorHelpers';
 
 vi.mock('../../utils/storage', () => ({
   isBackendEnabled: vi.fn(() => true),
@@ -74,6 +78,21 @@ describe('richTextEditorHelpers', () => {
     it('returns array as-is when given array', () => {
       const blocks = [{ id: 'p1', type: 'paragraph', content: [] }];
       expect(parseDoc(blocks)).toEqual(blocks);
+    });
+  });
+
+  describe('createTaskLinkSchema', () => {
+    // wikiCollaboration.ts seeds Yjs with a headless editor built from this same schema, passing
+    // empty refs. Keep that call signature working so the two cannot drift apart.
+    it('builds the taskLink spec from the headless argument shape', () => {
+      const schema = createTaskLinkSchema({
+        entitiesRef: { current: [] },
+        onEntityClickRef: { current: undefined },
+        isMountedRef: { current: true },
+      });
+
+      expect(schema.inlineContentSpecs.taskLink).toBeDefined();
+      expect(schema.inlineContentSchema.taskLink).toBeDefined();
     });
   });
 });

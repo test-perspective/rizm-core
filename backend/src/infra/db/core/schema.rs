@@ -18,7 +18,8 @@ pub(crate) const SCHEMA_SQL: &str = r#"
 
             CREATE TABLE IF NOT EXISTS manifests (
               project_id TEXT PRIMARY KEY,
-              json TEXT NOT NULL
+              json TEXT NOT NULL,
+              etag TEXT NULL
             );
 
             -- Per-project counters (e.g. for taskKey sequence)
@@ -250,6 +251,18 @@ pub(crate) const SCHEMA_SQL: &str = r#"
             );
             CREATE INDEX IF NOT EXISTS idx_entity_external_ids_project_provider
               ON entity_external_ids(project_id, provider);
+
+            -- Task keys a task used to be known by (REQ-309 cross-project move).
+            -- The owning project is read from entities.project_id, so a task that
+            -- moves again does not need its alias rows rewritten.
+            CREATE TABLE IF NOT EXISTS task_key_aliases (
+              alias_key TEXT PRIMARY KEY,
+              entity_pk TEXT NOT NULL,
+              created_at INTEGER NOT NULL,
+              FOREIGN KEY(entity_pk) REFERENCES entities(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_task_key_aliases_entity_pk
+              ON task_key_aliases(entity_pk);
             "#;
 
 /// Run schema creation and migrations.
@@ -277,6 +290,31 @@ pub(crate) fn migrate(conn: &rusqlite::Connection) -> anyhow::Result<()> {
         [],
     )
     .context("create unique index idx_projects_project_key")?;
+
+    // Manifest ETag must be owned by the manifest itself: deriving it from
+    // `projects.updated_at` or the newest `manifest_versions` row made it change on
+    // unrelated writes (any entity edit) and made `put_manifest_if_match` hand back a
+    // token the next read would never agree with, so every second manifest write
+    // failed with 412. See REQ-322.
+    let has_manifest_etag: Option<String> = conn
+        .query_row(
+            "SELECT name FROM pragma_table_info('manifests') WHERE name = 'etag'",
+            [],
+            |r| r.get(0),
+        )
+        .optional()
+        .context("check manifests etag")?;
+    if has_manifest_etag.is_none() {
+        conn.execute("ALTER TABLE manifests ADD COLUMN etag TEXT NULL", [])
+            .context("add etag to manifests")?;
+    }
+    // Backfill (also covers rows written before the column existed).
+    conn.execute(
+        "UPDATE manifests SET etag = lower(hex(randomblob(16))) WHERE etag IS NULL",
+        [],
+    )
+    .context("backfill manifests etag")?;
+
 
     for (col, default) in [("processed_count", "DEFAULT 0"), ("total_count", "NULL")] {
         let has_col: Option<String> = conn

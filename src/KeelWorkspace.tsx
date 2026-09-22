@@ -9,16 +9,15 @@ import { useResolvedUsers } from './workspace/useResolvedUsers';
 import { useWorkspaceRouting } from './workspace/useWorkspaceRouting';
 import { useRecordRecentProject } from './workspace/useRecordRecentProject';
 import { useCreateEntityHandler } from './workspace/useCreateEntityHandler';
-import { resolveViewIdForSearchKind } from './workspace/searchRouting';
+import { navigateToSearchResult } from './workspace/searchRouting';
+import { TaskMoveProvider } from './components/tasks/TaskMoveProvider';
 import { useWorkspaceManifestHandlers } from './workspace/useWorkspaceManifestHandlers';
 import { WorkspaceStateScreens } from './components/workspace/WorkspaceStateScreens';
 import { useCreateProjectHandler } from './workspace/useCreateProjectHandler';
-import { fetchProjectState } from './api/projects';
 import type { SearchResult } from './api/search';
 import { useNotePaneState } from './workspace/useNotePaneState';
 import { useRenameBoardColumn } from './workspace/useRenameBoardColumn';
 import { buildNotesConfig } from './workspace/notesPanelConfig';
-import { setLastWikiPageForProjectView } from './workspace/storage';
 import { WorkspaceBody } from './components/workspace/WorkspaceBody';
 
 export function KeelWorkspace() {
@@ -38,6 +37,7 @@ export function KeelWorkspace() {
     addEntity,
     modifyEntity,
     removeEntity,
+    moveTasksToProject,
     updateSchema,
     updateManifest,
     createProject,
@@ -298,32 +298,17 @@ export function KeelWorkspace() {
     }
   };
 
-  const handleSearchResultSelect = async (result: SearchResult, query: string) => {
-    let targetManifest = manifest;
-    if (!targetManifest || result.projectId !== activeProjectId) {
-      try {
-        const { project } = await fetchProjectState(result.projectId);
-        targetManifest = project.config.manifest;
-      } catch (e) {
-        console.error('Failed to load project for search result:', e);
-        return;
-      }
-    }
-    if (!targetManifest) return;
-    const viewId = resolveViewIdForSearchKind(targetManifest, result.kind);
-    if (!viewId) return;
-    if (result.kind === 'page') {
-      setLastWikiPageForProjectView(result.projectId, viewId, result.entityPk);
-      navigate(buildPath({ projectId: result.projectId, viewId, entityId: result.entityPk }), {
-        replace: false,
-        state: { searchQuery: query },
-      });
-      return;
-    }
-    navigate(buildPath({ projectId: result.projectId, viewId, entityId: result.entityPk }), { replace: false });
-  };
+  const handleSearchResultSelect = (result: SearchResult, query: string) =>
+    navigateToSearchResult({
+      result,
+      query,
+      activeProjectId,
+      activeManifest: manifest,
+      navigate,
+    });
 
   return (
+    <TaskMoveProvider activeProjectId={activeProjectId} entities={entities} projects={projects} onMove={moveTasksToProject}>
     <WorkspaceBody
       projects={projects}
       activeProjectId={activeProjectId}
@@ -399,5 +384,6 @@ export function KeelWorkspace() {
       renameProject={renameProject}
       deleteProject={deleteProject}
     />
+    </TaskMoveProvider>
   );
 }

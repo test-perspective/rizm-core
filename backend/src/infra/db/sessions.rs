@@ -57,6 +57,30 @@ impl Db {
         Ok(())
     }
 
+    /// Extend the idle window of a session. Returns the number of rows updated
+    /// (0 means the session is already gone).
+    ///
+    /// The `expires_at < ?3` guard keeps renewal monotonic: concurrent tabs or a
+    /// delayed request can never pull an expiry back. It does not by itself stop
+    /// an already-expired session from being revived -- `session_middleware`
+    /// rejects those before any handler runs.
+    pub fn renew_session(
+        &self,
+        session_id: &str,
+        now_ms: i64,
+        expires_at: i64,
+    ) -> anyhow::Result<usize> {
+        let conn = self.pool.get().context("get sqlite conn")?;
+        let n = conn
+            .execute(
+                "UPDATE sessions SET last_seen_at = ?2, expires_at = ?3
+                 WHERE id = ?1 AND expires_at < ?3",
+                params![session_id, now_ms, expires_at],
+            )
+            .context("renew session")?;
+        Ok(n)
+    }
+
     pub fn delete_session(&self, session_id: &str) -> anyhow::Result<()> {
         let conn = self.pool.get().context("get sqlite conn")?;
         conn.execute("DELETE FROM sessions WHERE id = ?1", params![session_id])

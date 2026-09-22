@@ -51,6 +51,10 @@ fn build_tool_definitions_includes_admin_tools_when_admin_and_empty_project() {
         "should include update_task"
     );
     assert!(
+        names.contains(&"move_tasks".to_string()),
+        "should include move_tasks"
+    );
+    assert!(
         names.contains(&"add_comment".to_string()),
         "should include add_comment"
     );

@@ -25,6 +25,9 @@ pub struct AppState {
 #[derive(Clone, Debug)]
 pub struct AuthConfig {
     pub cookie_name: String,
+    /// Idle window: how long a session survives **without user activity**.
+    /// It is measured from the last heartbeat (`POST /api/auth/heartbeat`),
+    /// not from login, and there is no absolute cap on total session age.
     pub session_ttl_ms: i64,
     pub cookie_secure: bool,
     pub csrf_allowed_origin: Option<String>,

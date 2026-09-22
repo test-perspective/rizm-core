@@ -384,3 +384,49 @@ fn jira_emoticons_in_markdown_line() {
     assert!(t.contains('✅'), "{t}");
     assert!(t.contains('❌'), "{t}");
 }
+
+// REQ-313: The frontend BlockNote schema owns the code block content shape, but this
+// converter hand-writes the same JSON with no compile-time checking. Pin the structure
+// so a BlockNote upgrade that changes it shows up here instead of in production docs.
+#[test]
+fn code_block_uses_language_prop_and_styled_text_content() {
+    let doc =
+        markdown_to_blocknote_doc("{code:typescript}const answer = 42;{code}").expect("convert");
+    let arr: Vec<Value> = serde_json::from_str(&doc).expect("parse");
+
+    let block = arr
+        .iter()
+        .find(|b| b.get("type").and_then(Value::as_str) == Some("codeBlock"))
+        .expect("code block");
+    assert_eq!(
+        block
+            .get("props")
+            .and_then(|p| p.get("language"))
+            .and_then(Value::as_str),
+        Some("typescript"),
+        "{doc}"
+    );
+
+    let content = block
+        .get("content")
+        .and_then(Value::as_array)
+        .expect("content array");
+    assert_eq!(content.len(), 1, "{doc}");
+    assert_eq!(
+        content[0].get("type").and_then(Value::as_str),
+        Some("text"),
+        "{doc}"
+    );
+    assert_eq!(
+        content[0].get("text").and_then(Value::as_str),
+        Some("const answer = 42;"),
+        "{doc}"
+    );
+    assert!(
+        content[0]
+            .get("styles")
+            .map(|s| s.is_object())
+            .unwrap_or(false),
+        "{doc}"
+    );
+}

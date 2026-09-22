@@ -173,6 +173,48 @@ export interface WikiPageResponse {
   order?: number;
 }
 
+/** REQ-309: moving tasks to another project. */
+export interface MoveTasksRequest {
+  destinationProjectId?: string;
+  destinationProjectKey?: string;
+  /** Entity ids. Either this or taskKeys must be non-empty. */
+  taskIds?: string[];
+  taskKeys?: string[];
+}
+
+export interface MovedTask {
+  id: string;
+  /** Key the task had before the move. Still resolves via /api/tasks/:key. */
+  previousTaskKey: string;
+  taskKey: string;
+  title: string;
+}
+
+/** A reference dropped because only one side of it moved. */
+export interface DetachedRelation {
+  taskKey: string;
+  projectId: string;
+  property: string;
+  removedKeys: string[];
+}
+
+export interface MoveTasksResponse {
+  sourceProjectId: string;
+  destinationProjectId: string;
+  destinationProjectKey: string;
+  moved: MovedTask[];
+  detachedRelations: DetachedRelation[];
+  manifestUpdated: boolean;
+}
+
+export interface TaskLookupResponse {
+  project: { id: string; projectKey: string; name: string };
+  task: Entity;
+  labels: { entityId: string; propertyRefs: Record<string, { id: string; label: string; entityId: string }> };
+  requestedTaskKey: string;
+  resolvedVia: 'taskKey' | 'alias';
+}
+
 export interface MoveWikiPageResponse {
   destinationProjectId: string;
   rootPageId: string;

@@ -8,6 +8,10 @@ type TableContextMenuProps = {
   onOpenDetail: () => void;
   onCopyTaskKey: () => void;
   onCopyDetailUrl: () => void;
+  /** Absent when no move handler is available (e.g. outside the workspace). */
+  onMoveToProject?: () => void;
+  /** How many tasks the move would cover, from the current cell selection. */
+  moveTargetCount?: number;
 };
 
 export function TableContextMenu({
@@ -17,6 +21,8 @@ export function TableContextMenu({
   onOpenDetail,
   onCopyTaskKey,
   onCopyDetailUrl,
+  onMoveToProject,
+  moveTargetCount = 0,
 }: TableContextMenuProps) {
   return (
     <Menu
@@ -57,6 +63,17 @@ export function TableContextMenu({
       <MenuItem onClick={onCopyDetailUrl} disabled={!entity}>
         Copy detail URL
       </MenuItem>
+      {onMoveToProject && (
+        <MenuItem
+          onClick={onMoveToProject}
+          disabled={moveTargetCount === 0}
+          data-testid="table-context-move-to-project"
+        >
+          {moveTargetCount > 1
+            ? `Move to project… (${moveTargetCount} tasks)`
+            : 'Move to project…'}
+        </MenuItem>
+      )}
     </Menu>
   );
 }

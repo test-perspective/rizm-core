@@ -12,6 +12,7 @@ vi.mock('../../api/projects', () => ({
 
 vi.mock('../../utils/storage', () => ({
   getBackendUrl: () => 'http://test.example',
+  isBackendEnabled: () => true,
 }));
 
 vi.mock('@hocuspocus/provider', () => ({
@@ -35,14 +36,15 @@ function HookHarness(props: {
   return null;
 }
 
-function BlobHarness(props: { crdtBlob: number[] }) {
+function BlobHarness(props: { crdtBlob?: number[]; docJson?: string }) {
+  const docJson = props.docJson ?? '[]';
   const collab = useWikiCollaboration({
     enabled: true,
     projectId: 'project-1',
     pageId: 'page-1',
-    docJson: '[]',
+    docJson,
     crdtBlob: props.crdtBlob,
-    getCurrentDoc: () => '[]',
+    getCurrentDoc: () => docJson,
   });
   return <div data-testid="fragment-length" data-length={String(collab.fragment.length)} />;
 }
@@ -105,6 +107,37 @@ describe('useWikiCollaboration', () => {
     });
 
     expect(container.querySelector('[data-testid="fragment-length"]')?.getAttribute('data-length')).toBe('1');
+
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  // REQ-319: a cross-project move drops the collab row, so the editor has to rebuild the
+  // Yjs document from the (URL-rewritten) doc it gets instead.
+  it('seeds the fragment from docJson when no CRDT blob is available', async () => {
+    const docJson = JSON.stringify([
+      {
+        id: 'b1',
+        type: 'paragraph',
+        props: {},
+        content: [{ type: 'text', text: 'Hello', styles: {} }],
+        children: [],
+      },
+    ]);
+
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<BlobHarness docJson={docJson} />);
+    });
+
+    expect(
+      container.querySelector('[data-testid="fragment-length"]')?.getAttribute('data-length')
+    ).toBe('1');
 
     act(() => {
       root.unmount();

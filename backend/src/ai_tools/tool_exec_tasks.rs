@@ -5,7 +5,8 @@ use serde_json::Value;
 use crate::app_state::AppState;
 use crate::auth::AuthedUser;
 use crate::mcp::task_wiki::{
-    create_task_for_user, update_task_for_user, TaskCreateInput, TaskUpdateInput,
+    create_task_for_user, move_tasks_for_user, update_task_for_user, TaskCreateInput,
+    TaskMoveInput, TaskUpdateInput,
 };
 use crate::ApiError;
 
@@ -27,4 +28,14 @@ pub(super) fn update_task(
     let input = TaskUpdateInput::from_mcp_args(args)
         .map_err(|e| ApiError::bad_request(format!("{e:#}")))?;
     update_task_for_user(state, user, input).map_err(|e| ApiError::bad_request(format!("{e:#}")))
+}
+
+pub(super) fn move_tasks(
+    state: &AppState,
+    user: &AuthedUser,
+    args: &Value,
+) -> Result<String, ApiError> {
+    let input =
+        TaskMoveInput::from_mcp_args(args).map_err(|e| ApiError::bad_request(format!("{e:#}")))?;
+    move_tasks_for_user(state, user, input).map_err(|e| ApiError::bad_request(format!("{e:#}")))
 }

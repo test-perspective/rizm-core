@@ -74,6 +74,7 @@ export function WikiView({
     docById,
     crdtBlobById,
     setCrdtBlobById,
+    forgetCachedPageBodies,
     editorResetTokenById,
     loadingDocId,
     pendingEditAnchorById,
@@ -278,6 +279,10 @@ export function WikiView({
           pages={pages}
           projects={projects}
           onRefreshProject={onRefreshProject}
+          onMoved={({ movedPageIds, crossProject }) => {
+            // REQ-319: cached bodies still carry source-project attachment URLs.
+            if (crossProject) forgetCachedPageBodies(movedPageIds);
+          }}
         />
       ) : null}
     </div>

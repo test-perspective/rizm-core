@@ -1,16 +1,24 @@
-import { putManifestApi, type PutManifestOptions } from '../../api/manifest';
+import { type PutManifestOptions } from '../../api/manifest';
 import type { Entity, Project, ProjectManifest, ViewConfig } from '../../types';
 import { reconcileManifestWithData } from '../../utils/manifestReconcile';
 import { getDefaultManifest } from '../../utils/storage';
 import type { CoreRefs, CoreSetters } from './actionsTypes';
 import { enqueueManifestPut } from './manifestPutQueue';
 import type { RefreshAfterConflict } from './modifyEntityPatchPump';
+import { putManifestWith412Retries } from './putManifestWith412Retries';
 import { putViewConfigManifestWith412Retries } from './putViewConfigManifest';
+
+export interface ManifestWriteOptions {
+  /** Re-applies the caller's change to the server's latest manifest after a 412. */
+  rebuild?: (latest: ProjectManifest) => ProjectManifest;
+  /** Called when the write could not be persisted, so the UI can say so. */
+  onError?: (error: unknown) => void;
+}
 
 export function updateSchemaAction(args: {
   activeProjectId: string;
   newManifest: ProjectManifest;
-  options?: { removeEntityProperty?: { entityId: string; propName: string } };
+  options?: ManifestWriteOptions & { removeEntityProperty?: { entityId: string; propName: string } };
   setActiveProject: CoreSetters['setActiveProject'];
   manifestEtagRef: CoreRefs['manifestEtagRef'];
   refreshActiveProject: RefreshAfterConflict;
@@ -38,10 +46,16 @@ export function updateSchemaAction(args: {
 
   enqueueManifestPut(activeProjectId, async () => {
     try {
-      const next = await putManifestApi(activeProjectId, newManifest, manifestEtagRef.current, { source: 'silent' });
-      manifestEtagRef.current = next.trim().replace(/^"|"$/g, '').trim();
+      await putManifestWith412Retries({
+        activeProjectId,
+        initialManifest: newManifest,
+        rebuild: options?.rebuild ?? (() => newManifest),
+        manifestEtagRef,
+        setActiveProject,
+      });
     } catch (e) {
       console.error('Failed to save manifest:', e);
+      options?.onError?.(e);
       await refreshActiveProject({ bypassProjectRefreshBlock: true });
     }
   });
@@ -51,7 +65,7 @@ export function updateManifestAction(args: {
   activeProject: Project | null;
   activeProjectId: string;
   newManifest: ProjectManifest;
-  options?: PutManifestOptions;
+  options?: PutManifestOptions & ManifestWriteOptions;
   setActiveProject: CoreSetters['setActiveProject'];
   manifestEtagRef: CoreRefs['manifestEtagRef'];
   refreshActiveProject: RefreshAfterConflict;
@@ -72,12 +86,23 @@ export function updateManifestAction(args: {
   });
 
   const putOptions: PutManifestOptions = options?.source ? options : { source: 'silent', ...options };
+  const entities = activeProject?.entities ?? [];
   enqueueManifestPut(activeProjectId, async () => {
     try {
-      const next = await putManifestApi(activeProjectId, reconciled, manifestEtagRef.current, putOptions);
-      manifestEtagRef.current = next.trim().replace(/^"|"$/g, '').trim();
+      await putManifestWith412Retries({
+        activeProjectId,
+        initialManifest: reconciled,
+        rebuild:
+          options?.rebuild ??
+          ((latest) => reconcileManifestWithData(latest, newManifest, entities).manifest),
+        source: putOptions.source,
+        message: putOptions.message,
+        manifestEtagRef,
+        setActiveProject,
+      });
     } catch (e) {
       console.error('Failed to save manifest:', e);
+      options?.onError?.(e);
       await refreshActiveProject({ bypassProjectRefreshBlock: true });
     }
   });
@@ -100,8 +125,13 @@ export function transformManifestAction(args: {
   });
   enqueueManifestPut(activeProjectId, async () => {
     try {
-      const next = await putManifestApi(activeProjectId, nextManifest, manifestEtagRef.current, { source: 'silent' });
-      manifestEtagRef.current = next.trim().replace(/^"|"$/g, '').trim();
+      await putManifestWith412Retries({
+        activeProjectId,
+        initialManifest: nextManifest,
+        rebuild: (latest) => ({ ...latest, ...transformation }),
+        manifestEtagRef,
+        setActiveProject,
+      });
     } catch (e) {
       console.error('Failed to save manifest:', e);
       await refreshActiveProject({ bypassProjectRefreshBlock: true });

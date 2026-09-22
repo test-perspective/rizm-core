@@ -160,6 +160,23 @@ pub(super) fn project_tools() -> Vec<Value> {
         json!({
             "type": "function",
             "function": {
+                "name": "move_tasks",
+                "description": "Move tasks to another project. Subtasks move with their parent. Task keys are re-issued from the destination project, and the old keys keep resolving. References that would cross projects (parentTaskKey, blockedBy, link) are removed on both sides and reported in detachedRelations.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "taskKeys": { "type": "array", "items": { "type": "string" }, "description": "Task keys to move, e.g. [\"REQ-299\"]. All keys must belong to the same project." },
+                        "destinationProjectKey": { "type": "string", "description": "Destination project key like OPS." },
+                        "destinationProjectId": { "type": "string", "description": "Destination project id (alternative to destinationProjectKey)." }
+                    },
+                    "required": ["taskKeys"],
+                    "additionalProperties": false
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
                 "name": "add_comment",
                 "description": "Add a comment to a task or wiki page. Input text is Markdown/plain text and is stored as a BlockNote document.",
                 "parameters": {

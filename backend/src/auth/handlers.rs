@@ -27,6 +27,12 @@ struct MeResponse {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub(super) struct HeartbeatResponse {
+    pub(super) expires_at: i64,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct DevAdminLoginStatusResponse {
     enabled: bool,
 }
@@ -55,6 +61,7 @@ pub fn protected_router() -> Router<AppState> {
     Router::new()
         .route("/api/auth/logout", post(logout))
         .route("/api/auth/me", get(me))
+        .route("/api/auth/heartbeat", post(heartbeat))
         .route("/api/auth/change-password", post(change_password))
 }
 
@@ -233,6 +240,31 @@ async fn me(Extension(user): Extension<AuthedUser>) -> Result<Json<MeResponse>, 
         role: user.role,
         last_login_at: user.last_login_at,
     }))
+}
+
+/// Reset the idle countdown. The frontend calls this only when the user has
+/// actually interacted with the app since the last heartbeat; renewing on every
+/// authenticated request would let a tab left open on background polling keep a
+/// session alive forever.
+pub(super) async fn heartbeat(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthedUser>,
+) -> Result<Json<HeartbeatResponse>, ApiError> {
+    let now = crate::time::now_ms();
+    let expires_at = now + state.auth.session_ttl_ms;
+
+    let updated = {
+        let db = state.db.read().await;
+        db.renew_session(&user.session_id, now, expires_at)
+            .map_err(|_| ApiError::internal())?
+    };
+
+    // 0 rows means the session was deleted between the middleware check and here.
+    if updated == 0 {
+        return Err(ApiError::unauthorized("unauthorized"));
+    }
+
+    Ok(Json(HeartbeatResponse { expires_at }))
 }
 
 async fn change_password(

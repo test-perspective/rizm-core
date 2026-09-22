@@ -674,6 +674,26 @@ async fn create_wiki_page_tool_creates_page() {
 }
 
 #[test]
+fn tools_list_includes_move_tasks() {
+    let tools = crate::mcp_http::protocol::tools_list_result();
+    let move_tasks = tools
+        .get("tools")
+        .and_then(|t| t.as_array())
+        .expect("tools array")
+        .iter()
+        .find(|t| t.get("name").and_then(|n| n.as_str()) == Some("move_tasks"))
+        .expect("tools/list should expose move_tasks");
+    let required = move_tasks
+        .pointer("/inputSchema/required")
+        .and_then(|r| r.as_array())
+        .expect("required")
+        .iter()
+        .filter_map(|v| v.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(required, vec!["taskKeys"]);
+}
+
+#[test]
 fn tools_list_includes_update_wiki_page() {
     let tools = crate::mcp_http::protocol::tools_list_result();
     let names: Vec<&str> = tools

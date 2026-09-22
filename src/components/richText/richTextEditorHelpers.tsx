@@ -1,10 +1,11 @@
 import type { PartialBlock } from '@blocknote/core';
 import { BlockNoteSchema, defaultInlineContentSpecs } from '@blocknote/core';
-import { createReactInlineContentSpec } from '@blocknote/react';
+import { createReactInlineMathSpec, createReactMathBlockSpec } from '@blocknote/math-block';
 import type { Entity } from '../../types';
 import { sanitizeBlockNoteBlocksForEditor } from '../../utils/sanitizeBlockNoteForEditor';
 import { getBackendUrl, isBackendEnabled } from '../../utils/storage';
 import { createStatusInlineSpec } from './StatusInline';
+import { createTaskLinkInlineSpec } from './TaskLinkInline';
 
 /** Convert a data URL or blob URL to a File for upload. */
 async function urlToFile(url: string, defaultName = 'image.png'): Promise<File | null> {
@@ -117,63 +118,7 @@ export type TaskLinkSchemaParams = {
 
 export function createTaskLinkSchema(params: TaskLinkSchemaParams) {
   const { entitiesRef, onEntityClickRef, isMountedRef } = params;
-  const taskLinkSpec = createReactInlineContentSpec(
-    {
-      type: 'taskLink',
-      propSchema: { taskKey: { default: '' } },
-      content: 'none',
-    },
-    {
-      render: (props) => {
-        const taskKey = props.inlineContent.props.taskKey;
-        const linkedEntity = entitiesRef.current.find((e) => {
-          const tk = typeof e.properties?.taskKey === 'string' ? e.properties.taskKey.trim() : '';
-          return tk === taskKey;
-        });
-
-        const handleMouseDown = (e: React.MouseEvent) => {
-          e.preventDefault();
-          e.stopPropagation();
-          e.nativeEvent.stopImmediatePropagation();
-          requestAnimationFrame(() => {
-            setTimeout(() => {
-              if (!isMountedRef.current) return;
-              if (linkedEntity && onEntityClickRef.current) {
-                try {
-                  onEntityClickRef.current(linkedEntity);
-                } catch {
-                  // ignore
-                }
-              }
-            }, 0);
-          });
-        };
-
-        const handleClick = (e: React.MouseEvent) => {
-          e.preventDefault();
-          e.stopPropagation();
-          e.nativeEvent.stopImmediatePropagation();
-        };
-
-        return (
-          <span
-            data-keel-task-link
-            onMouseDown={handleMouseDown}
-            onClick={handleClick}
-            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-mono ${
-              linkedEntity
-                ? 'text-violet-400 hover:text-violet-300 hover:bg-violet-500/20 cursor-pointer underline'
-                : 'text-zinc-500 line-through'
-            }`}
-            title={linkedEntity ? `Click to open: ${taskKey}` : `Deleted entity: ${taskKey}`}
-            style={{ userSelect: 'none', pointerEvents: 'auto' }}
-          >
-            {taskKey}
-          </span>
-        );
-      },
-    }
-  );
+  const taskLinkSpec = createTaskLinkInlineSpec({ entitiesRef, onEntityClickRef, isMountedRef });
 
   return BlockNoteSchema.create({
     inlineContentSpecs: {
@@ -181,5 +126,11 @@ export function createTaskLinkSchema(params: TaskLinkSchemaParams) {
       taskLink: taskLinkSpec,
       status: createStatusInlineSpec(),
     },
+  }).extend({
+    // Math lives in an optional package, so it has to be opted into the schema.
+    // Both the editor and the headless editor used to seed Yjs go through this
+    // function, so they cannot drift apart.
+    blockSpecs: { mathBlock: createReactMathBlockSpec() },
+    inlineContentSpecs: { math: createReactInlineMathSpec() },
   });
 }

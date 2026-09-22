@@ -100,9 +100,19 @@ export function useWikiSync(params: WikiSyncParams) {
 
       setLastSavedDocById((prev) => ({ ...prev, [pageId]: remote.doc }));
       setLastSavedTitleById((prev) => ({ ...prev, [pageId]: remote.title }));
-      if (remote.crdtBlob !== undefined) {
-        setCrdtBlobById((prev) => ({ ...prev, [pageId]: remote.crdtBlob }));
-      }
+      // REQ-319: the server omits crdtBlob once it drops the collab row (cross-project
+      // move, MCP/AI doc replacement). Treat the response as authoritative and forget the
+      // cached blob, otherwise the editor keeps rendering — and re-saving — stale content.
+      setCrdtBlobById((prev) => {
+        if (prev[pageId] === remote.crdtBlob) return prev;
+        const next = { ...prev };
+        if (remote.crdtBlob === undefined) {
+          delete next[pageId];
+        } else {
+          next[pageId] = remote.crdtBlob;
+        }
+        return next;
+      });
       lastSyncedUpdatedAtByIdRef.current[pageId] = remote.updatedAt;
     },
     [

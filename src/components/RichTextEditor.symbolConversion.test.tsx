@@ -5,6 +5,7 @@
 import { act } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRoot } from 'react-dom/client';
+import * as Y from 'yjs';
 import { RichTextEditor } from './RichTextEditor';
 import type { ReactNode } from 'react';
 
@@ -58,18 +59,18 @@ vi.mock('./richText/StatusDialog', () => ({
   StatusDialog: () => null,
 }));
 
-vi.mock('@blocknote/core', () => ({
-  BlockNoteSchema: { create: () => ({}) },
-  defaultInlineContentSpecs: {},
-}));
-
+// @blocknote/core is intentionally NOT mocked: BlockNoteSchema and the default specs
+// are pure data, and stubbing them would let a BlockNote upgrade change the schema API
+// without any test noticing.
 vi.mock('@blocknote/core/extensions', () => ({
   filterSuggestionItems: (items: unknown[]) => items,
 }));
 
+// A real Y.XmlFragment: BlockNote's collaboration options are typed against it, and a
+// stub would hide signature changes introduced by a BlockNote upgrade.
 const mockCollaboration = {
   provider: {},
-  fragment: {},
+  fragment: new Y.Doc().getXmlFragment('document-store'),
   user: { name: 'Test', color: '#000' },
 };
 

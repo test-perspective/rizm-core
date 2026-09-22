@@ -10,6 +10,7 @@ import {
   createProjectAction,
   deleteProjectAction,
   modifyEntityAction,
+  moveTasksAction,
   reloadAction,
   removeEntityAction,
   renameProjectAction,
@@ -18,6 +19,7 @@ import {
   updateSchemaAction,
   updateViewConfigAction,
 } from './useKeel/actions';
+import type { ManifestWriteOptions } from './useKeel/actions';
 
 export type RefreshActiveProjectOptions = {
   bypassProjectRefreshBlock?: boolean;
@@ -210,9 +212,23 @@ export const useKeel = () => {
     });
   }, [activeProjectId, refreshActiveProject]);
 
+  const moveTasksToProject = useCallback(
+    (destinationProjectId: string, taskIds: string[]) =>
+      moveTasksAction({
+        activeProjectId,
+        destinationProjectId,
+        taskIds,
+        setActiveProject,
+        entityEtagByIdRef,
+        pendingCreatedEntitiesRef,
+        refreshActiveProject,
+      }),
+    [activeProjectId, refreshActiveProject]
+  );
+
   const updateSchema = useCallback((
     newManifest: ProjectManifest,
-    options?: {
+    options?: ManifestWriteOptions & {
       removeEntityProperty?: { entityId: string; propName: string };
     }
   ) => {
@@ -226,7 +242,10 @@ export const useKeel = () => {
     });
   }, [activeProjectId, refreshActiveProject]);
 
-  const updateManifest = useCallback((newManifest: ProjectManifest, options?: PutManifestOptions) => {
+  const updateManifest = useCallback((
+    newManifest: ProjectManifest,
+    options?: PutManifestOptions & ManifestWriteOptions
+  ) => {
     updateManifestAction({
       activeProject,
       activeProjectId,
@@ -335,6 +354,7 @@ export const useKeel = () => {
     addEntity,
     modifyEntity,
     removeEntity,
+    moveTasksToProject,
     updateSchema,
     updateManifest,
     transformManifest,

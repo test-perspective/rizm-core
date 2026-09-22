@@ -3,6 +3,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRoot } from 'react-dom/client';
 import type { Entity, PropertyDefinition } from '../types';
 import { EntityDetailPanel } from './EntityDetailPanel';
+import { TaskMoveContext } from './tasks/taskMoveContext';
 
 const mockHandleClose = vi.fn();
 const mockSetSchemaOpen = vi.fn();
@@ -329,6 +330,37 @@ describe('EntityDetailPanel', () => {
     await act(async () => {
       document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
     });
+
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
+  it('offers Move to project only when a move handler is available', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<EntityDetailPanel {...baseProps} />);
+    });
+    expect(container.querySelector('[data-testid="entity-detail-move-to-project"]')).toBeNull();
+
+    const requestTaskMove = vi.fn();
+    await act(async () => {
+      root.render(
+        <TaskMoveContext.Provider value={requestTaskMove}>
+          <EntityDetailPanel {...baseProps} />
+        </TaskMoveContext.Provider>
+      );
+    });
+
+    const button = container.querySelector('[data-testid="entity-detail-move-to-project"]');
+    expect(button).not.toBeNull();
+    await act(async () => {
+      button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(requestTaskMove).toHaveBeenCalledWith([baseEntity]);
 
     act(() => {
       root.unmount();

@@ -1,9 +1,11 @@
 //! Wiki page subtree move (same or cross project): entities, collab state, attachment files, URL rewrites.
 //!
 //! Structure:
-//!   - `helpers`     : pure utilities (parent lookup, sort keys, URL rewrite, subtree collection)
-//!   - `reindex`     : transactional reindexing / sibling order application
-//!   - `attachments` : cross-project attachment file copy/delete
+//!   - `helpers` : pure utilities (parent lookup, sort keys, subtree collection)
+//!   - `reindex` : transactional reindexing / sibling order application
+//!
+//! Attachment blob relocation and URL rewriting are shared with the task mover
+//! in `super::entity_move_common`.
 //!
 //! The public entry point is `Db::move_wiki_page_subtree`, defined here.
 
@@ -15,17 +17,18 @@ use std::collections::{HashMap, HashSet};
 use super::Db;
 use crate::models::Entity;
 
-mod attachments;
 mod helpers;
 mod reindex;
 
 pub(super) const WIKI_ENTITY: &str = "wikiPage";
 pub(super) const ORDER_GAP: f64 = 1000.0;
 
-use attachments::{copy_attachment_files_for_wiki_subtree, delete_attachment_files_for_project};
+use super::entity_move_common::{
+    copy_attachment_files_for_entities, delete_attachment_files_for_project,
+    rewrite_project_in_attachment_urls, CopiedAttachmentsGuard,
+};
 use helpers::{
-    collect_subtree_ids, insert_root_into_sibling_order, parent_id_from_props,
-    rewrite_project_in_attachment_urls, wiki_sort_key,
+    collect_subtree_ids, insert_root_into_sibling_order, parent_id_from_props, wiki_sort_key,
 };
 use reindex::{apply_sibling_order, reindex_siblings_under_parent};
 
@@ -120,13 +123,14 @@ impl Db {
         }
 
         // Pre-copy attachment files before DB transaction (cross-project only).
-        copy_attachment_files_for_wiki_subtree(
+        // Rolled back automatically if anything below fails before the commit.
+        let mut copied_attachments = CopiedAttachmentsGuard::new(copy_attachment_files_for_entities(
             db_path,
             source_project_id,
             dest_project_id,
             &wiki_by_id_source,
             &subtree_ids,
-        )?;
+        )?);
 
         let now = crate::time::now_ms();
         let cross_project = dest_project_id != source_project_id;
@@ -216,12 +220,15 @@ impl Db {
                 if proj_row != source_project_id {
                     anyhow::bail!("entity not in source project");
                 }
+                // Attachment URLs embed the owning project id at any nesting depth
+                // (the body `doc`, `comments`, ...), so rewrite the whole properties blob.
+                let rewritten = rewrite_project_in_attachment_urls(
+                    &props_json,
+                    source_project_id,
+                    dest_project_id,
+                );
                 let mut props: Map<String, serde_json::Value> =
-                    serde_json::from_str(&props_json).context("deserialize")?;
-                if let Some(serde_json::Value::String(doc)) = props.get_mut("doc") {
-                    *doc =
-                        rewrite_project_in_attachment_urls(doc, source_project_id, dest_project_id);
-                }
+                    serde_json::from_str(&rewritten).context("deserialize")?;
                 props.insert(
                     "updatedBy".to_string(),
                     serde_json::Value::String(updated_by.to_string()),
@@ -233,32 +240,17 @@ impl Db {
                 )
                 .context("update entity project")?;
 
-                let collab: Option<(String, Vec<u8>)> = tx
-                    .query_row(
-                        "SELECT doc_json, crdt_blob FROM wiki_collab_states WHERE project_id = ?1 AND page_id = ?2",
-                        params![source_project_id, id],
-                        |r| Ok((r.get(0)?, r.get(1)?)),
-                    )
-                    .optional()
-                    .context("select collab")?;
-                if let Some((doc_json, blob)) = collab {
-                    let new_doc = rewrite_project_in_attachment_urls(
-                        &doc_json,
-                        source_project_id,
-                        dest_project_id,
-                    );
-                    tx.execute(
-                        "DELETE FROM wiki_collab_states WHERE project_id = ?1 AND page_id = ?2",
-                        params![source_project_id, id],
-                    )
-                    .context("delete old collab")?;
-                    tx.execute(
-                        "INSERT INTO wiki_collab_states (project_id, page_id, updated_at, doc_json, crdt_blob)
-                         VALUES (?1, ?2, ?3, ?4, ?5)",
-                        params![dest_project_id, id, now, new_doc, blob],
-                    )
-                    .context("insert new collab")?;
-                }
+                // REQ-319: the Yjs blob is opaque here, so its embedded attachment URLs
+                // cannot be rewritten. Drop the collab row rather than carrying a stale
+                // blob over: the editor prefers the blob over `doc` when rendering, so it
+                // would keep showing (and re-saving) source-project URLs whose files are
+                // deleted right after this move. The next open re-seeds from `doc`.
+                // Same reasoning as `super::wiki_write::replace_wiki_doc_for_project`.
+                tx.execute(
+                    "DELETE FROM wiki_collab_states WHERE project_id = ?1 AND page_id = ?2",
+                    params![source_project_id, id],
+                )
+                .context("delete collab state")?;
             }
         }
 
@@ -321,6 +313,7 @@ impl Db {
         .context("bump meta version")?;
 
         tx.commit().context("commit move tx")?;
+        copied_attachments.disarm();
 
         if cross_project {
             delete_attachment_files_for_project(

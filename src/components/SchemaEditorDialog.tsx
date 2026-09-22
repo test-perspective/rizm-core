@@ -146,7 +146,7 @@ export function SchemaEditorDialog({
 
         <div className="p-6 space-y-6 overflow-y-auto flex-1">
           <div className="text-sm text-amber-200 bg-amber-950/40 border border-amber-900 rounded-md p-3">
-            Deleting fields is dangerous. The corresponding key will be removed from existing data (Entity.properties), and view settings will be automatically adjusted.
+            Deleting fields is dangerous. The field stops being shown and editable everywhere, and view settings are adjusted automatically. Values already stored on existing records (Entity.properties) are kept, so re-adding a field with the same name brings them back.
           </div>
 
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">

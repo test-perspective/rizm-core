@@ -22,13 +22,22 @@ const page = (overrides?: Partial<Entity>): Entity => ({
   ...overrides,
 });
 
-function Harness({ pages, selectedPageId }: { pages: Entity[]; selectedPageId: string | null }) {
+function Harness({
+  pages,
+  selectedPageId,
+  initialCrdtBlobById = {},
+}: {
+  pages: Entity[];
+  selectedPageId: string | null;
+  initialCrdtBlobById?: Record<string, number[] | undefined>;
+}) {
   const [mode, setMode] = useState<'edit' | 'read'>('read');
   const [docById, setDocById] = useState<Record<string, string | undefined>>({});
   const [lastSavedDocById, setLastSavedDocById] = useState<Record<string, string | undefined>>({});
   const [titleById, setTitleById] = useState<Record<string, string>>({});
   const [lastSavedTitleById, setLastSavedTitleById] = useState<Record<string, string | undefined>>({});
-  const [crdtBlobById, setCrdtBlobById] = useState<Record<string, number[] | undefined>>({});
+  const [crdtBlobById, setCrdtBlobById] =
+    useState<Record<string, number[] | undefined>>(initialCrdtBlobById);
   const [loadingDocId, setLoadingDocId] = useState<string | null>(null);
   const [editorResetTokenById, setEditorResetTokenById] = useState<Record<string, number>>({});
   const [commentValues, setCommentValues] = useState<Record<string, any>>({});
@@ -155,6 +164,72 @@ describe('useWikiSync', () => {
     expect(container.firstElementChild?.getAttribute('data-doc')).toContain('Hello');
     expect(container.firstElementChild?.getAttribute('data-last-saved-doc')).toContain('Hello');
     expect(container.firstElementChild?.getAttribute('data-title')).toContain('Title');
+
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  // REQ-319: the server omits crdtBlob once it drops the collab row (cross-project move,
+  // MCP doc replacement). A stale cached blob would keep rendering the old body.
+  it('forgets the cached CRDT blob when the fetched page has none', async () => {
+    fetchWikiPages.mockResolvedValue([]);
+    fetchWikiPage.mockResolvedValue({
+      doc: '[{"id":"b1","type":"paragraph","content":[{"type":"text","text":"Fresh"}]}]',
+      title: 'Title',
+      updatedAt: 20,
+      comments: [],
+    });
+
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <Harness
+          pages={[page()]}
+          selectedPageId="page-1"
+          initialCrdtBlobById={{ 'page-1': [1, 2, 3] }}
+        />
+      );
+    });
+
+    expect(container.firstElementChild?.getAttribute('data-crdt')).toBe('{}');
+    expect(container.firstElementChild?.getAttribute('data-doc')).toContain('Fresh');
+
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it('keeps the CRDT blob the server returns', async () => {
+    fetchWikiPages.mockResolvedValue([]);
+    fetchWikiPage.mockResolvedValue({
+      doc: '[{"id":"b1","type":"paragraph","content":[{"type":"text","text":"Fresh"}]}]',
+      title: 'Title',
+      updatedAt: 20,
+      comments: [],
+      crdtBlob: [4, 5, 6],
+    });
+
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <Harness
+          pages={[page()]}
+          selectedPageId="page-1"
+          initialCrdtBlobById={{ 'page-1': [1, 2, 3] }}
+        />
+      );
+    });
+
+    expect(container.firstElementChild?.getAttribute('data-crdt')).toBe('{"page-1":[4,5,6]}');
 
     act(() => {
       root.unmount();

@@ -30,11 +30,15 @@ export function addPropertyToEntity(
   manifest: ProjectManifest,
   entityId: string,
   viewId: string | undefined,
-  prop: PropertyDefinition
+  prop: PropertyDefinition,
+  opts?: { existingOk?: boolean }
 ): ProjectManifest {
   const entities = manifest.entities.map((e) => {
     if (e.id !== entityId) return e;
     if (e.properties.some((p) => p.name === prop.name)) {
+      // `existingOk` is for replaying the intent onto a newer server manifest that
+      // already has it (see putManifestWith412Retries).
+      if (opts?.existingOk) return e;
       throw new Error(`Property '${prop.name}' already exists on entity '${entityId}'`);
     }
     return { ...e, properties: [...e.properties, prop] };
@@ -61,7 +65,8 @@ export function addPropertyToEntity(
 export function removePropertyFromEntity(
   manifest: ProjectManifest,
   entityId: string,
-  propName: string
+  propName: string,
+  opts?: { missingOk?: boolean }
 ): ProjectManifest {
   const entityBefore = manifest.entities.find((e) => e.id === entityId);
   if (!entityBefore) throw new Error(`Entity '${entityId}' not found`);
@@ -71,6 +76,9 @@ export function removePropertyFromEntity(
   }
 
   if (!entityBefore.properties.some((p) => p.name === propName)) {
+    // `missingOk` is for replaying the intent onto a newer server manifest that no
+    // longer has it (see putManifestWith412Retries).
+    if (opts?.missingOk) return manifest;
     // Treat as a hard error: the UI and manifest are out of sync.
     throw new Error(`Property '${propName}' not found on entity '${entityId}'`);
   }

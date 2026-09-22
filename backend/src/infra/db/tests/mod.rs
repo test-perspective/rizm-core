@@ -36,10 +36,12 @@ pub(super) fn manifest_named(name: &str) -> ProjectManifest {
 }
 
 mod concurrent_entity_write;
+mod manifest_etag;
 mod manifest_history;
 mod project_key_lookup;
 mod scm;
 mod seed;
 mod task_keys;
+mod task_move;
 mod wiki_collab;
 mod wiki_move;

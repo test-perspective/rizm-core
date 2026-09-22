@@ -2,8 +2,12 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { BlockNoteView } from '@blocknote/ariakit';
 import { useCreateBlockNote, useEditorChange } from '@blocknote/react';
 import { getDefaultReactSlashMenuItems, SuggestionMenuController } from '@blocknote/react';
-import type { PartialBlock } from '@blocknote/core';
+import type { BlockChangeSource, PartialBlock } from '@blocknote/core';
+import { combineByGroup } from '@blocknote/core';
+import { getMathSlashMenuItems } from '@blocknote/math-block';
 import { filterSuggestionItems } from '@blocknote/core/extensions';
+import { withCollaboration } from '@blocknote/core/yjs';
+import type { Awareness } from 'y-protocols/awareness';
 import type { AttachmentMeta, Entity } from '../types';
 import { convertBlockContent } from './richTextTaskLinking';
 import { replaceTrailingSymbols } from './richTextSymbolSubstitutions';
@@ -135,22 +139,26 @@ export function RichTextEditor({
   );
 
   const createBlockNoteOptions = useMemo(
-    () =>
-      ({
+    () => {
+      const base = {
         initialContent,
         schema,
-        ...(collaboration
-          ? {
-              collaboration: {
-                provider: collaboration.provider as any,
-                fragment: collaboration.fragment as any,
-                user: collaboration.user,
-              },
-            }
-          : {}),
         uploadFile: attachmentProjectId && attachmentEntityPk ? uploadFile : undefined,
         pasteHandler,
-      }) as any,
+      };
+      if (!collaboration) return base;
+      // BlockNote 0.52 moved collaboration out of the plain editor options; it is now
+      // applied by wrapping them with withCollaboration.
+      return withCollaboration({
+        ...base,
+        collaboration: {
+          // Only the nullability of `awareness` differs between Hocuspocus and BlockNote.
+          provider: collaboration.provider as { awareness?: Awareness },
+          fragment: collaboration.fragment,
+          user: collaboration.user,
+        },
+      });
+    },
     [
       initialContent,
       schema,
@@ -213,13 +221,19 @@ export function RichTextEditor({
   const getSlashMenuItems = useCallback(
     async (query: string) => {
       const defaultItems = getDefaultReactSlashMenuItems(editor);
+      // Math specs live in an optional package, so their items are opt-in. This
+      // returns nothing unless the specs are in the editor's schema.
+      const mathItems = getMathSlashMenuItems(editor);
       const statusItem = {
         title: 'Status',
         onItemClick: () => setStatusDialogOpen(true),
         aliases: ['status', 'pill'],
         group: 'Other',
       };
-      return filterSuggestionItems([...defaultItems, statusItem], query);
+      return filterSuggestionItems(
+        combineByGroup(defaultItems, mathItems, [statusItem]),
+        query
+      );
     },
     [editor, setStatusDialogOpen]
   );
@@ -244,7 +258,7 @@ export function RichTextEditor({
         if (!block || seen.has(block.id)) continue;
         seen.add(block.id);
 
-        const sourceType = (change as { source?: { type?: string } }).source?.type ?? 'unknown';
+        const sourceType: BlockChangeSource['type'] | 'unknown' = change.source?.type ?? 'unknown';
         // REQ-232: Skip yjs-remote changes. Processing remote changes and calling updateBlock
         // can overwrite local typing with stale remote content, causing characters to disappear.
         if (sourceType === 'yjs-remote') continue;
@@ -304,13 +318,11 @@ export function RichTextEditor({
     if (debounceTimer.current) globalThis.clearTimeout(debounceTimer.current);
 
     const changes = getChanges?.() ?? [];
-    const hasPaste = changes.some(
-      (c: { source?: { type?: string } }) => c?.source?.type === 'paste'
-    );
+    const hasPaste = changes.some((c) => c?.source?.type === ('paste' satisfies BlockChangeSource['type']));
     const nextDoc = JSON.stringify(changedEditor.document);
     if (collaboration && changes.length > 0) {
       const hasLocalChange = changes.some(
-        (c: { source?: { type?: string } }) => c?.source?.type !== 'yjs-remote'
+        (c) => c?.source?.type !== ('yjs-remote' satisfies BlockChangeSource['type'])
       );
       if (collabSnapshotRef.current == null) {
         collabSnapshotRef.current = nextDoc;

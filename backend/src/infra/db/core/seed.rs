@@ -36,7 +36,7 @@ pub(crate) fn seed_if_empty(conn: &mut rusqlite::Connection) -> anyhow::Result<(
         let m = default_manifest();
         let json = serde_json::to_string(&m).context("serialize default manifest")?;
         conn.execute(
-            "INSERT INTO manifests (project_id, json) VALUES (?1, ?2)",
+            "INSERT INTO manifests (project_id, json, etag) VALUES (?1, ?2, lower(hex(randomblob(16))))",
             params![DEFAULT_PROJECT_ID, json],
         )
         .context("insert default manifest")?;

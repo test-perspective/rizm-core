@@ -54,11 +54,9 @@ vi.mock('./richText/StatusDialog', () => ({
   StatusDialog: () => null,
 }));
 
-vi.mock('@blocknote/core', () => ({
-  BlockNoteSchema: { create: () => ({}) },
-  defaultInlineContentSpecs: {},
-}));
-
+// @blocknote/core is intentionally NOT mocked: BlockNoteSchema and the default specs
+// are pure data, and stubbing them would let a BlockNote upgrade change the schema API
+// without any test noticing.
 vi.mock('@blocknote/core/extensions', () => ({
   filterSuggestionItems: (items: unknown[]) => items,
 }));

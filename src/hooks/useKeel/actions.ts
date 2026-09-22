@@ -8,6 +8,7 @@ export {
   updateViewConfigAction,
   applyServerEntityAction,
 } from './entityManifestActions';
+export type { ManifestWriteOptions } from './entityManifestActions';
 
 export {
   createProjectAction,
@@ -15,3 +16,5 @@ export {
   renameProjectAction,
   deleteProjectAction,
 } from './projectActions';
+
+export { moveTasksAction } from './taskMoveAction';

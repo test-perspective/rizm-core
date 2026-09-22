@@ -263,8 +263,8 @@ impl Db {
         let manifest_json =
             serde_json::to_string(&project.config.manifest).context("serialize manifest")?;
         tx.execute(
-            "INSERT INTO manifests (project_id, json) VALUES (?1, ?2)
-             ON CONFLICT(project_id) DO UPDATE SET json = excluded.json",
+            "INSERT INTO manifests (project_id, json, etag) VALUES (?1, ?2, lower(hex(randomblob(16))))
+             ON CONFLICT(project_id) DO UPDATE SET json = excluded.json, etag = excluded.etag",
             params![project.id, manifest_json],
         )
         .with_context(|| format!("upsert manifest {}", project.id))?;

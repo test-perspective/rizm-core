@@ -1,13 +1,17 @@
 import { useCallback, useState } from 'react';
-import { GridRow } from '@mui/x-data-grid-premium';
+import { GridRow, useGridApiRef } from '@mui/x-data-grid-premium';
 import type { GridRowProps } from '@mui/x-data-grid-premium';
 import type { Entity, ViewConfig } from '../../types';
+import { useTaskMove } from '../tasks/taskMoveContext';
+import { isTaskEntity } from '../tasks/taskMoveHelpers';
+import { resolveRowActionTargets } from './tableMoveSelection';
 
 type UseTableContextMenuParams = {
   entities: Entity[];
   view: ViewConfig;
   projectId: string;
   onEntityClick?: (entity: Entity) => void;
+  apiRef?: ReturnType<typeof useGridApiRef>;
 };
 
 function buildDetailPath(projectId: string, viewId: string, entityId: string): string {
@@ -19,13 +23,17 @@ export function useTableContextMenu({
   view,
   projectId,
   onEntityClick,
+  apiRef,
 }: UseTableContextMenuParams) {
+  const requestTaskMove = useTaskMove();
   const [contextMenuAnchor, setContextMenuAnchor] = useState<{ x: number; y: number } | null>(null);
   const [contextMenuEntity, setContextMenuEntity] = useState<Entity | null>(null);
+  const [moveTargets, setMoveTargets] = useState<Entity[]>([]);
 
   const closeContextMenu = useCallback(() => {
     setContextMenuAnchor(null);
     setContextMenuEntity(null);
+    setMoveTargets([]);
   }, []);
 
   const RowWithContextMenu = useCallback(
@@ -35,10 +43,15 @@ export function useTableContextMenu({
         e.preventDefault();
         setContextMenuAnchor({ x: e.clientX, y: e.clientY });
         setContextMenuEntity(entity ?? null);
+        // Read the live cell selection now: it is cleared as the menu takes focus.
+        const selectedCells = apiRef?.current?.getSelectedCellsAsArray?.() ?? [];
+        setMoveTargets(
+          resolveRowActionTargets(selectedCells, entity ?? null, entities).filter(isTaskEntity)
+        );
       };
       return <GridRow {...props} onContextMenu={handleContextMenu} />;
     },
-    [entities]
+    [entities, apiRef]
   );
 
   const handleCopyTaskKey = useCallback(async () => {
@@ -80,6 +93,13 @@ export function useTableContextMenu({
     closeContextMenu();
   }, [contextMenuEntity, onEntityClick, closeContextMenu]);
 
+  const handleMoveToProject = useCallback(() => {
+    if (requestTaskMove && moveTargets.length > 0) {
+      requestTaskMove(moveTargets);
+    }
+    closeContextMenu();
+  }, [requestTaskMove, moveTargets, closeContextMenu]);
+
   return {
     contextMenuAnchor,
     contextMenuEntity,
@@ -88,6 +108,8 @@ export function useTableContextMenu({
     handleCopyTaskKey,
     handleCopyDetailUrl,
     handleContextMenuOpenDetail,
+    handleMoveToProject: requestTaskMove ? handleMoveToProject : undefined,
+    moveTargetCount: moveTargets.length,
   };
 }
 

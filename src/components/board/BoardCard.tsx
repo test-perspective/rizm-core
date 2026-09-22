@@ -3,7 +3,7 @@ import type { Entity, PropertyDefinition, ScmBranchInfo, ScmProjectConfig, ScmPu
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Menu, MenuItem } from '@mui/material';
-import { MoreVertical, ArrowUpToLine, ArrowDownToLine, GripVertical } from 'lucide-react';
+import { MoreVertical, ArrowUpToLine, ArrowDownToLine, FolderInput, GripVertical } from 'lucide-react';
 import { CreateBranchDialog } from '../scm/CreateBranchDialog';
 import { CreatePullRequestDialog } from '../scm/CreatePullRequestDialog';
 import {
@@ -14,6 +14,7 @@ import {
 } from '../../utils/scm';
 import { CardContent } from './BoardCardContent';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { useTaskMove } from '../tasks/taskMoveContext';
 export { CardContent } from './BoardCardContent';
 
 export const SortableCard = ({
@@ -61,6 +62,7 @@ export const SortableCard = ({
   } = useSortable({ id: entity.id });
 
   const isMobile = useIsMobile();
+  const requestTaskMove = useTaskMove();
 
   const [contextMenuAnchor, setContextMenuAnchor] = useState<{ x: number; y: number } | null>(null);
   const skipClickRef = useRef(false);
@@ -186,7 +188,7 @@ export const SortableCard = ({
             <MoreVertical className="w-4 h-4" />
           </button>
           {moveMenuOpen && (
-            <div className="absolute right-0 mt-1 w-36 bg-zinc-900 border border-zinc-800 rounded-lg shadow-lg z-50">
+            <div className="absolute right-0 mt-1 w-44 bg-zinc-900 border border-zinc-800 rounded-lg shadow-lg z-50">
               <div className="py-1">
                 <button
                   onClick={(e) => {
@@ -214,6 +216,21 @@ export const SortableCard = ({
                   <ArrowDownToLine className="w-3 h-3 shrink-0" />
                   Move to bottom
                 </button>
+                {requestTaskMove && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      requestTaskMove([entity]);
+                      setMoveMenuOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs text-white hover:bg-zinc-800 transition-colors flex items-center gap-2"
+                    type="button"
+                    data-testid="board-card-move-to-project"
+                  >
+                    <FolderInput className="w-3 h-3 shrink-0" />
+                    Move to project…
+                  </button>
+                )}
               </div>
             </div>
           )}

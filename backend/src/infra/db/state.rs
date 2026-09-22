@@ -149,8 +149,8 @@ impl Db {
                 .context("prepare insert project")?;
             let mut upsert_manifest = tx
                 .prepare(
-                    "INSERT INTO manifests (project_id, json) VALUES (?1, ?2)
-                     ON CONFLICT(project_id) DO UPDATE SET json = excluded.json",
+                    "INSERT INTO manifests (project_id, json, etag) VALUES (?1, ?2, lower(hex(randomblob(16))))
+                     ON CONFLICT(project_id) DO UPDATE SET json = excluded.json, etag = excluded.etag",
                 )
                 .context("prepare upsert manifest")?;
             let mut insert_entity = tx
